@@ -1,61 +1,62 @@
 # =============================================================================
-# CATE estimation: FusionForest (RCT + OS) vs. T-learner (RCT only)
+# CATE estimation: FusionForest (RCT + OS) vs. BART T-learner (RCT only)
 #
 # Data-generating process
 # -----------------------
 #   y = m0(X) + A * tau(X) + A * (1-S) * c(X) + sigma * eps
 #
-#   m0(X)   = 2*X1 - X2 + 0.5*X3          (prognostic function)
-#   tau(X)  = X1 + 0.5*X2^2               (true CATE — nonlinear)
-#   c(X)    = -X1 + X3                     (confounding, OS treated only)
+#   m0(X)   = 2*X1 - X2 + 0.5*X3        (prognostic function)
+#   tau(X)  = X1 + 0.5*X2^2             (true CATE — nonlinear)
+#   c(X)    = -X1 + X3                  (confounding, OS treated only)
 #
 # Source coding: S = 1 (RCT), S = 0 (OS)
+#
+# Requires:
+#   devtools::load_all()   for FusionForest
+#   install.packages("BART")
 # =============================================================================
 
 library(FusionForests)
+library(BART)
 
 set.seed(42)
 
 # ---- Dimensions -------------------------------------------------------
-n_rct  <- 200   # RCT sample size
-n_os   <- 400   # OS sample size (larger, confounded)
-n_test <- 500   # test set (true CATE known)
+n_rct  <- 200
+n_os   <- 400
+n_test <- 500
 p      <- 5
 
-# ---- Covariate draws --------------------------------------------------
+# ---- Covariates -------------------------------------------------------
 X_rct  <- matrix(rnorm(n_rct * p), n_rct,  p)
 X_os   <- matrix(rnorm(n_os  * p), n_os,   p)
 X_test <- matrix(rnorm(n_test * p), n_test, p)
 
 # ---- True functions ---------------------------------------------------
 m0   <- function(X) 2*X[,1] - X[,2] + 0.5*X[,3]
-tau  <- function(X) X[,1] + 0.5*X[,2]^2          # true CATE
-conf <- function(X) -X[,1] + X[,3]               # confounding
+tau  <- function(X) X[,1] + 0.5*X[,2]^2          # true CATE (nonlinear)
+conf <- function(X) -X[,1] + X[,3]               # confounding (OS only)
 
 true_cate_test <- tau(X_test)
 
 # ---- Treatment assignment ---------------------------------------------
-# RCT: balanced randomisation
-A_rct <- rbinom(n_rct, 1, 0.5)
-
-# OS: confounded — higher treatment probability for X1 > 0
-ps_os <- plogis(X_os[,1])
-A_os  <- rbinom(n_os, 1, ps_os)
+A_rct <- rbinom(n_rct, 1, 0.5)                    # RCT: balanced
+A_os  <- rbinom(n_os,  1, plogis(X_os[,1]))       # OS: confounded
 
 # ---- Outcomes ---------------------------------------------------------
 sigma <- 1.0
 
-y_rct <- m0(X_rct) + A_rct * tau(X_rct)                          + rnorm(n_rct, 0, sigma)
-y_os  <- m0(X_os)  + A_os  * tau(X_os)  + A_os * conf(X_os)     + rnorm(n_os,  0, sigma)
+y_rct <- m0(X_rct) + A_rct * tau(X_rct)                       + rnorm(n_rct, 0, sigma)
+y_os  <- m0(X_os)  + A_os  * tau(X_os) + A_os * conf(X_os)   + rnorm(n_os,  0, sigma)
 
-# ---- Combine into a single training set (RCT first) ------------------
-X_train   <- rbind(X_rct, X_os)
-A_train   <- c(A_rct, A_os)
-S_train   <- c(rep(1L, n_rct), rep(0L, n_os))   # 1 = RCT, 0 = OS
-y_train   <- c(y_rct, y_os)
+# ---- Combined training set (RCT first) --------------------------------
+X_train <- rbind(X_rct, X_os)
+A_train <- c(A_rct, A_os)
+S_train <- c(rep(1L, n_rct), rep(0L, n_os))
+y_train <- c(y_rct, y_os)
 
 # =============================================================================
-# Model 1: FusionForest (RCT + OS)
+# Model 1: FusionForest — RCT + OS, three-forest data fusion
 # =============================================================================
 cat("Fitting FusionForest (RCT + OS)...\n")
 
@@ -68,7 +69,7 @@ fit_ff <- FusionForest(
   X_test_control            = X_test,
   X_test_treat              = X_test,
   treatment_indicator_test  = rep(1L, n_test),
-  source_indicator_test     = rep(1L, n_test),   # treat test obs as RCT
+  source_indicator_test     = rep(1L, n_test),
   N_post = 1000, N_burn = 500,
   verbose = FALSE
 )
@@ -77,31 +78,45 @@ cate_ff   <- fit_ff$test_predictions_treat
 rmse_ff   <- sqrt(mean((cate_ff - true_cate_test)^2))
 
 # =============================================================================
-# Model 2: T-learner on RCT only (linear, to keep it simple)
+# Model 2: BART T-learner — RCT only, standard BART priors
 #
-# Fit two OLS models on treated and control RCT observations separately.
-# CATE = mu_1(X) - mu_0(X)
+# Two separate BART forests fitted on the treated and control RCT arms.
+# CATE(x) = E[Y(1)|X=x] - E[Y(0)|X=x]
+#          = mu_1(x) - mu_0(x)
+#
+# This is the equivalent of CausalShrinkageForest with standard (non-horseshoe)
+# BART priors, using only the RCT data.
 # =============================================================================
-cat("Fitting T-learner (RCT only, linear)...\n")
+cat("Fitting BART T-learner (RCT only)...\n")
 
-rct_df  <- as.data.frame(X_rct)
-names(rct_df) <- paste0("V", seq_len(p))
-rct_df$y <- y_rct
-rct_df$A <- A_rct
+rct_ctrl_idx <- which(A_rct == 0)
+rct_trt_idx  <- which(A_rct == 1)
 
-fit_t1   <- lm(y ~ ., data = rct_df[rct_df$A == 1, setdiff(names(rct_df), "A")])
-fit_t0   <- lm(y ~ ., data = rct_df[rct_df$A == 0, setdiff(names(rct_df), "A")])
+fit_ctrl <- wbart(
+  x.train = X_rct[rct_ctrl_idx, ],
+  y.train = y_rct[rct_ctrl_idx],
+  x.test  = X_test,
+  nskip   = 500,
+  ndpost  = 1000,
+  printevery = 0L
+)
 
-test_df        <- as.data.frame(X_test)
-names(test_df) <- paste0("V", seq_len(p))
+fit_trt <- wbart(
+  x.train = X_rct[rct_trt_idx, ],
+  y.train = y_rct[rct_trt_idx],
+  x.test  = X_test,
+  nskip   = 500,
+  ndpost  = 1000,
+  printevery = 0L
+)
 
-cate_tl  <- predict(fit_t1, newdata = test_df) - predict(fit_t0, newdata = test_df)
-rmse_tl  <- sqrt(mean((cate_tl - true_cate_test)^2))
+cate_tl   <- fit_trt$yhat.test.mean - fit_ctrl$yhat.test.mean
+rmse_tl   <- sqrt(mean((cate_tl - true_cate_test)^2))
 
 # =============================================================================
 # Results
 # =============================================================================
 cat("\n===== CATE RMSE on test set =====\n")
-cat(sprintf("  FusionForest (RCT + OS) : %.4f\n", rmse_ff))
-cat(sprintf("  T-learner   (RCT only)  : %.4f\n", rmse_tl))
-cat(sprintf("  Ratio (TL / FF)         : %.2fx\n", rmse_tl / rmse_ff))
+cat(sprintf("  FusionForest (RCT + OS)      : %.4f\n", rmse_ff))
+cat(sprintf("  BART T-learner (RCT only)    : %.4f\n", rmse_tl))
+cat(sprintf("  Ratio (T-learner / FF)       : %.2fx\n", rmse_tl / rmse_ff))

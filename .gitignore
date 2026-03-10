@@ -37,3 +37,4 @@ src/RcppExports.cpp
 docs/
 
 # testthat output
+tests/testthat/_snaps/
