@@ -1,0 +1,30 @@
+Package: FusionForests
+Type: Package
+Title: Bayesian Tree Ensembles for Data Fusion and Causal Inference
+Version: 1.0.0
+Date: 2025-11-03 
+Authors@R: c(person("Tijn", "Jacobs", role = c("aut", "cre"), 
+                    email = "t.jacobs@vu.nl", 
+                    comment = c(ORCID = "0009-0003-6188-9296")))
+Maintainer: Tijn Jacobs <t.jacobs@vu.nl>
+Description: Bayesian tree ensemble models for data fusion and causal inference.
+  The flagship model FusionForest combines data from a randomised controlled
+  trial and an observational study using three separate tree forests with a
+  commensurate prior for adaptive borrowing. Also includes models for
+  single-study causal inference and survival analysis.
+URL: https://github.com/tijn-jacobs/FusionForests
+BugReports: https://github.com/tijn-jacobs/FusionForests/issues
+License: MIT + file LICENSE
+Depends: R (>= 3.5.0)
+Imports: Rcpp
+LinkingTo: Rcpp (>= 1.0.11)
+Suggests:
+    survival,
+    afthd,
+    coda,
+    ggplot2,
+    testthat (>= 3.0.0)
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Encoding: UTF-8
+Config/testthat/edition: 3

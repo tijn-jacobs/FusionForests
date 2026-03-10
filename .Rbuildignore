@@ -1,0 +1,12 @@
+^sticker$
+^simulations$
+^NEWS\.md$
+^paper$
+^\.github$
+^\.devcontainer$
+^\.claude$
+^LICENSE\.md$
+^CONTRIBUTING\.md$
+^background_for_claude_code_part1\.md$
+^examples$
+^src/README\.md$
