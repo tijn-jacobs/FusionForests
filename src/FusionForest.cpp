@@ -15,7 +15,6 @@ Rcpp::List FusionForest_cpp(
   SEXP no_trees_controlSEXP, SEXP power_controlSEXP, SEXP base_controlSEXP,
   SEXP p_grow_controlSEXP, SEXP p_prune_controlSEXP, SEXP omega_controlSEXP,
   SEXP sigma_knownSEXP, SEXP sigmaSEXP, SEXP lambdaSEXP, SEXP nuSEXP,
-  SEXP eta_commensurateSEXP,
   SEXP N_postSEXP, SEXP N_burnSEXP,
   SEXP store_posterior_sampleSEXP,
   SEXP verboseSEXP
@@ -90,8 +89,8 @@ Rcpp::List FusionForest_cpp(
   double lambda      = Rcpp::as<double>(lambdaSEXP);
   double nu          = Rcpp::as<double>(nuSEXP);
 
-  // Commensurate shift — initialised from argument, then updated each iteration
-  double eta = Rcpp::as<double>(eta_commensurateSEXP);
+  // Commensurate shift fixed at zero (no inter-source mean adjustment)
+  const double eta = 0.0;
 
   // MCMC dimensions
   size_t N_post = Rcpp::as<size_t>(N_postSEXP);
@@ -135,12 +134,6 @@ Rcpp::List FusionForest_cpp(
   Rcpp::NumericVector store_sigma = sigma_known
     ? Rcpp::NumericVector::create(sigma)
     : Rcpp::NumericVector(N_post + N_burn);
-
-  // Commensurate parameter posterior storage
-  Rcpp::NumericVector store_eta(N_post);
-  Rcpp::NumericVector store_nu(N_post);
-  Rcpp::IntegerVector store_w(N_post);
-  Rcpp::NumericVector store_rho(N_post);
 
   // Acceptance ratio trackers
   bool* accepted_control = new bool[no_trees_control]();
@@ -190,23 +183,6 @@ Rcpp::List FusionForest_cpp(
                              0.5, 1.0, static_cast<double>(p_deconf),
                              true, false, 1.0);
   forest_deconf.SetUpForest(p_deconf, n_deconf, X_train_deconf, augmented_outcome_deconf, nullptr, omega_deconf);
-
-
-  // ---- Commensurate parameter object ----
-  // Spike-slab prior on the commensurate shift eta:
-  //   w=1 (spike): eta ~ N(0, 1/spike^2)   [strong shrinkage to 0 = full borrowing]
-  //   w=0 (slab):  eta ~ N(0, 1/u^2), u ~ Uniform(B1, B2)
-  CommensurateParameters commensurate(
-    eta,    // eta_init
-    1.0,    // nu_init  (initial precision)
-    0.5,    // rho_init (initial spike probability)
-    0,      // w_init   (start in slab)
-    10.0,   // spike precision (large = strong shrinkage to 0)
-    0.01,   // B1: lower bound on slab precision
-    2.0,    // B2: upper bound on slab precision
-    1.0,    // a0: Beta prior for rho
-    1.0     // b0: Beta prior for rho
-  );
 
 
   // ---- Timing ----
@@ -282,47 +258,6 @@ Rcpp::List FusionForest_cpp(
     forest_deconf.UpdateForest(sigma, accepted_deconf, random);
 
     // After updating deconf: refresh treat and control augmented outcomes
-    {
-      size_t j = 0;
-      for (size_t k = 0; k < n; ++k) {
-        const double b = (treatment_indicator[k] == 1) ? 0.5 : -0.5;
-        const double s = (source_indicator[k]   == 1) ? 1.0 :  0.0;
-
-        double c_k = 0.0;
-        if (source_indicator[k] == 0) {
-          c_k = forest_deconf.GetPrediction(j);
-          ++j;
-        }
-        augmented_outcome_treat[k]   = (y[k] - (1.0 - s) * eta
-                                             - forest_control.GetPrediction(k)
-                                             - b * c_k) / b;
-        augmented_outcome_control[k] =  y[k] - (1.0 - s) * eta
-                                             - b * forest_treat.GetPrediction(k)
-                                             - b * c_k;
-      }
-    }
-
-    // -- Update commensurate parameters (outer Gibbs step) --
-    // Sufficient statistic: sum of residuals over OS observations
-    {
-      double R_eta = 0.0;
-      size_t j = 0;
-      for (size_t k = 0; k < n; ++k) {
-        if (source_indicator[k] == 0) {
-          const double b = (treatment_indicator[k] == 1) ? 0.5 : -0.5;
-          R_eta += y[k] - forest_control.GetPrediction(k)
-                        - b * forest_treat.GetPrediction(k)
-                        - b * forest_deconf.GetPrediction(j);
-          ++j;
-        }
-      }
-      commensurate.updateSpikeSlab(random);
-      commensurate.updateRho(random);
-      commensurate.updateEta(R_eta, static_cast<int>(n_deconf), sigma, random);
-      eta = commensurate.getEta();
-    }
-
-    // Recompute augmented outcomes with the updated eta
     {
       size_t j = 0;
       for (size_t k = 0; k < n; ++k) {
@@ -431,11 +366,6 @@ Rcpp::List FusionForest_cpp(
       for (size_t j = 0; j < no_trees_treat;   ++j) sum_accept_treat   += accepted_treat[j];
       for (size_t j = 0; j < no_trees_deconf;  ++j) sum_accept_deconf  += accepted_deconf[j];
 
-      // Commensurate parameter storage
-      store_eta[i - N_burn] = commensurate.getEta();
-      store_nu[i  - N_burn] = commensurate.getnu();
-      store_w[i   - N_burn] = commensurate.getW();
-      store_rho[i - N_burn] = commensurate.getRho();
     }
 
   } // end MCMC loop
@@ -490,11 +420,6 @@ Rcpp::List FusionForest_cpp(
   results["acceptance_ratio_control"]  = acceptance_ratio_control;
   results["acceptance_ratio_treat"]    = acceptance_ratio_treat;
   results["acceptance_ratio_deconf"]   = acceptance_ratio_deconf;
-  results["eta"]  = store_eta;
-  results["nu"]   = store_nu;
-  results["w"]    = store_w;
-  results["rho"]  = store_rho;
-
   if (store_posterior_sample) {
     results["train_predictions_sample_control"] = train_predictions_sample_control;
     results["test_predictions_sample_control"]  = test_predictions_sample_control;

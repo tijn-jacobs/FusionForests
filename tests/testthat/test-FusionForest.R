@@ -31,7 +31,6 @@ test_that("FusionForest runs on continuous outcomes and returns named list", {
   expect_true("train_predictions_treat"   %in% names(fit))
   expect_true("train_predictions_deconf"  %in% names(fit))
   expect_true("sigma"                     %in% names(fit))
-  expect_true("eta"                       %in% names(fit))
 })
 
 test_that("FusionForest train_predictions has length n", {

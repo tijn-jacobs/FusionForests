@@ -2,7 +2,6 @@
 #define FUSIONFOREST_H
 
 #include "ForestEngine.h"
-#include "CommensurateParameters.h"
 #include "OuterGibbsFunctions.h"
 
 Rcpp::List FusionForest_cpp(
@@ -19,7 +18,6 @@ Rcpp::List FusionForest_cpp(
   SEXP no_trees_controlSEXP, SEXP power_controlSEXP, SEXP base_controlSEXP,
   SEXP p_grow_controlSEXP, SEXP p_prune_controlSEXP, SEXP omega_controlSEXP,
   SEXP sigma_knownSEXP, SEXP sigmaSEXP, SEXP lambdaSEXP, SEXP nuSEXP,
-  SEXP eta_commensurateSEXP,
   SEXP N_postSEXP, SEXP N_burnSEXP,
   SEXP store_posterior_sampleSEXP,
   SEXP verboseSEXP

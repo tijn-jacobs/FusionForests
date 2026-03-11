@@ -6,7 +6,7 @@
 #' \deqn{\log(T) = m_0(X,S) + A\,\tau(X) + A\,(1-S)\,c(X) + \sigma\varepsilon}
 #' where \eqn{m_0} is the prognostic function, \eqn{\tau} is the CATE,
 #' \eqn{c} is the confounding function (active only in the OS treated arm),
-#' and \eqn{\eta} is a commensurate shift between the two sources.
+#' and \eqn{\eta = 0} (sources share a common baseline; no commensurate shift).
 #'
 #' @param y Numeric vector of outcomes (survival times or continuous responses).
 #' @param status Integer vector of event indicators (\code{1} = event observed,
@@ -61,8 +61,6 @@
 #'     the confounding function \eqn{c(X)} (OS rows only for training).}
 #'   \item{sigma}{Posterior sample of \eqn{\sigma} (or the fixed value if
 #'     \code{sigma} was supplied).}
-#'   \item{eta, nu, w, rho}{Posterior samples of the commensurate-prior
-#'     parameters.}
 #'   \item{acceptance_ratio_control, acceptance_ratio_treat,
 #'     acceptance_ratio_deconf}{Tree-update acceptance rates.}
 #'   \item{train_predictions_sample_control, ...}{Full posterior sample matrices
@@ -275,7 +273,6 @@ FusionForest <- function(
       sigmaSEXP                   = sigma_hat,
       lambdaSEXP                  = lambda,
       nuSEXP                      = nu,
-      eta_commensurateSEXP        = 0.0,
       N_postSEXP                  = N_post,
       N_burnSEXP                  = N_burn,
       store_posterior_sampleSEXP  = store_posterior_sample,
@@ -381,7 +378,6 @@ FusionForest <- function(
       sigmaSEXP                   = sigma_hat,
       lambdaSEXP                  = lambda,
       nuSEXP                      = nu,
-      eta_commensurateSEXP        = 0.0,
       N_postSEXP                  = N_post,
       N_burnSEXP                  = N_burn,
       store_posterior_sampleSEXP  = store_posterior_sample,
