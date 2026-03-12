@@ -134,14 +134,4 @@ for (rate in miss_rates) {
 # ----------------------------------------------------------------------------
 
 cat("=== Summary ===\n\n")
-cat(sprintf("%-18s  %6s  %11s  %11s  %10s  %10s\n",
-            "Mode", "Miss%", "Train RMSE", "Test RMSE", "Sigma hat", "Accept"))
-cat(paste(rep("-", 72), collapse = ""), "\n")
-for (j in seq_len(nrow(results))) {
-  miss_label <- if (results$missingness[j] == 0) "  -" else
-    sprintf("%4.0f%%", results$missingness[j] * 100)
-  cat(sprintf("%-18s  %6s  %11.3f  %11.3f  %10.3f  %10.3f\n",
-              results$mode[j], miss_label,
-              results$rmse_train[j], results$rmse_test[j],
-              results$sigma_hat[j], results$accept[j]))
-}
+print(results, digits = 3, row.names = FALSE)

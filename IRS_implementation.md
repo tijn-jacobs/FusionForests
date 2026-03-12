@@ -136,7 +136,10 @@ Iterates all entries in the routing map. For each node that `IsNog()`, redraws a
 Simple `routing_map.erase(dying_node)`.
 
 **Routing-map GetSufficientStatistics — birth variant (Step 8):**
-Uses routing-map `FindLeaf` to determine if each observation falls in the target leaf. For the proposed `split_var`, NaN observations are **skipped** (they contribute to neither left nor right count). Their routing will be drawn by `DrawRoutingIndicators` after acceptance.
+Used by **mode 1**. Uses routing-map `FindLeaf` to determine if each observation falls in the target leaf. For the proposed `split_var`, NaN observations are **skipped** (they contribute to neither left nor right count). Their routing will be drawn by `DrawRoutingIndicators` after acceptance.
+
+**DrawRoutingAndGetSufficientStatistics (mode 2):**
+Used by **mode 2**. Combined draw-and-stats function that works BEFORE the birth happens (target_leaf is still a leaf). Pass 1: routes non-NaN deterministically, accumulates left/right stats. Pass 2: draws tentative routing for NaN observations using `ComputeIRSProbability`, includes them in stats. Returns tentative_indicators vector alongside full sufficient statistics.
 
 **Routing-map GetSufficientStatistics — death variant (Step 8):**
 Uses routing-map `FindLeaf` to determine if each observation is in `left_leaf` or `right_leaf`. Stored routing indicators already exist.
@@ -149,54 +152,64 @@ Calls routing-map `GetAllLeafStatistics`, then draws leaf means as usual.
 
 ### 3.7 `src/StanForest.h`
 
-- Added `bool use_irs` member (default `false`)
+- Added `int irs_mode` member (default `0`: off; `1`: skip-then-draw; `2`: draw-then-decide)
 - Added `std::vector<RoutingMap> routing_maps` member (one per tree)
-- Added `void SetIRS(bool v)` setter
+- Added `void SetIRS(int mode)` setter
 - Added `void Predict(size_t, size_t, double*, double*, Random&)` overload for test-time
-- Added friend declaration for IRS-aware `BirthDeathStep` overload
+- Added friend declaration for IRS-aware `BirthDeathStep` overload (takes `RoutingMap&` and `int irs_mode`)
 
 ### 3.8 `src/StanForest.cpp`
 
-- Constructor initialises `use_irs(false)` and `routing_maps(num_trees_init)`
+- Constructor initialises `irs_mode(0)` and `routing_maps(num_trees_init)`
 - `SetNumTrees` resizes `routing_maps` alongside `trees`
-- **`Draw()` method:** When `use_irs` is true, for each tree j:
+- **`Draw()` method:** When `irs_mode > 0`, for each tree j:
   1. `RedrawNogRouting(trees[j], ...)` — Gibbs-redraw routing at nog nodes
   2. `FitTree(..., routing_maps[j])` — remove tree j's contribution using routing map
-  3. `BirthDeathStep(..., routing_maps[j])` — IRS-aware birth/death
+  3. `BirthDeathStep(..., routing_maps[j], irs_mode)` — IRS-aware birth/death (mode passed through)
   4. `DrawAllLeafMeans(..., routing_maps[j])` — IRS-aware leaf draws
   5. `FitTree(..., routing_maps[j])` — add back tree j's contribution
 
-  When `use_irs` is false, the original code path is preserved unchanged.
+  When `irs_mode == 0`, the original code path is preserved unchanged.
 
 - Added `Predict(p, n, x, fp, Random&)` — test-time prediction with uniform random routing
 
 ### 3.9 `src/StanBirthDeath.h`
 
-Added declaration for IRS-aware `BirthDeathStep` overload that takes `RoutingMap&`.
+Added declaration for IRS-aware `BirthDeathStep` overload that takes `RoutingMap&` and `int irs_mode`.
 
 ### 3.10 `src/StanBirthDeath.cpp`
 
-Added IRS-aware `BirthDeathStep` overload:
+Added IRS-aware `BirthDeathStep` overload. The birth path branches on `irs_mode`:
 
-- **Birth path:** Calls routing-map `GetSufficientStatistics` (which skips NaN at proposed split_var). After acceptance, calls `DrawRoutingIndicators` to populate the routing map for the new internal node.
-- **Death path:** Calls routing-map `GetSufficientStatistics`. After acceptance, calls `RemoveRoutingIndicators` to erase the dying node's entry from the routing map, then prunes.
+- **Mode 1 (skip-then-draw) birth path:**
+  1. `GetSufficientStatistics(routing_map)` — skips NaN at proposed `split_var`
+  2. MH accept/reject (NaN observations excluded from likelihood ratio)
+  3. If accepted: `DrawRoutingIndicators` to populate the routing map for the new internal node
+
+- **Mode 2 (draw-then-decide) birth path:**
+  1. `DrawRoutingAndGetSufficientStatistics` — draws tentative routing for NaN observations, includes **all** observations in sufficient stats
+  2. MH accept/reject (NaN observations included in likelihood ratio via their tentative routing)
+  3. If accepted: store the pre-drawn tentative indicators in the routing map
+  4. If rejected: tentative indicators are discarded (no side effects)
+
+- **Death path (same for both modes):** Calls routing-map `GetSufficientStatistics`. After acceptance, calls `RemoveRoutingIndicators` to erase the dying node's entry from the routing map, then prunes.
 
 ### 3.11 `src/ForestEngine.h`
 
-- Added `void SetIRS(bool v)` — delegates to `StanForest::SetIRS`
+- Added `void SetIRS(int mode)` — delegates to `StanForest::SetIRS`
 - Added `void Predict(size_t, size_t, double*, double*, Random&)` — delegates to `StanForest::Predict` with `Random&`
 - Added `SetUpForest` overload taking `size_t num_cuts` (uniform cutpoints) instead of `int* nc`
 
 ### 3.12 `src/SimpleBART.h` / `src/SimpleBART.cpp`
 
-- Added `irsSEXP` parameter to the function signature
-- Converts to `bool irs` and calls `forest.SetIRS(true)` when enabled
-- Test-time prediction uses `forest.Predict(p, n_test, X_test, testpred, random)` when IRS is on
+- Added `irsSEXP` (integer) parameter to the function signature
+- Converts to `int irs` and calls `forest.SetIRS(irs)` when `irs > 0`
+- Test-time prediction uses `forest.Predict(p, n_test, X_test, testpred, random)` when `irs > 0`
 
 ### 3.13 `R/SimpleBART.R`
 
-- Added `irs = FALSE` argument to the R wrapper
-- Passes `irsSEXP = irs` to the C++ function
+- Added `irs = 0L` argument to the R wrapper (integer: 0=off, 1=skip-then-draw, 2=draw-then-decide)
+- Passes `as.integer(irs)` to the C++ function
 
 ### 3.14 `R/RcppExports.R` / `src/RcppExports.cpp`
 
@@ -211,7 +224,7 @@ Added IRS-aware `BirthDeathStep` overload:
 
 ## 4. MCMC Lifecycle Summary
 
-Each MCMC iteration, for each tree `j`:
+Each MCMC iteration, for each tree `j` (when `irs_mode > 0`):
 
 ```
 1. RedrawNogRouting(tree_j, routing_maps[j])
@@ -220,12 +233,20 @@ Each MCMC iteration, for each tree `j`:
 
 2. FitTree(tree_j, routing_maps[j])  →  subtract from all_fit  →  compute residuals
 
-3. BirthDeathStep(tree_j, routing_maps[j])
-   ├── Birth path:
+3. BirthDeathStep(tree_j, routing_maps[j], irs_mode)
+   ├── Birth path (MODE 1 — skip-then-draw):
    │   ├── GetSufficientStatistics(routing_map) — skips NaN at split_var
-   │   ├── MH accept/reject
+   │   ├── MH accept/reject (NaN excluded from ratio)
    │   └── If accepted: DrawRoutingIndicators for new internal node
-   └── Death path:
+   │
+   ├── Birth path (MODE 2 — draw-then-decide):
+   │   ├── DrawRoutingAndGetSufficientStatistics — draws tentative routing,
+   │   │   includes all obs in stats
+   │   ├── MH accept/reject (NaN included in ratio via tentative routing)
+   │   ├── If accepted: store tentative indicators in routing map
+   │   └── If rejected: discard tentative indicators
+   │
+   └── Death path (same for both modes):
        ├── GetSufficientStatistics(routing_map)
        ├── MH accept/reject
        └── If accepted: RemoveRoutingIndicators for dying node
@@ -250,11 +271,15 @@ When a node is a nog, only the leaf step heights below it depend on the routing.
 
 But when a node has internal-node descendants, the tree splits below were proposed and accepted conditional on the routing at this node. Changing the routing would invalidate the basis for those downstream splits. So routing must be frozen.
 
-### Why skip NaN observations in the birth MH ratio?
+### Two IRS modes for handling NaN in birth proposals
 
-During a birth proposal, we don't yet know how to route NaN observations at the proposed split variable. Rather than making a temporary routing decision that biases the MH ratio, we simply exclude these observations from the sufficient statistics. The NaN observations get their routing indicators drawn by `DrawRoutingIndicators` after the birth is accepted.
+Two parallel approaches are implemented so they can be compared empirically. The right choice may depend on the DGP and missingness mechanism.
 
-This is interesting. NOTE HERE. Look into this myself.
+**Mode 1: skip-then-draw.** During a birth proposal, NaN observations at the proposed split variable are excluded from the sufficient statistics and thus from the MH ratio. After acceptance, their routing is drawn by `DrawRoutingIndicators`. Rationale: we don't yet know how to route NaN observations, so rather than making a temporary decision that biases the ratio, we leave them out. The split decision is based solely on observed data.
+
+**Mode 2: draw-then-decide.** Before computing the MH ratio, tentative routing indicators are drawn for NaN observations using `DrawRoutingAndGetSufficientStatistics` (informed by posterior predictive densities). All observations — including NaN with tentative routing — are included in the sufficient statistics and MH ratio. If the proposal is accepted, the tentative indicators are stored. If rejected, they are discarded. Rationale: NaN observations carry information about the quality of a split; including them gives a more complete picture. The tentative routing is informed (not random), so it should not systematically bias the ratio.
+
+NOTE: Look into this myself — which approach is theoretically better, and under what conditions?
 
 ### Why uniform random (P=0.5) at test time?
 
@@ -265,7 +290,8 @@ At test time we don't have the tree-specific residuals needed for informed routi
 ## 6. Verification Plan
 
 1. **Build**: `R CMD INSTALL .` — no compilation errors
-2. **No-missingness regression**: Run with `irs=TRUE` on complete data — should give identical results (no routing map entries created)
-3. **Crash fix**: Data with NaN values, `irs=TRUE` — no segfault
+2. **No-missingness regression**: Run with `irs=1` and `irs=2` on complete data — should give identical results to `irs=0` (no routing map entries created)
+3. **Crash fix**: Data with NaN values, `irs=1` and `irs=2` — no segfault
 4. **Simple DGP**: `Y = X1 + eps`, `X2` noise with missingness — model recovers `f(X1)`
 5. **Informed vs. uniform**: `Y = X1 + X2 + eps`, mask `X2` for half — informed IRS should outperform uniform
+6. **Mode comparison benchmark**: `examples/benchmark_simple_bart.R` — compares mode 1 vs mode 2 across varying missingness rates (10%, 20%, 30%, 50%) using a step-function DGP
