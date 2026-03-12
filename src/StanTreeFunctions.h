@@ -15,5 +15,13 @@ bool CanSplit(StanTree* node, CutpointMatrix& cutpoints);
 void GetSplittableVariables(StanTree* node, CutpointMatrix& cutpoints,
                             std::vector<size_t>& good_vars);
 
+// IRS: routing-map variant of FitTree.
+void FitTree(StanTree& tree, CutpointMatrix& cutpoints, size_t p, size_t n,
+             double* x, double* fit_values, RoutingMap& routing_map);
+
+// IRS: uniform random routing variant of FitTree (test-time prediction).
+void FitTree(StanTree& tree, CutpointMatrix& cutpoints, size_t p, size_t n,
+             double* x, double* fit_values, Random& random);
+
 #endif
 

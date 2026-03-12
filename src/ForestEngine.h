@@ -30,6 +30,17 @@ struct ForestEngine {
     stan_forest->SetData(p, n, X, augment_outcome, nc);
   }
 
+  // Overload with uniform number of cutpoints per variable.
+  void SetUpForest(size_t p, size_t n, double* X, double* augment_outcome,
+                   size_t num_cuts, double omega) {
+    stan_forest->SetData(p, n, X, augment_outcome, num_cuts);
+  }
+
+  // Set IRS mode: 0=off, 1=skip-then-draw, 2=draw-then-decide.
+  void SetIRS(int mode) {
+    stan_forest->SetIRS(mode);
+  }
+
   // Set per-observation weights for weighted regression (e.g., b_i^2 in BCF)
   // Note: StanForest does not currently support per-observation weights
   void SetWeights(double* w) {}
@@ -49,6 +60,11 @@ struct ForestEngine {
   // Predict new outcomes
   void Predict(size_t p, size_t n_test, double* X, double* out) {
     stan_forest->Predict(p, n_test, X, out);
+  }
+
+  // IRS: test-time prediction with uniform random routing at NaN splits.
+  void Predict(size_t p, size_t n_test, double* X, double* out, Random& random) {
+    stan_forest->Predict(p, n_test, X, out, random);
   }
 
   // Accessors

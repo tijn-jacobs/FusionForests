@@ -38,3 +38,23 @@ void GetSplittableVariables(StanTree* node, CutpointMatrix& cutpoints,
   }
 }
 
+// IRS: routing-map variant of FitTree.
+void FitTree(StanTree& tree, CutpointMatrix& cutpoints, size_t p, size_t n,
+             double* x, double* fit_values, RoutingMap& routing_map)
+{
+  for (size_t i = 0; i < n; i++) {
+    StanTree* leaf = tree.FindLeaf(x + i * p, i, cutpoints, routing_map);
+    fit_values[i]  = leaf->GetStepHeight();
+  }
+}
+
+// IRS: uniform random routing variant of FitTree (test-time prediction).
+void FitTree(StanTree& tree, CutpointMatrix& cutpoints, size_t p, size_t n,
+             double* x, double* fit_values, Random& random)
+{
+  for (size_t i = 0; i < n; i++) {
+    StanTree* leaf = tree.FindLeaf(x + i * p, cutpoints, random);
+    fit_values[i]  = leaf->GetStepHeight();
+  }
+}
+

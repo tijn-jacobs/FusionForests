@@ -15,5 +15,15 @@ bool BirthDeathStep(StanTree& tree, CutpointMatrix& cutpoints,
                     std::vector<double>& split_probabilities,
                     bool use_augmentation, Random& random);
 
+// IRS-aware overload: passes routing map for missing data handling.
+// irs_mode: 1 = skip NaN in MH then draw after, 2 = draw routing before MH.
+bool BirthDeathStep(StanTree& tree, CutpointMatrix& cutpoints,
+                    DataInfo& data_info, PriorInfo& prior_info,
+                    double sigma,
+                    std::vector<size_t>& variable_split_counts,
+                    std::vector<double>& split_probabilities,
+                    bool use_augmentation, Random& random,
+                    RoutingMap& routing_map, int irs_mode = 1);
+
 #endif
 

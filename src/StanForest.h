@@ -24,6 +24,15 @@ public:
                              std::vector<double>& split_probabilities,
                              bool use_augmentation, Random& random);
 
+  // IRS-aware overload of the birth-death step function.
+  friend bool BirthDeathStep(StanTree& tree, CutpointMatrix& cutpoints,
+                             DataInfo& data_info, PriorInfo& prior_info,
+                             double sigma,
+                             std::vector<size_t>& variable_split_counts,
+                             std::vector<double>& split_probabilities,
+                             bool use_augmentation, Random& random,
+                             RoutingMap& routing_map, int irs_mode);
+
   // Constructor / Destructor
   explicit StanForest(size_t num_trees);
   ~StanForest();
@@ -93,6 +102,12 @@ public:
   // Compute the forest prediction for all n observations and store in fp.
   void Predict(size_t p, size_t n, double* x, double* fp);
 
+  // IRS: test-time prediction with uniform random routing at NaN splits.
+  void Predict(size_t p, size_t n, double* x, double* fp, Random& random);
+
+  // IRS mode: 0 = off, 1 = skip-then-draw, 2 = draw-then-decide.
+  void SetIRS(int mode) { irs_mode = mode; }
+
   // Perform one full MCMC update (birth-death + leaf parameter draws).
   bool Draw(double sigma, Random& random, bool* accept);
 
@@ -122,6 +137,10 @@ protected:
   double* residuals;             // Working residuals (length n)
   double* tree_fit_temp;         // Temporary per-tree fit buffer (length n)
   DataInfo data_info;            // Thin wrapper pointing into the arrays above
+  // IRS (Informed Random Splitting) state
+  int irs_mode = 0;              // 0=off, 1=skip-then-draw, 2=draw-then-decide
+  std::vector<RoutingMap> routing_maps; // Per-tree routing maps for NaN obs
+
   // DART state
   bool use_dart;                 // Whether a Dirichlet prior is used
   bool dart_active;              // Whether DART split-probability updates are on

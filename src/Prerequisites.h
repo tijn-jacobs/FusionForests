@@ -17,6 +17,7 @@
 #include <algorithm>   // Algorithms like std::min, std::max, std::sort
 #include <iomanip>     // Input/output manipulators (e.g., for formatting output)
 #include <map>         // Associative containers (e.g., map)
+#include <unordered_map> // Hash-based associative containers
 #include <fstream>     // File stream operations for input/output with files
 #include <ctime>       // Time functions (e.g., clock, time)
 #include <stdexcept>   // 

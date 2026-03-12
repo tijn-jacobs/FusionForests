@@ -7,6 +7,14 @@
 // An observation goes left when x[v] < CutpointMatrix[v][c].
 using CutpointMatrix = std::vector<std::vector<double>>;
 
+// Per-node routing indicators for missing-data handling (IRS).
+// Maps internal-node pointer -> vector of length n:
+//   0 = not missing (deterministic routing)
+//   1 = routed left
+//  -1 = routed right
+class StanTree;  // forward declaration for the typedef
+using RoutingMap = std::unordered_map<StanTree*, std::vector<int8_t>>;
+
 // Information about a single node, used by the input-stream operator.
 struct NodeInfo {
   std::size_t id;
@@ -60,6 +68,13 @@ public:
 
   // Find the leaf node reached by observation x using the given cutpoints.
   StanTree* FindLeaf(double* x, CutpointMatrix& cutpoints);
+
+  // IRS: uniform random routing at NaN splits (for test-time prediction).
+  StanTree* FindLeaf(double* x, CutpointMatrix& cutpoints, Random& random);
+
+  // IRS: routing-map lookup at NaN splits (for training MCMC).
+  StanTree* FindLeaf(double* x, size_t obs_index, CutpointMatrix& cutpoints,
+                     RoutingMap& routing_map);
 
   // Recursively narrow the valid range [lower_bound, upper_bound] for
   // split_var by walking up to the root.

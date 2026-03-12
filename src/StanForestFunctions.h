@@ -94,5 +94,77 @@ void DrawSparsityParameter(bool fixed_theta, double& dart_theta,
                            double dart_a, double dart_b, double dart_rho,
                            Random& random);
 
+// ===== Informed Random Splitting (IRS) =====
+
+// Compute the informed routing probability P(go left) for a missing
+// observation at a split node, based on posterior predictive densities.
+double ComputeIRSProbability(double residual_i,
+                             size_t n_left, double sum_left,
+                             size_t n_right, double sum_right,
+                             double sigma, double tau_h);
+
+// Draw routing indicators for all observations at a newly born internal node.
+// Called after a birth is accepted.
+void DrawRoutingIndicators(
+    StanTree* node, size_t split_var, size_t cut_val,
+    CutpointMatrix& cutpoints, StanTree& tree_root,
+    DataInfo& data_info, double sigma, double tau_h,
+    RoutingMap& routing_map, Random& random);
+
+// Gibbs-redraw routing indicators at all nog nodes in the tree.
+// Called once per tree per MCMC iteration (before computing residuals).
+void RedrawNogRouting(
+    StanTree& tree, CutpointMatrix& cutpoints,
+    DataInfo& data_info, double sigma, double tau_h,
+    RoutingMap& routing_map, Random& random);
+
+// Remove routing indicators for a dying node. Called after death acceptance.
+void RemoveRoutingIndicators(StanTree* dying_node, RoutingMap& routing_map);
+
+// Routing-map variants of GetSufficientStatistics (birth).
+void GetSufficientStatistics(StanTree& tree, StanTree* target_leaf,
+                             size_t split_var, size_t cut_val,
+                             CutpointMatrix& cutpoints, DataInfo& data_info,
+                             size_t& left_count, double& left_sum,
+                             size_t& right_count, double& right_sum,
+                             RoutingMap& routing_map);
+
+// Routing-map variant of GetSufficientStatistics (death).
+void GetSufficientStatistics(StanTree& tree, StanTree* left_leaf,
+                             StanTree* right_leaf,
+                             CutpointMatrix& cutpoints, DataInfo& data_info,
+                             size_t& left_count, double& left_sum,
+                             size_t& right_count, double& right_sum,
+                             RoutingMap& routing_map);
+
+// Routing-map variant of GetAllLeafStatistics.
+void GetAllLeafStatistics(StanTree& tree, CutpointMatrix& cutpoints,
+                          DataInfo& data_info,
+                          std::vector<StanTree*>& leaves,
+                          std::vector<size_t>& observation_counts,
+                          std::vector<double>& residual_sums,
+                          RoutingMap& routing_map);
+
+// Routing-map variant of DrawAllLeafMeans.
+void DrawAllLeafMeans(StanTree& tree, CutpointMatrix& cutpoints,
+                      DataInfo& data_info, PriorInfo& prior_info,
+                      double sigma, Random& random,
+                      RoutingMap& routing_map);
+
+// Draw-then-decide: draw routing indicators for NaN observations at the
+// proposed split_var BEFORE the birth, compute sufficient stats including
+// routed NaN observations, and return the tentative routing indicators.
+// If the birth is accepted, store the indicators in routing_map.
+// If rejected, discard them.
+void DrawRoutingAndGetSufficientStatistics(
+    StanTree& tree, StanTree* target_leaf,
+    size_t split_var, size_t cut_val,
+    CutpointMatrix& cutpoints, DataInfo& data_info,
+    double sigma, double tau_h,
+    size_t& left_count, double& left_sum,
+    size_t& right_count, double& right_sum,
+    std::vector<int8_t>& tentative_indicators,
+    RoutingMap& routing_map, Random& random);
+
 #endif
 

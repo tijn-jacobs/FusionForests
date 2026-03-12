@@ -32,8 +32,8 @@ library(FusionForests)
 library(ShrinkageTrees)
 
 # ---- Dimensions -------------------------------------------------------
-n_rct <- 100
-n_os  <- 400
+n_rct <- 200
+n_os  <- 800
 p     <- 5     # number of OBSERVED covariates
 q     <- 2     # number of UNOBSERVED confounders (OS only)
 
@@ -131,8 +131,15 @@ cate_csf_all <- c(cate_csf_rct, cate_csf_os)
 # =============================================================================
 rmse <- function(pred, truth) sqrt(mean((pred - truth)^2))
 
-cat("\n===== CATE RMSE by population =====\n")
-cat(sprintf("%-12s  %10s  %10s\n", "Population", "FusionForest", "CSF (RCT)"))
-cat(sprintf("%-12s  %10.4f  %10.4f\n", "RCT",  rmse(cate_ff_rct, true_cate_rct), rmse(cate_csf_rct, true_cate_rct)))
-cat(sprintf("%-12s  %10.4f  %10.4f\n", "RWD",  rmse(cate_ff_os,  true_cate_os),  rmse(cate_csf_os,  true_cate_os)))
-cat(sprintf("%-12s  %10.4f  %10.4f\n", "All",  rmse(cate_ff_all, true_cate_all), rmse(cate_csf_all, true_cate_all)))
+results <- data.frame(
+  Population   = c("RCT", "RWD", "All"),
+  FusionForest = c(rmse(cate_ff_rct, true_cate_rct),
+                   rmse(cate_ff_os,  true_cate_os),
+                   rmse(cate_ff_all, true_cate_all)),
+  CSF_RCT_only = c(rmse(cate_csf_rct, true_cate_rct),
+                   rmse(cate_csf_os,  true_cate_os),
+                   rmse(cate_csf_all, true_cate_all))
+)
+results$Ratio_CSF_FF <- results$CSF_RCT_only / results$FusionForest
+
+print(results, digits = 4, row.names = FALSE)

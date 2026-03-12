@@ -181,6 +181,45 @@ StanTree* StanTree::FindLeaf(double* x, CutpointMatrix& cutpoints)
   }
 }
 
+// IRS: uniform random routing at NaN splits (test-time prediction).
+StanTree* StanTree::FindLeaf(double* x, CutpointMatrix& cutpoints, Random& random)
+{
+  if (left == nullptr) return this;
+  if (std::isnan(x[split_var])) {
+    if (random.uniform() < 0.5) {
+      return left->FindLeaf(x, cutpoints, random);
+    } else {
+      return right->FindLeaf(x, cutpoints, random);
+    }
+  }
+  if (x[split_var] < cutpoints[split_var][cut_val]) {
+    return left->FindLeaf(x, cutpoints, random);
+  } else {
+    return right->FindLeaf(x, cutpoints, random);
+  }
+}
+
+// IRS: routing-map lookup at NaN splits (training MCMC).
+StanTree* StanTree::FindLeaf(double* x, size_t obs_index,
+                             CutpointMatrix& cutpoints,
+                             RoutingMap& routing_map)
+{
+  if (left == nullptr) return this;
+  if (std::isnan(x[split_var])) {
+    auto it = routing_map.find(this);
+    if (it != routing_map.end() && it->second[obs_index] == 1) {
+      return left->FindLeaf(x, obs_index, cutpoints, routing_map);
+    } else {
+      return right->FindLeaf(x, obs_index, cutpoints, routing_map);
+    }
+  }
+  if (x[split_var] < cutpoints[split_var][cut_val]) {
+    return left->FindLeaf(x, obs_index, cutpoints, routing_map);
+  } else {
+    return right->FindLeaf(x, obs_index, cutpoints, routing_map);
+  }
+}
+
 // Narrow [lower_bound, upper_bound] for split_var by walking up the ancestors.
 void StanTree::FindRegionBounds(size_t split_var, int* lower_bound,
                                 int* upper_bound)
