@@ -1,6 +1,7 @@
 # Development environment
 .claude/
 .devcontainer/
+info/
 
 # R package build artifacts
 *.o
