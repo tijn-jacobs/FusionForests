@@ -17,7 +17,11 @@
 #' @param verbose Logical; print progress bar.
 #' @param irs Integer IRS mode: 0 = off (default), 1 = skip-then-draw
 #'   (NaN obs excluded from MH ratio, routed after acceptance),
-#'   2 = draw-then-decide (routing drawn before MH, all obs in ratio).
+#'   2 = draw-then-decide (routing drawn before MH, all obs in ratio),
+#'   3 = uniform random routing (P=0.5, ablation baseline).
+#' @param store_posterior_sample Logical; if \code{TRUE}, return the full
+#'   \code{N_post x n_test} matrix of posterior test predictions
+#'   (element \code{test_predictions_sample}).
 #'
 #' @return A named list with:
 #' \describe{
@@ -25,6 +29,10 @@
 #'   \item{test_predictions}{Posterior mean test predictions (length n_test).}
 #'   \item{sigma}{Posterior samples of sigma (after burn-in).}
 #'   \item{acceptance_ratio}{Mean tree-proposal acceptance rate.}
+#'   \item{train_predictions_sample}{(If \code{store_posterior_sample = TRUE})
+#'     Matrix of dimension \code{N_post x n} with per-iteration train predictions.}
+#'   \item{test_predictions_sample}{(If \code{store_posterior_sample = TRUE})
+#'     Matrix of dimension \code{N_post x n_test} with per-iteration test predictions.}
 #' }
 #'
 #' @importFrom Rcpp evalCpp
@@ -46,7 +54,8 @@ SimpleBART <- function(
   N_post          = 1000,
   N_burn          = 1000,
   verbose         = TRUE,
-  irs             = 0L
+  irs             = 0L,
+  store_posterior_sample = FALSE
 ) {
 
   ## Input validation
@@ -113,12 +122,19 @@ SimpleBART <- function(
     N_postSEXP    = as.integer(N_post),
     N_burnSEXP    = as.integer(N_burn),
     verboseSEXP   = verbose,
-    irsSEXP       = as.integer(irs)
+    irsSEXP       = as.integer(irs),
+    store_posterior_sampleSEXP = store_posterior_sample
   )
 
   ## Back-transform: undo the mean shift
   fit$train_predictions <- fit$train_predictions + y_mean
   fit$test_predictions  <- fit$test_predictions  + y_mean
+  if (store_posterior_sample) {
+    if (!is.null(fit$train_predictions_sample))
+      fit$train_predictions_sample <- fit$train_predictions_sample + y_mean
+    if (!is.null(fit$test_predictions_sample))
+      fit$test_predictions_sample <- fit$test_predictions_sample + y_mean
+  }
 
   ## Discard burn-in sigma draws
   if (!sigma_known) fit$sigma <- fit$sigma[-(1:N_burn)]

@@ -119,7 +119,7 @@ bool StanForest::Draw(double sigma, Random& random, bool* accept)
 
       // Redraw routing indicators at nog nodes (Gibbs step).
       RedrawNogRouting(trees[j], cutpoints, data_info, sigma,
-                       prior_info.eta, routing_maps[j], random);
+                       prior_info.eta, routing_maps[j], random, irs_mode);
 
       // Remove the current contribution of tree j from all_fit.
       FitTree(trees[j], cutpoints, p, n, x, tree_fit_temp, routing_maps[j]);

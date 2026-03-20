@@ -105,7 +105,7 @@ public:
   // IRS: test-time prediction with uniform random routing at NaN splits.
   void Predict(size_t p, size_t n, double* x, double* fp, Random& random);
 
-  // IRS mode: 0 = off, 1 = skip-then-draw, 2 = draw-then-decide.
+  // IRS mode: 0=off, 1=skip-then-draw, 2=draw-then-decide, 3=uniform (P=0.5).
   void SetIRS(int mode) { irs_mode = mode; }
 
   // Perform one full MCMC update (birth-death + leaf parameter draws).
@@ -138,7 +138,7 @@ protected:
   double* tree_fit_temp;         // Temporary per-tree fit buffer (length n)
   DataInfo data_info;            // Thin wrapper pointing into the arrays above
   // IRS (Informed Random Splitting) state
-  int irs_mode = 0;              // 0=off, 1=skip-then-draw, 2=draw-then-decide
+  int irs_mode = 0;              // 0=off, 1=skip-then-draw, 2=draw-then-decide, 3=uniform
   std::vector<RoutingMap> routing_maps; // Per-tree routing maps for NaN obs
 
   // DART state

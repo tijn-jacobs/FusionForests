@@ -9,7 +9,8 @@ Rcpp::List SimpleBART_cpp(
   SEXP sigma_knownSEXP, SEXP sigmaSEXP, SEXP lambdaSEXP, SEXP nuSEXP,
   SEXP N_postSEXP, SEXP N_burnSEXP,
   SEXP verboseSEXP,
-  SEXP irsSEXP
+  SEXP irsSEXP,
+  SEXP store_posterior_sampleSEXP
 ) {
 
   // ---- Argument conversion ----
@@ -42,6 +43,7 @@ Rcpp::List SimpleBART_cpp(
   size_t N_burn = Rcpp::as<size_t>(N_burnSEXP);
   bool verbose  = Rcpp::as<bool>(verboseSEXP);
   int irs       = Rcpp::as<int>(irsSEXP);
+  bool store_posterior_sample = Rcpp::as<bool>(store_posterior_sampleSEXP);
 
   RandomGenerator random;
 
@@ -57,6 +59,13 @@ Rcpp::List SimpleBART_cpp(
 
   bool* accepted = new bool[no_trees]();
   double sum_accept = 0.0;
+
+  Rcpp::NumericMatrix train_predictions_sample;
+  Rcpp::NumericMatrix test_predictions_sample;
+  if (store_posterior_sample) {
+    train_predictions_sample = Rcpp::NumericMatrix(N_post, n);
+    test_predictions_sample  = Rcpp::NumericMatrix(N_post, n_test);
+  }
 
   double* testpred = n_test ? new double[n_test] : nullptr;
 
@@ -108,6 +117,11 @@ Rcpp::List SimpleBART_cpp(
       for (size_t k = 0; k < n; ++k)
         train_predictions_mean[k] += forest.GetPrediction(k);
 
+      if (store_posterior_sample) {
+        for (size_t k = 0; k < n; ++k)
+          train_predictions_sample(i - N_burn, k) = forest.GetPrediction(k);
+      }
+
       if (n_test > 0) {
         if (irs > 0) {
           forest.Predict(p, n_test, X_test, testpred, random);
@@ -116,6 +130,11 @@ Rcpp::List SimpleBART_cpp(
         }
         for (size_t k = 0; k < n_test; ++k)
           test_predictions_mean[k] += testpred[k];
+
+        if (store_posterior_sample) {
+          for (size_t k = 0; k < n_test; ++k)
+            test_predictions_sample(i - N_burn, k) = testpred[k];
+        }
       }
 
       for (size_t j = 0; j < no_trees; ++j)
@@ -152,6 +171,10 @@ Rcpp::List SimpleBART_cpp(
   results["test_predictions"]  = test_predictions_mean;
   results["sigma"]             = store_sigma;
   results["acceptance_ratio"]  = acceptance_ratio;
+  if (store_posterior_sample) {
+    results["train_predictions_sample"] = train_predictions_sample;
+    results["test_predictions_sample"]  = test_predictions_sample;
+  }
 
 
   // ---- Clean up ----

@@ -36,7 +36,7 @@ struct ForestEngine {
     stan_forest->SetData(p, n, X, augment_outcome, num_cuts);
   }
 
-  // Set IRS mode: 0=off, 1=skip-then-draw, 2=draw-then-decide.
+  // Set IRS mode: 0=off, 1=skip-then-draw, 2=draw-then-decide, 3=uniform.
   void SetIRS(int mode) {
     stan_forest->SetIRS(mode);
   }

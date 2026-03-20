@@ -9,3 +9,5 @@ devtools::check()
 source("examples/cate_rmse_comparison.R")
 
 
+devtools::document()                                      
+devtools::install()

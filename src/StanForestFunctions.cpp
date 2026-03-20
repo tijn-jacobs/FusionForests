@@ -495,11 +495,12 @@ double ComputeIRSProbability(double residual_i,
 }
 
 // Draw routing indicators for a newly born internal node.
+// irs_mode: 1/2 = informed routing, 3 = uniform P=0.5.
 void DrawRoutingIndicators(
     StanTree* node, size_t split_var, size_t cut_val,
     CutpointMatrix& cutpoints, StanTree& tree_root,
     DataInfo& data_info, double sigma, double tau_h,
-    RoutingMap& routing_map, Random& random)
+    RoutingMap& routing_map, Random& random, int irs_mode)
 {
   size_t n = data_info.n;
   size_t p = data_info.p;
@@ -534,12 +535,14 @@ void DrawRoutingIndicators(
     }
   }
 
-  // Pass 2: route NaN observations using informed probability
+  // Pass 2: route NaN observations
   for (size_t idx : nan_obs) {
-    double pi = ComputeIRSProbability(
-      data_info.residuals[idx],
-      left_count, left_sum, right_count, right_sum,
-      sigma, tau_h);
+    double pi = (irs_mode == 3)
+      ? 0.5
+      : ComputeIRSProbability(
+          data_info.residuals[idx],
+          left_count, left_sum, right_count, right_sum,
+          sigma, tau_h);
 
     if (random.uniform() < pi) {
       indicators[idx] = 1;   // go left
@@ -556,10 +559,11 @@ void DrawRoutingIndicators(
 }
 
 // Gibbs-redraw routing at all nog nodes in the tree.
+// irs_mode: 1/2 = informed routing, 3 = uniform P=0.5.
 void RedrawNogRouting(
     StanTree& tree, CutpointMatrix& cutpoints,
     DataInfo& data_info, double sigma, double tau_h,
-    RoutingMap& routing_map, Random& random)
+    RoutingMap& routing_map, Random& random, int irs_mode)
 {
   size_t n = data_info.n;
   size_t p = data_info.p;
@@ -604,10 +608,12 @@ void RedrawNogRouting(
 
     // Pass 2: redraw NaN observations
     for (size_t idx : nan_obs) {
-      double pi = ComputeIRSProbability(
-        data_info.residuals[idx],
-        left_count, left_sum, right_count, right_sum,
-        sigma, tau_h);
+      double pi = (irs_mode == 3)
+        ? 0.5
+        : ComputeIRSProbability(
+            data_info.residuals[idx],
+            left_count, left_sum, right_count, right_sum,
+            sigma, tau_h);
 
       if (random.uniform() < pi) {
         indicators[idx] = 1;   // go left

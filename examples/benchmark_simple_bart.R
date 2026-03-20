@@ -15,14 +15,13 @@
 
 library(FusionForests)
 
-set.seed(42)
 
 # ----------------------------------------------------------------------------
 # Data generation
 # ----------------------------------------------------------------------------
 
-n_train <- 250
-n_test  <- 250
+n_train <- 100
+n_test  <- 1000
 p       <- 3
 
 N_post <- 2000
@@ -67,7 +66,7 @@ cat("Acceptance ratio:      ", round(fit_complete$acceptance_ratio, 3), "\n\n")
 # 2. Missing data: compare IRS mode 1 vs mode 2
 # ----------------------------------------------------------------------------
 
-miss_rates <- c(0.10, 0.20, 0.30, 0.50)
+miss_rates <- c(0.10, 0.20, 0.30, 0.50, 0.8)
 irs_modes  <- c(1L, 2L)
 mode_names <- c("skip-then-draw", "draw-then-decide")
 

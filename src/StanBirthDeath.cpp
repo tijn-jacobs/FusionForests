@@ -114,7 +114,8 @@ bool BirthDeathStep(StanTree& tree, CutpointMatrix& cutpoints,
 }
 
 // IRS-aware overload: routes missing observations using the routing map.
-// irs_mode: 1 = skip NaN in MH then draw after, 2 = draw routing before MH.
+// irs_mode: 1 = skip NaN in MH then draw after, 2 = draw routing before MH,
+// 3 = uniform random routing (P=0.5).
 bool BirthDeathStep(StanTree& tree, CutpointMatrix& cutpoints,
                     DataInfo& data_info, PriorInfo& prior_info,
                     double sigma,
@@ -154,7 +155,7 @@ bool BirthDeathStep(StanTree& tree, CutpointMatrix& cutpoints,
         left_count, left_sum, right_count, right_sum,
         tentative_indicators, routing_map, random);
     } else {
-      // Skip-then-draw: compute stats from non-NaN only.
+      // Skip-then-draw (mode 1) or uniform (mode 3): stats from non-NaN only.
       GetSufficientStatistics(tree, target_leaf, split_var, cut_val,
                               cutpoints, data_info,
                               left_count, left_sum, right_count, right_sum,
@@ -194,10 +195,10 @@ bool BirthDeathStep(StanTree& tree, CutpointMatrix& cutpoints,
         // Store the pre-drawn tentative indicators in the routing map.
         routing_map[target_leaf] = std::move(tentative_indicators);
       } else {
-        // Draw routing indicators after acceptance (mode 1).
+        // Draw routing indicators after acceptance (mode 1 or 3).
         DrawRoutingIndicators(target_leaf, split_var, cut_val,
                               cutpoints, tree, data_info, sigma, prior_info.eta,
-                              routing_map, random);
+                              routing_map, random, irs_mode);
       }
       return true;
     } else {

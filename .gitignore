@@ -2,6 +2,7 @@
 .claude/
 .devcontainer/
 info/
+CLAUDE.md
 
 # R package build artifacts
 *.o

@@ -12,7 +12,8 @@ Rcpp::List SimpleBART_cpp(
   SEXP sigma_knownSEXP, SEXP sigmaSEXP, SEXP lambdaSEXP, SEXP nuSEXP,
   SEXP N_postSEXP, SEXP N_burnSEXP,
   SEXP verboseSEXP,
-  SEXP irsSEXP
+  SEXP irsSEXP,
+  SEXP store_posterior_sampleSEXP
 );
 
 #endif // SIMPLEBART_H

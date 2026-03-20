@@ -105,18 +105,20 @@ double ComputeIRSProbability(double residual_i,
 
 // Draw routing indicators for all observations at a newly born internal node.
 // Called after a birth is accepted.
+// irs_mode: 1/2 = informed routing, 3 = uniform P=0.5.
 void DrawRoutingIndicators(
     StanTree* node, size_t split_var, size_t cut_val,
     CutpointMatrix& cutpoints, StanTree& tree_root,
     DataInfo& data_info, double sigma, double tau_h,
-    RoutingMap& routing_map, Random& random);
+    RoutingMap& routing_map, Random& random, int irs_mode = 1);
 
 // Gibbs-redraw routing indicators at all nog nodes in the tree.
 // Called once per tree per MCMC iteration (before computing residuals).
+// irs_mode: 1/2 = informed routing, 3 = uniform P=0.5.
 void RedrawNogRouting(
     StanTree& tree, CutpointMatrix& cutpoints,
     DataInfo& data_info, double sigma, double tau_h,
-    RoutingMap& routing_map, Random& random);
+    RoutingMap& routing_map, Random& random, int irs_mode = 1);
 
 // Remove routing indicators for a dying node. Called after death acceptance.
 void RemoveRoutingIndicators(StanTree* dying_node, RoutingMap& routing_map);

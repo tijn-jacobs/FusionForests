@@ -1,0 +1,86 @@
+
+The following have been reloaded with a version change:
+  1) Java/17.0.6 => Java/21.0.2
+
+TMPDIR is set to: /scratch-local/tjacobs.20960424
+HOME is set to: /home/tjacobs
+Loading required package: rJava
+Loading required package: bartMachineJARs
+WARNING: Using incubator modules: jdk.incubator.vector
+Loading required package: randomForest
+randomForest 4.7-1.2
+Type rfNews() to see new features/changes/bug fixes.
+Loading required package: missForest
+Welcome to bartMachine v1.3.4.1! You have 5.37GB memory available.
+
+If you run out of memory, restart R, and use e.g.
+'options(java.parameters = "-Xmx5g")' for 5GB of RAM before you call
+'library(bartMachine)'.
+
+bartMachine now using 1 cores.
+bartMachine cores: 192
+Replications per scenario: 192
+Total scenarios: 108
+Output directory: /scratch-local/tjacobs.20960424
+
+=== Scenario 1 / 108: quadratic | mcar | p=0.25 | n=100 ===
+
+          method rmse_train rmse_test bias_test mae_test coverage width
+ bartMachine MIA      0.854      2.11     0.149      1.4    0.955  8.37
+
+=== Scenario 2 / 108: linear | mcar | p=0.25 | n=100 ===
+
+          method rmse_train rmse_test bias_test mae_test coverage width
+ bartMachine MIA      0.523      1.27     0.133    0.961     0.98   6.4
+
+=== Scenario 3 / 108: friedman | mcar | p=0.25 | n=100 ===
+
+          method rmse_train rmse_test bias_test mae_test coverage width
+ bartMachine MIA        8.7      20.8     0.318     13.4    0.945    69
+
+=== Scenario 4 / 108: nonlinear | mcar | p=0.25 | n=100 ===
+
+          method rmse_train rmse_test bias_test mae_test coverage width
+ bartMachine MIA      0.525      0.81    0.0939    0.609    0.992  5.04
+
+=== Scenario 5 / 108: quadratic | mnar | p=0.25 | n=100 ===
+
+          method rmse_train rmse_test bias_test mae_test coverage width
+ bartMachine MIA      0.817      4.37     -2.02     2.52    0.821  8.07
+
+=== Scenario 6 / 108: linear | mnar | p=0.25 | n=100 ===
+
+          method rmse_train rmse_test bias_test mae_test coverage width
+ bartMachine MIA      0.513      1.47     -0.27     1.05    0.955  6.15
+
+=== Scenario 7 / 108: friedman | mnar | p=0.25 | n=100 ===
+
+          method rmse_train rmse_test bias_test mae_test coverage width
+ bartMachine MIA       8.94      32.9     -10.7     19.1    0.868  70.1
+
+=== Scenario 8 / 108: nonlinear | mnar | p=0.25 | n=100 ===
+
+          method rmse_train rmse_test bias_test mae_test coverage width
+ bartMachine MIA      0.515      1.49    -0.467        1    0.979  6.23
+
+=== Scenario 9 / 108: quadratic | predictive | p=0.25 | n=100 ===
+
+          method rmse_train rmse_test bias_test mae_test coverage width
+ bartMachine MIA      0.835      2.08     0.193     1.39    0.961   8.6
+
+=== Scenario 10 / 108: linear | predictive | p=0.25 | n=100 ===
+
+          method rmse_train rmse_test bias_test mae_test coverage width
+ bartMachine MIA       0.81      4.26     0.577     3.34    0.695  8.58
+
+=== Scenario 11 / 108: friedman | predictive | p=0.25 | n=100 ===
+
+          method rmse_train rmse_test bias_test mae_test coverage width
+ bartMachine MIA       0.83      50.7     -34.4     35.5   0.0851  8.75
+
+=== Scenario 12 / 108: nonlinear | predictive | p=0.25 | n=100 ===
+
+          method rmse_train rmse_test bias_test mae_test coverage width
+ bartMachine MIA       1.18      13.9       6.7     7.81    0.646  9.01
+
+=== Scenario 13 / 108: quadratic | mcar | p=0.60 | n=100 ===
