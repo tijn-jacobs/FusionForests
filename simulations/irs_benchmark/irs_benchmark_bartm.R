@@ -17,8 +17,8 @@ options(java.parameters = c("-Xmx5g",
 
 library(bartMachine)
 
-source("~/irs_benchmark_common.R")
-# source("/Users/tijnjacobs/Library/CloudStorage/OneDrive-VrijeUniversiteitAmsterdam/Documents/GitHub/FusionForests/simulations/irs_benchmark/irs_benchmark_common.R")
+#source("~/irs_benchmark_common.R")
+ source("/Users/tijnjacobs/Library/CloudStorage/OneDrive-VrijeUniversiteitAmsterdam/Documents/GitHub/FusionForests/simulations/irs_benchmark/irs_benchmark_common.R")
 
 
 # ============================================================================
@@ -33,7 +33,7 @@ if (length(args) >= 1) {
   bm_cores <- parallel::detectCores() - 1
 }
 
-bartMachine::set_bart_machine_num_cores(bm_cores)
+bartMachine::set_bart_machine_num_cores(1)
 
 # n_reps must match irs_benchmark.R for seed alignment.
 # In irs_benchmark.R: n_reps <- num_cores (= args[1] - 1).
