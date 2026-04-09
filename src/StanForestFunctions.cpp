@@ -794,3 +794,59 @@ void DrawAllLeafMeans(StanTree& tree, CutpointMatrix& cutpoints,
   }
 }
 
+// Routing-map variant with optional exclusion of NaN-routed observations.
+// When exclude_routed=true (modes 4-6), only observations that were
+// deterministically routed at every split contribute to (n_l, s_l).
+void DrawAllLeafMeans(StanTree& tree, CutpointMatrix& cutpoints,
+                      DataInfo& data_info, PriorInfo& prior_info,
+                      double sigma, Random& random,
+                      RoutingMap& routing_map, bool exclude_routed)
+{
+  if (!exclude_routed) {
+    DrawAllLeafMeans(tree, cutpoints, data_info, prior_info,
+                     sigma, random, routing_map);
+    return;
+  }
+
+  // Precompute which observations were routed at any split.
+  std::vector<bool> was_routed(data_info.n, false);
+  for (auto& entry : routing_map) {
+    const std::vector<int8_t>& ind = entry.second;
+    for (size_t i = 0; i < data_info.n; i++) {
+      if (ind[i] != 0) was_routed[i] = true;
+    }
+  }
+
+  // Collect leaves and build index map.
+  std::vector<StanTree*> leaves;
+  leaves.clear();
+  tree.CollectLeaves(leaves);
+
+  size_t num_leaves = leaves.size();
+  std::vector<size_t> observation_counts(num_leaves, 0);
+  std::vector<double> residual_sums(num_leaves, 0.0);
+
+  std::map<const StanTree*, size_t> leaf_index_map;
+  for (size_t i = 0; i < num_leaves; i++) {
+    leaf_index_map[leaves[i]] = i;
+  }
+
+  // Route all observations but only count non-routed ones.
+  for (size_t i = 0; i < data_info.n; i++) {
+    double* x_row = data_info.X + i * data_info.p;
+    const StanTree* leaf = tree.FindLeaf(x_row, i, cutpoints,
+                                         routing_map);
+    if (!was_routed[i]) {
+      size_t idx = leaf_index_map[leaf];
+      observation_counts[idx]++;
+      residual_sums[idx] += data_info.residuals[i];
+    }
+  }
+
+  for (size_t i = 0; i < num_leaves; i++) {
+    leaves[i]->SetStepHeight(
+      DrawLeafMean(observation_counts[i], residual_sums[i],
+                   prior_info.eta, sigma, random));
+  }
+}
+

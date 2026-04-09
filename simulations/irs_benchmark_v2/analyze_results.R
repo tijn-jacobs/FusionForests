@@ -9,25 +9,30 @@
 
 library(ggplot2)
 
-results_dir <- "simulations/irs_benchmark_v2/results"
+setwd("~/Library/CloudStorage/OneDrive-VrijeUniversiteitAmsterdam/Documents/GitHub/FusionForests/simulations/irs_benchmark_v2")
+results_dir <- "results"
 
 # ============================================================================
 # Load data
 # ============================================================================
 
-combined_file <- file.path(results_dir, "irs_v2_combined.rds")
-all_file      <- file.path(results_dir, "irs_v2_all_output.rds")
+# Load all available result files and combine
+rds_files <- c(
+  file.path(results_dir, "irs_v2_output.rds"),
+  file.path(results_dir, "irs_v2_mice_output.rds"),
+  file.path(results_dir, "irs_v2_bartm_output.rds")
+)
+rds_files <- rds_files[file.exists(rds_files)]
 
-if (file.exists(combined_file)) {
-  cat("Loading combined results file...\n")
-  obj <- readRDS(combined_file)
-  combined <- obj$results
-} else if (file.exists(all_file)) {
-  cat("Loading all-output results file...\n")
-  combined <- readRDS(all_file)
-} else {
+if (length(rds_files) == 0) {
   stop("No result files found in ", results_dir)
 }
+
+parts <- lapply(rds_files, function(f) {
+  cat(sprintf("Loading %s\n", basename(f)))
+  readRDS(f)
+})
+combined <- do.call(rbind, parts)
 
 cat(sprintf("Loaded %d rows across %d scenarios.\n",
             nrow(combined),
@@ -158,23 +163,6 @@ if (nrow(cov_data) > 0) {
 } else {
   cat("No coverage data available.\n")
 }
-
-# ============================================================================
-# Table 5: Wall-clock time
-# ============================================================================
-
-cat("\n")
-cat("============================================================\n")
-cat("  Table 5: Average wall-clock time (seconds)\n")
-cat("============================================================\n\n")
-
-tab5 <- aggregate(
-  time ~ method,
-  data = combined,
-  FUN = function(x) mean(x, na.rm = TRUE)
-)
-tab5 <- tab5[order(tab5$time), ]
-print(tab5, digits = 2, row.names = FALSE)
 
 # ============================================================================
 # Plot 1: CATE RMSE by outcome scenario, faceted by missingness
@@ -350,14 +338,159 @@ p5 <- ggplot(
 plot_dir <- file.path(results_dir, "figures")
 dir.create(plot_dir, showWarnings = FALSE, recursive = TRUE)
 
-ggsave(file.path(plot_dir, "cate_rmse_by_scenario.pdf"),
-       p1, width = 12, height = 5)
-ggsave(file.path(plot_dir, "cate_rmse_by_rho.pdf"),
-       p2, width = 10, height = 7)
-ggsave(file.path(plot_dir, "cate_coverage.pdf"),
-       p3, width = 12, height = 5)
-ggsave(file.path(plot_dir, "ate_bias.pdf"),
-       p4, width = 12, height = 5)
+# --- Helper: bar plot by scenario x missingness ---
+
+make_scenario_plot <- function(data, yvar, ylabel, title,
+                               hline = NULL,
+                               ylim = NULL) {
+  p <- ggplot(
+    data,
+    aes(x = outcome_label, y = .data[[yvar]],
+        fill = method)
+  ) +
+    geom_col(position = position_dodge(0.8), width = 0.7) +
+    facet_wrap(~ miss_label) +
+    scale_fill_manual(values = method_colors) +
+    labs(x = "Outcome scenario", y = ylabel,
+         title = title, fill = "Method") +
+    theme_bench +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1))
+  if (!is.null(hline)) {
+    p <- p + geom_hline(yintercept = hline,
+                        linetype = "dashed",
+                        color = "grey50")
+  }
+  if (!is.null(ylim)) p <- p + coord_cartesian(ylim = ylim)
+  p
+}
+
+# --- Helper: bar plot by rho x outcome ---
+
+make_rho_plot <- function(data, yvar, ylabel, title,
+                          hline = NULL) {
+  p <- ggplot(
+    data,
+    aes(x = factor(rho), y = .data[[yvar]],
+        fill = method)
+  ) +
+    geom_col(position = position_dodge(0.8), width = 0.7) +
+    facet_wrap(~ outcome_label, scales = "free_y") +
+    scale_fill_manual(values = method_colors) +
+    labs(x = expression(rho ~ "(covariate correlation)"),
+         y = ylabel, title = title, fill = "Method") +
+    theme_bench
+  if (!is.null(hline)) {
+    p <- p + geom_hline(yintercept = hline,
+                        linetype = "dashed",
+                        color = "grey50")
+  }
+  p
+}
+
+# --- Aggregate all metrics by scenario x missingness ---
+
+metrics_scen <- aggregate(
+  cbind(cate_rmse_test, cate_bias_test, rmse_m_test,
+        cate_rmse_train, cate_bias_train, rmse_m_train,
+        ate_bias, cate_coverage, cate_ci_width,
+        avg_post_var) ~
+    method + outcome_scenario + miss_pattern,
+  data = combined,
+  FUN = function(x) mean(x, na.rm = TRUE),
+  na.action = na.pass
+)
+metrics_scen$outcome_label <- outcome_labels[
+  as.character(metrics_scen$outcome_scenario)
+]
+metrics_scen$miss_label <- miss_labels[
+  metrics_scen$miss_pattern
+]
+
+# --- Aggregate all metrics by rho x outcome ---
+
+metrics_rho <- aggregate(
+  cbind(cate_rmse_test, cate_bias_test, rmse_m_test,
+        cate_rmse_train, cate_bias_train, rmse_m_train,
+        ate_bias, cate_coverage, cate_ci_width,
+        avg_post_var) ~
+    method + outcome_scenario + rho,
+  data = combined,
+  FUN = function(x) mean(x, na.rm = TRUE),
+  na.action = na.pass
+)
+metrics_rho$outcome_label <- outcome_labels[
+  as.character(metrics_rho$outcome_scenario)
+]
+
+# --- Plot specifications (test + train pairs) ---
+
+scenario_specs <- list(
+  # Test set metrics
+  list(yvar = "cate_rmse_test",
+       ylabel = "CATE RMSE (test)",
+       title = "CATE estimation accuracy — test set"),
+  list(yvar = "cate_rmse_train",
+       ylabel = "CATE RMSE (train)",
+       title = "CATE estimation accuracy — training set"),
+  list(yvar = "cate_bias_test",
+       ylabel = "CATE bias (test)",
+       title = "CATE estimation bias — test set",
+       hline = 0),
+  list(yvar = "cate_bias_train",
+       ylabel = "CATE bias (train)",
+       title = "CATE estimation bias — training set",
+       hline = 0),
+  list(yvar = "rmse_m_test",
+       ylabel = "RMSE of m (test)",
+       title = "Prediction accuracy — test set"),
+  list(yvar = "rmse_m_train",
+       ylabel = "RMSE of m (train)",
+       title = "Prediction accuracy — training set"),
+  # ATE and uncertainty (not train/test split)
+  list(yvar = "ate_bias",
+       ylabel = "ATE bias",
+       title = "Bias in average treatment effect",
+       hline = 0),
+  list(yvar = "cate_coverage",
+       ylabel = "95% CI coverage",
+       title = "Credible interval coverage for CATE",
+       hline = 0.95, ylim = c(0.5, 1.0)),
+  list(yvar = "cate_ci_width",
+       ylabel = "Average CI width",
+       title = "Credible interval width for CATE"),
+  list(yvar = "avg_post_var",
+       ylabel = "Avg posterior variance",
+       title = "Average posterior variance of CATE")
+)
+
+# --- Multi-page PDF: by scenario x missingness ---
+
+pdf(file.path(plot_dir, "results_by_scenario.pdf"),
+    width = 12, height = 5)
+for (spec in scenario_specs) {
+  p <- make_scenario_plot(
+    metrics_scen, spec$yvar, spec$ylabel, spec$title,
+    hline = spec$hline, ylim = spec$ylim
+  )
+  print(p)
+}
+dev.off()
+
+# --- Multi-page PDF: by rho ---
+
+pdf(file.path(plot_dir, "results_by_rho.pdf"),
+    width = 10, height = 7)
+for (spec in scenario_specs) {
+  p <- make_rho_plot(
+    metrics_rho, spec$yvar, spec$ylabel, spec$title,
+    hline = spec$hline
+  )
+  print(p)
+}
+dev.off()
+
+# --- Relative CATE RMSE (single page) ---
+
 ggsave(file.path(plot_dir, "relative_cate_rmse.pdf"),
        p5, width = 12, height = 5)
 
@@ -367,14 +500,53 @@ cat(sprintf("\nPlots saved to %s/\n", plot_dir))
 # Save summary CSV
 # ============================================================================
 
-agg_full <- aggregate(
-  cbind(rmse_m_test, cate_bias_test, cate_rmse_test,
-        ate_bias, cate_coverage, cate_ci_width,
-        time) ~ method + outcome_scenario + miss_pattern +
-    rho,
+# Means of all per-rep metrics
+agg_means <- aggregate(
+  cbind(rmse_m_train, rmse_m_test, mae_m_test,
+        cate_bias_train, cate_rmse_train,
+        cate_bias_test, cate_rmse_test,
+        ate_bias, ate_hat, ate_true,
+        cate_coverage, cate_ci_width, avg_post_var,
+        ate_coverage, ate_ci_width
+        ) ~ method + outcome_scenario +
+    miss_pattern + rho,
   data = combined,
-  FUN = function(x) mean(x, na.rm = TRUE)
+  FUN = function(x) mean(x, na.rm = TRUE),
+  na.action = na.pass
 )
+
+# Frequentist variance of ATE estimator (across reps)
+ate_var <- aggregate(
+  ate_hat ~ method + outcome_scenario +
+    miss_pattern + rho,
+  data = combined,
+  FUN = function(x) var(x, na.rm = TRUE),
+  na.action = na.pass
+)
+names(ate_var)[ncol(ate_var)] <- "ate_freq_var"
+
+# ATE RMSE across reps
+ate_rmse <- aggregate(
+  ate_bias ~ method + outcome_scenario +
+    miss_pattern + rho,
+  data = combined,
+  FUN = function(x) sqrt(mean(x^2, na.rm = TRUE)),
+  na.action = na.pass
+)
+names(ate_rmse)[ncol(ate_rmse)] <- "ate_rmse"
+
+agg_full <- merge(agg_means, ate_var,
+  by = c("method", "outcome_scenario",
+         "miss_pattern", "rho")
+)
+agg_full <- merge(agg_full, ate_rmse,
+  by = c("method", "outcome_scenario",
+         "miss_pattern", "rho")
+)
+
+# Round numeric columns to 3 digits
+num_cols <- sapply(agg_full, is.numeric)
+agg_full[num_cols] <- round(agg_full[num_cols], 3)
 
 agg_file <- file.path(results_dir, "irs_v2_summary.csv")
 write.csv(agg_full, file = agg_file, row.names = FALSE)

@@ -1,19 +1,24 @@
 # ============================================================================
-# IRS Benchmark v2 — BART+MIA (bartMachine) only
+# IRS Benchmark v3 — BCF decomposition: Y = mu(X,e) + tau(X)*A + eps
+#
+# Same DGP and scenarios as v2, but using SimpleBCF (two-forest)
+# instead of SimpleBART (single forest).
+#
+# Methods: Oracle, IRS, Complete case, Complete covariates,
+#          MissForest+BCF
 #
 # Usage:
-#   Rscript irs_v2_bartm.R [num_cores]
+#   Rscript irs_v3.R [num_cores]
 #
 # Output:
-#   $TMPDIR/irs_v2_bartm_output.rds
+#   $TMPDIR/irs_v3_output.rds
 # ============================================================================
 
-# Force Java options BEFORE anything loads Java
-options(java.parameters = c("-Xmx20g", "--add-modules=jdk.incubator.vector", "-XX:+UseZGC")) 
-
 library(FusionForests)
+library(doParallel)
+library(foreach)
 library(MASS)
-library(bartMachine)
+library(missForest)
 
 source("evaluation_functions.R")
 
@@ -24,24 +29,22 @@ source("evaluation_functions.R")
 args <- commandArgs(trailingOnly = TRUE)
 
 if (length(args) >= 1) {
-  num_cores <- as.integer(args[1]) - 0
+  num_cores <- as.integer(args[1]) - 2
 } else {
-  num_cores <- parallel::detectCores() - 0
+  num_cores <- parallel::detectCores() - 2
 }
 
-# bartMachine uses Java threads internally — let it use
-# all available cores per fit. No R-level parallelism.
-bartMachine::set_bart_machine_num_cores(num_cores)
+registerDoParallel(cores = num_cores)
 
 # ============================================================================
 # Settings
 # ============================================================================
 
-n_reps  <- 950L
+n_reps  <- num_cores
 n_rct   <- 150L
 n_rwd   <- 350L
 n_test  <- 500L
-seed0   <- 2026L
+seed0   <- 3030L
 
 # DGP parameters
 beta5   <- 1
@@ -52,11 +55,12 @@ alpha1  <- 0.5
 alpha5  <- 0.5
 pi_mcar <- 0.3
 
-# BART settings
-bart_settings <- list(
-  number_of_trees = 200L,
-  N_post          = 2000L,
-  N_burn          = 1000L
+# BCF settings
+bcf_settings <- list(
+  number_of_trees_prog  = 200L,
+  number_of_trees_treat = 100L,
+  N_post                = 2000L,
+  N_burn                = 2000L
 )
 
 # Output directory
@@ -72,7 +76,7 @@ cat(sprintf("Cores: %d | Reps per scenario: %d\n",
             num_cores, n_reps))
 
 # ============================================================================
-# DGP functions
+# DGP functions (same as v2)
 # ============================================================================
 
 generate_covariates <- function(n, p = 5, rho = 0) {
@@ -93,26 +97,21 @@ assign_treatment <- function(X, S, alpha0 = 0,
   A
 }
 
-# Outcome models
 m_scenario0 <- function(X, A) {
   1 + X[, 1] + X[, 2] + 2 * X[, 3] * A
 }
-
 m_scenario1 <- function(X, A, beta5 = 1) {
   1 + X[, 1] + X[, 2] + beta5 * X[, 5] + 2 * X[, 3] * A
 }
-
 m_scenario2 <- function(X, A, gamma0 = 2, gamma1 = 1) {
   1 + X[, 1] + X[, 2] + (gamma0 + gamma1 * X[, 5]) * A
 }
-
 m_scenario3 <- function(X, A, beta5 = 1, gamma0 = 2,
                         gamma1 = 1) {
   1 + X[, 1] + X[, 2] + beta5 * X[, 5] +
     (gamma0 + gamma1 * X[, 5]) * A
 }
 
-# CATE functions
 tau_scenario0 <- function(X) { 2 * X[, 3] }
 tau_scenario1 <- function(X) { 2 * X[, 3] }
 tau_scenario2 <- function(X, gamma0 = 2, gamma1 = 1) {
@@ -143,8 +142,7 @@ generate_data <- function(n_rct = 150, n_rwd = 350,
                           alpha0 = 0, alpha1 = 0.5,
                           alpha5 = 0.5,
                           beta5 = 1, gamma0 = 2,
-                          gamma1 = 1,
-                          seed = NULL) {
+                          gamma1 = 1, seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
 
   n <- n_rct + n_rwd
@@ -178,45 +176,32 @@ generate_data <- function(n_rct = 150, n_rwd = 350,
   m_test    <- m_fn(X_test, A_test)
   tau_train <- tau_fn(X)
   tau_test  <- tau_fn(X_test)
-
   y <- m_train + rnorm(n, sd = sigma)
 
-  XA_train <- cbind(X, A)
-  XA_test  <- cbind(X_test, A_test)
-  colnames(XA_train) <- c(paste0("X", 1:5), "A")
-  colnames(XA_test)  <- c(paste0("X", 1:5), "A")
-
-  XA_test_1 <- cbind(X_test, 1)
-  XA_test_0 <- cbind(X_test, 0)
-  colnames(XA_test_1) <- colnames(XA_train)
-  colnames(XA_test_0) <- colnames(XA_train)
-
-  XA_train_1 <- cbind(X, 1)
-  XA_train_0 <- cbind(X, 0)
-  colnames(XA_train_1) <- colnames(XA_train)
-  colnames(XA_train_0) <- colnames(XA_train)
+  # Estimate propensity score (logistic on X1..X5)
+  ps_fit <- glm(A ~ X, family = binomial)
+  e_train <- fitted(ps_fit)
+  e_test  <- plogis(cbind(1, X_test) %*% coef(ps_fit))
 
   list(
-    y = y, XA_train = XA_train, X_train = X,
-    A_train = A, S_train = S,
+    y = y, X_train = X, A_train = A, S_train = S,
     m_train = m_train, tau_train = tau_train,
-    XA_test = XA_test, XA_test_1 = XA_test_1,
-    XA_test_0 = XA_test_0,
     X_test = X_test, A_test = A_test,
     m_test = m_test, tau_test = tau_test,
-    XA_train_1 = XA_train_1, XA_train_0 = XA_train_0,
+    e_train = as.numeric(e_train),
+    e_test  = as.numeric(e_test),
     sigma = sigma, n_rct = n_rct, n_rwd = n_rwd
   )
 }
 
-impose_missingness <- function(XA, S,
+impose_missingness <- function(X, S,
                                miss_pattern = c("block_rct",
                                                 "block_rwd",
                                                 "mcar"),
                                pi_mcar = 0.3) {
   miss_pattern <- match.arg(miss_pattern)
-  n <- nrow(XA)
-  XA_miss <- XA
+  n <- nrow(X)
+  X_miss <- X
   M <- integer(n)
 
   if (miss_pattern == "block_rct") {
@@ -227,13 +212,13 @@ impose_missingness <- function(XA, S,
     idx <- which(rbinom(n, 1, pi_mcar) == 1)
   }
   M[idx] <- 1L
-  XA_miss[idx, 5] <- NaN
+  X_miss[idx, 5] <- NaN
 
-  list(XA_miss = XA_miss, M = M)
+  list(X_miss = X_miss, M = M)
 }
 
 # ============================================================================
-# Scenario grid
+# Scenario grid (same as v2)
 # ============================================================================
 
 build_scenario_grid <- function() {
@@ -261,65 +246,154 @@ get_n_scenarios <- function() {
 }
 
 # ============================================================================
-# Method wrapper
+# BCF method wrappers
 # ============================================================================
 
-# --- bartMachine MIA ---
-
-run_bartmachine <- function(data, miss, s) {
-  XA_na <- miss$XA_miss
-  XA_na[is.nan(XA_na)] <- NA
-
-  bm <- bartMachine::bartMachine(
-    as.data.frame(XA_na), data$y,
-    num_trees                          = s$number_of_trees,
-    num_burn_in                        = s$N_burn,
-    num_iterations_after_burn_in       = s$N_post,
-    use_missing_data                   = TRUE,
-    use_missing_data_dummies_as_covars = TRUE,
-    verbose                            = FALSE
+#' Fit SimpleBCF and return structured results for evaluation
+#'
+#' SimpleBCF directly gives tau(x) from the treatment forest,
+#' so no counterfactual trick is needed.
+fit_bcf <- function(y, X_train, A_train, e_train,
+                    X_test, A_test, e_test,
+                    irs, s) {
+  fit <- SimpleBCF(
+    y = y, X_train = X_train,
+    treatment_indicator = as.integer(A_train),
+    propensity_score = e_train,
+    X_test = X_test,
+    treatment_indicator_test = as.integer(A_test),
+    propensity_score_test = e_test,
+    number_of_trees_prog  = s$number_of_trees_prog,
+    number_of_trees_treat = s$number_of_trees_treat,
+    N_post  = s$N_post,
+    N_burn  = s$N_burn,
+    verbose = FALSE,
+    irs     = as.integer(irs),
+    store_posterior_sample = TRUE
   )
 
-  pred_obs <- bartMachine::bart_machine_get_posterior(
-    bm, as.data.frame(data$XA_test)
-  )
-  pred_1 <- bartMachine::bart_machine_get_posterior(
-    bm, as.data.frame(data$XA_test_1)
-  )
-  pred_0 <- bartMachine::bart_machine_get_posterior(
-    bm, as.data.frame(data$XA_test_0)
-  )
-  pred_tr <- bartMachine::bart_machine_get_posterior(
-    bm, as.data.frame(XA_na)
-  )
-  pred_tr1 <- bartMachine::bart_machine_get_posterior(
-    bm, as.data.frame(data$XA_train_1)
-  )
-  pred_tr0 <- bartMachine::bart_machine_get_posterior(
-    bm, as.data.frame(data$XA_train_0)
-  )
-
+  # Build objects compatible with evaluate_fit
   fit_obs <- list(
-    train_predictions = pred_tr$y_hat,
-    test_predictions  = pred_obs$y_hat
+    train_predictions = fit$train_predictions,
+    test_predictions  = fit$test_predictions
   )
+  # tau(x) comes directly from the treatment forest
   fit_1 <- list(
-    train_predictions = pred_tr1$y_hat,
-    test_predictions  = pred_1$y_hat,
-    test_predictions_sample =
-      t(pred_1$y_hat_posterior_samples)
+    train_predictions = fit$train_predictions_treat,
+    test_predictions  = fit$test_predictions_treat
   )
+  # For the "fit_0" slot we store zeros (tau = fit_1 - 0)
   fit_0 <- list(
-    train_predictions = pred_tr0$y_hat,
-    test_predictions  = pred_0$y_hat,
-    test_predictions_sample =
-      t(pred_0$y_hat_posterior_samples)
+    train_predictions = rep(0, length(fit$train_predictions)),
+    test_predictions  = rep(0, length(fit$test_predictions))
   )
 
-  rm(bm); gc()
+  if (!is.null(fit$test_predictions_treat_sample)) {
+    fit_1$test_predictions_sample <-
+      fit$test_predictions_treat_sample
+    fit_0$test_predictions_sample <-
+      matrix(0, nrow = nrow(fit$test_predictions_treat_sample),
+                ncol = ncol(fit$test_predictions_treat_sample))
+  }
 
+  list(fit = fit_obs, fit_1 = fit_1, fit_0 = fit_0)
+}
+
+# --- Oracle BCF ---
+
+run_oracle <- function(data, s) {
+  fits <- fit_bcf(
+    y = data$y, X_train = data$X_train,
+    A_train = data$A_train, e_train = data$e_train,
+    X_test = data$X_test, A_test = data$A_test,
+    e_test = data$e_test,
+    irs = 0L, s = s
+  )
   evaluate_fit(
-    fit_obs, fit_1, fit_0,
+    fits$fit, fits$fit_1, fits$fit_0,
+    data$m_train, data$m_test,
+    data$tau_train, data$tau_test
+  )
+}
+
+# --- IRS BCF ---
+
+run_irs <- function(data, miss, s, irs_mode = 2L) {
+  fits <- fit_bcf(
+    y = data$y, X_train = miss$X_miss,
+    A_train = data$A_train, e_train = data$e_train,
+    X_test = data$X_test, A_test = data$A_test,
+    e_test = data$e_test,
+    irs = irs_mode, s = s
+  )
+  evaluate_fit(
+    fits$fit, fits$fit_1, fits$fit_0,
+    data$m_train, data$m_test,
+    data$tau_train, data$tau_test
+  )
+}
+
+# --- Complete case BCF ---
+
+run_complete_case <- function(data, miss, s) {
+  obs_rows <- !is.nan(miss$X_miss[, 5])
+  n_obs <- sum(obs_rows)
+  if (n_obs < 30) return(null_result())
+
+  fits <- fit_bcf(
+    y = data$y[obs_rows],
+    X_train = miss$X_miss[obs_rows, , drop = FALSE],
+    A_train = data$A_train[obs_rows],
+    e_train = data$e_train[obs_rows],
+    X_test = data$X_test, A_test = data$A_test,
+    e_test = data$e_test,
+    irs = 0L, s = s
+  )
+  evaluate_fit(
+    fits$fit, fits$fit_1, fits$fit_0,
+    data$m_train[obs_rows], data$m_test,
+    data$tau_train[obs_rows], data$tau_test
+  )
+}
+
+# --- Complete covariates BCF (drop X5) ---
+
+run_complete_covariates <- function(data, s) {
+  fits <- fit_bcf(
+    y = data$y,
+    X_train = data$X_train[, -5, drop = FALSE],
+    A_train = data$A_train, e_train = data$e_train,
+    X_test = data$X_test[, -5, drop = FALSE],
+    A_test = data$A_test, e_test = data$e_test,
+    irs = 0L, s = s
+  )
+  evaluate_fit(
+    fits$fit, fits$fit_1, fits$fit_0,
+    data$m_train, data$m_test,
+    data$tau_train, data$tau_test
+  )
+}
+
+# --- MissForest + BCF ---
+
+run_missforest <- function(data, miss, s) {
+  X_na <- miss$X_miss
+  X_na[is.nan(X_na)] <- NA
+
+  imputed <- missForest::missForest(
+    as.data.frame(X_na), verbose = FALSE
+  )
+  X_imp <- as.matrix(imputed$ximp)
+
+  fits <- fit_bcf(
+    y = data$y, X_train = X_imp,
+    A_train = data$A_train, e_train = data$e_train,
+    X_test = data$X_test, A_test = data$A_test,
+    e_test = data$e_test,
+    irs = 0L, s = s
+  )
+  evaluate_fit(
+    fits$fit, fits$fit_1, fits$fit_0,
     data$m_train, data$m_test,
     data$tau_train, data$tau_test
   )
@@ -363,9 +437,12 @@ for (scenario_id in seq_len(n_scenarios)) {
     scenario$miss_pattern, scenario$rho
   ))
 
-  rep_list <- vector("list", n_reps)
-
-  for (rep in seq_len(n_reps)) {
+  results <- foreach(
+    rep = seq_len(n_reps),
+    .combine  = rbind,
+    .packages = c("FusionForests", "MASS", "missForest"),
+    .errorhandling = "stop"
+  ) %dopar% {
 
     seed <- seed0 + (scenario_id - 1) * n_reps + rep
 
@@ -379,39 +456,77 @@ for (scenario_id in seq_len(n_scenarios)) {
     )
 
     miss <- impose_missingness(
-      XA           = data$XA_train,
+      X            = data$X_train,
       S            = data$S_train,
       miss_pattern = scenario$miss_pattern,
       pi_mcar      = pi_mcar
     )
 
+    make_row <- function(method_name, ev, elapsed) {
+      row <- data.frame(
+        rep = rep, method = method_name, time = elapsed,
+        stringsAsFactors = FALSE
+      )
+      for (nm in names(ev)) {
+        row[[nm]] <- ifelse(is.null(ev[[nm]]), NA,
+                            ev[[nm]])
+      }
+      row
+    }
+
+    rep_rows <- list()
+    idx <- 0L
+
+    # Oracle BCF
+    t0 <- proc.time()
+    ev <- tryCatch(run_oracle(data, bcf_settings),
+                   error = function(e) null_result())
+    idx <- idx + 1L
+    rep_rows[[idx]] <- make_row("Oracle", ev,
+                                (proc.time() - t0)[3])
+
+    # IRS BCF
     t0 <- proc.time()
     ev <- tryCatch(
-      run_bartmachine(data, miss, bart_settings),
-      error = function(e) {
-        cat(sprintf("  Rep %d error: %s\n", rep,
-                    conditionMessage(e)))
-        null_result()
-      }
+      run_irs(data, miss, bcf_settings, irs_mode = 2L),
+      error = function(e) null_result()
     )
-    elapsed <- (proc.time() - t0)[3]
+    idx <- idx + 1L
+    rep_rows[[idx]] <- make_row("IRS", ev,
+                                (proc.time() - t0)[3])
 
-    row <- data.frame(
-      rep = rep, method = "BART+MIA", time = elapsed,
-      stringsAsFactors = FALSE
+    # Complete case BCF
+    t0 <- proc.time()
+    ev <- tryCatch(
+      run_complete_case(data, miss, bcf_settings),
+      error = function(e) null_result()
     )
-    for (nm in names(ev)) {
-      row[[nm]] <- ifelse(is.null(ev[[nm]]), NA, ev[[nm]])
-    }
-    rep_list[[rep]] <- row
+    idx <- idx + 1L
+    rep_rows[[idx]] <- make_row("Complete case", ev,
+                                (proc.time() - t0)[3])
 
-    if (rep %% 10 == 0) {
-      cat(sprintf("  Completed %d / %d reps\n",
-                  rep, n_reps))
-    }
+    # Complete covariates BCF
+    t0 <- proc.time()
+    ev <- tryCatch(
+      run_complete_covariates(data, bcf_settings),
+      error = function(e) null_result()
+    )
+    idx <- idx + 1L
+    rep_rows[[idx]] <- make_row("Complete covariates", ev,
+                                (proc.time() - t0)[3])
+
+    # MissForest + BCF
+    t0 <- proc.time()
+    ev <- tryCatch(
+      run_missforest(data, miss, bcf_settings),
+      error = function(e) null_result()
+    )
+    idx <- idx + 1L
+    rep_rows[[idx]] <- make_row("MissForest+BCF", ev,
+                                (proc.time() - t0)[3])
+
+    do.call(rbind, rep_rows)
   }
-
-  results <- do.call(rbind, rep_list)
 
   # Handle error results
   if (is.data.frame(results)) {
@@ -461,11 +576,9 @@ for (scenario_id in seq_len(n_scenarios)) {
 combined <- do.call(rbind, all_scenario_results)
 rownames(combined) <- NULL
 
-combined_file <- file.path(output_dir,
-                           "irs_v2_bartm_output.rds")
+combined_file <- file.path(output_dir, "irs_v3_output.rds")
 saveRDS(combined, file = combined_file)
 
 cat(sprintf("All %d scenarios complete.\n", n_scenarios))
 cat(sprintf("Combined results: %s (%d rows)\n",
             combined_file, nrow(combined)))
-

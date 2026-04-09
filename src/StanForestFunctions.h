@@ -153,6 +153,14 @@ void DrawAllLeafMeans(StanTree& tree, CutpointMatrix& cutpoints,
                       double sigma, Random& random,
                       RoutingMap& routing_map);
 
+// Routing-map variant with optional exclusion of NaN-routed observations.
+// When exclude_routed=true, only non-missing observations contribute to
+// the leaf mean posterior (modes 4-6).
+void DrawAllLeafMeans(StanTree& tree, CutpointMatrix& cutpoints,
+                      DataInfo& data_info, PriorInfo& prior_info,
+                      double sigma, Random& random,
+                      RoutingMap& routing_map, bool exclude_routed);
+
 // Draw-then-decide: draw routing indicators for NaN observations at the
 // proposed split_var BEFORE the birth, compute sufficient stats including
 // routed NaN observations, and return the tentative routing indicators.

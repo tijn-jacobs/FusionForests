@@ -6,7 +6,8 @@ StanForest::StanForest(size_t num_trees_init)
   : num_trees(num_trees_init), trees(num_trees_init), prior_info(),
     p(0), n(0), x(nullptr), y(nullptr), cutpoints(),
     all_fit(nullptr), residuals(nullptr), tree_fit_temp(nullptr), data_info(),
-    irs_mode(0), routing_maps(num_trees_init),
+    irs_mode(0), irs_exclude_nan_from_mu(false),
+    routing_maps(num_trees_init),
     use_dart(false), dart_active(false), use_augmentation(false),
     fixed_theta(false), dart_a(0.0), dart_b(0.0), dart_rho(0.0),
     dart_theta(1.0) {}
@@ -136,7 +137,8 @@ bool StanForest::Draw(double sigma, Random& random, bool* accept)
 
       // Draw new leaf parameters for tree j (IRS-aware).
       DrawAllLeafMeans(trees[j], cutpoints, data_info, prior_info, sigma,
-                       random, routing_maps[j]);
+                       random, routing_maps[j],
+                       irs_exclude_nan_from_mu);
 
       // Add the updated contribution of tree j back to all_fit.
       FitTree(trees[j], cutpoints, p, n, x, tree_fit_temp, routing_maps[j]);

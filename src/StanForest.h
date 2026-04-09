@@ -106,7 +106,16 @@ public:
   void Predict(size_t p, size_t n, double* x, double* fp, Random& random);
 
   // IRS mode: 0=off, 1=skip-then-draw, 2=draw-then-decide, 3=uniform (P=0.5).
-  void SetIRS(int mode) { irs_mode = mode; }
+  // Modes 4-6 = same as 1-3 but exclude NaN obs from leaf mean draws.
+  void SetIRS(int mode) {
+    if (mode >= 4 && mode <= 6) {
+      irs_mode = mode - 3;
+      irs_exclude_nan_from_mu = true;
+    } else {
+      irs_mode = mode;
+      irs_exclude_nan_from_mu = false;
+    }
+  }
 
   // Perform one full MCMC update (birth-death + leaf parameter draws).
   bool Draw(double sigma, Random& random, bool* accept);
@@ -139,6 +148,7 @@ protected:
   DataInfo data_info;            // Thin wrapper pointing into the arrays above
   // IRS (Informed Random Splitting) state
   int irs_mode = 0;              // 0=off, 1=skip-then-draw, 2=draw-then-decide, 3=uniform
+  bool irs_exclude_nan_from_mu = false;  // modes 4-6: exclude NaN obs from mu draw
   std::vector<RoutingMap> routing_maps; // Per-tree routing maps for NaN obs
 
   // DART state

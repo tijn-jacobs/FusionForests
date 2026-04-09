@@ -23,9 +23,9 @@ source("evaluation_functions.R")
 args <- commandArgs(trailingOnly = TRUE)
 
 if (length(args) >= 1) {
-  num_cores <- as.integer(args[1]) - 1
+  num_cores <- as.integer(args[1]) - 5
 } else {
-  num_cores <- parallel::detectCores() - 1
+  num_cores <- parallel::detectCores() - 5
 }
 
 registerDoParallel(cores = num_cores)
