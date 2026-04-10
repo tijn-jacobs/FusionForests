@@ -1,19 +1,30 @@
 #' FusionForest
 #'
 #' Bayesian data-fusion model combining an RCT and an observational study to
-#' estimate heterogeneous treatment effects.  Three BART ensembles are fitted
-#' jointly under an AFT decomposition:
-#' \deqn{\log(T) = m_0(X,S) + A\,\tau(X) + A\,(1-S)\,c(X) + \sigma\varepsilon}
-#' where \eqn{m_0} is the prognostic function, \eqn{\tau} is the CATE,
-#' \eqn{c} is the confounding function (active only in the OS treated arm),
-#' and \eqn{\eta = 0} (sources share a common baseline; no commensurate shift).
+#' estimate heterogeneous treatment effects.
+#'
+#' Two decompositions are available, selected via
+#' \code{decomposition}:
+#' \describe{
+#'   \item{\code{"three-forest"}}{The original model with a single prognostic
+#'     forest:
+#'     \deqn{\log(T) = m_0(X) + b\,[\tau(X) + (1-S)\,c(X)] +
+#'       \sigma\varepsilon}}
+#'   \item{\code{"four-forest"} (default)}{Replaces \eqn{m_0} with a
+#'     MAP-prior decomposition:
+#'     \deqn{\log(T) = \mu(X) + (1-S)\,g(X) + b\,[\tau(X) + (1-S)\,c(X)] +
+#'       \sigma\varepsilon}
+#'     where \eqn{\mu(X)} is a shared baseline (all data) and \eqn{g(X)}
+#'     captures the RWD-specific deviation (RWD only).  The borrowing
+#'     parameter \code{k_g} controls shrinkage of \eqn{g} toward zero.}
+#' }
 #'
 #' @param y Numeric vector of outcomes (survival times or continuous responses).
 #' @param status Integer vector of event indicators (\code{1} = event observed,
 #'   \code{0} = censored).  Required when \code{outcome_type = "right-censored"}.
 #' @param X_train_control Numeric matrix of covariates for the prognostic
-#'   (\eqn{m_0}) and deconfounding (\eqn{c}) forests.  One row per training
-#'   observation.
+#'   (\eqn{m_0} or \eqn{\mu}) and deconfounding (\eqn{c}) forests.  One row
+#'   per training observation.
 #' @param X_train_treat Numeric matrix of covariates for the treatment-effect
 #'   (\eqn{\tau}) forest.  Must have the same number of rows as
 #'   \code{X_train_control}.
@@ -30,8 +41,17 @@
 #'   \code{"right-censored"}.
 #' @param timescale Character; \code{"time"} (raw survival times, will be
 #'   log-transformed internally) or \code{"log"} (already on log scale).
+#' @param decomposition Character; \code{"four-forest"} (default) for the
+#'   \eqn{\mu + g} decomposition or \code{"three-forest"} for the original
+#'   single-\eqn{m_0} model.
 #' @param number_of_trees_control,number_of_trees_treat,number_of_trees_deconf
-#'   Number of trees in each of the three BART ensembles.  Default 200.
+#'   Number of trees in each BART ensemble.  Default 200.
+#' @param number_of_trees_deviation Number of trees for the \eqn{g} forest
+#'   (four-forest mode only).  Default 200.
+#' @param k_g Leaf-prior scale for the deviation forest \eqn{g}.
+#'   Larger values shrink \eqn{g} toward zero (stronger borrowing).
+#'   \code{k_g = Inf} disables \eqn{g} entirely (full pooling).
+#'   Default 2 (standard BART scale).  Ignored in three-forest mode.
 #' @param power,base Tree topology prior parameters.  The probability that a
 #'   node at depth \eqn{d} is non-terminal is
 #'   \eqn{\texttt{base} / (1 + d)^{\texttt{power}}}.
@@ -46,23 +66,29 @@
 #' @param N_post,N_burn Number of posterior and burn-in MCMC iterations.
 #' @param store_posterior_sample Logical; if \code{TRUE}, the full
 #'   \eqn{N_{\text{post}} \times n} posterior sample matrices are returned for
-#'   all three component forests.
+#'   all component forests.
 #' @param verbose Logical; print a progress bar and summary statistics.
 #'
 #' @return A named list with components:
 #' \describe{
 #'   \item{train_predictions, test_predictions}{Posterior mean of the total
-#'     fitted values \eqn{\hat{y} = m_0 + (1-S)\eta + b[\tau + (1-S)c]}.}
+#'     fitted values.}
 #'   \item{train_predictions_control, test_predictions_control}{Posterior mean
-#'     of the prognostic component \eqn{m_0(X)}.}
+#'     of the shared baseline \eqn{\mu(X)} (four-forest) or \eqn{m_0(X)}
+#'     (three-forest).}
 #'   \item{train_predictions_treat, test_predictions_treat}{Posterior mean of
 #'     the CATE \eqn{\tau(X)}.}
 #'   \item{train_predictions_deconf, test_predictions_deconf}{Posterior mean of
 #'     the confounding function \eqn{c(X)} (OS rows only for training).}
+#'   \item{train_predictions_deviation, test_predictions_deviation}{Posterior
+#'     mean of the RWD deviation \eqn{g(X)} (four-forest only; OS rows only
+#'     for training).}
 #'   \item{sigma}{Posterior sample of \eqn{\sigma} (or the fixed value if
 #'     \code{sigma} was supplied).}
 #'   \item{acceptance_ratio_control, acceptance_ratio_treat,
 #'     acceptance_ratio_deconf}{Tree-update acceptance rates.}
+#'   \item{acceptance_ratio_deviation}{Acceptance rate for \eqn{g}
+#'     (four-forest only).}
 #'   \item{train_predictions_sample_control, ...}{Full posterior sample matrices
 #'     (only present when \code{store_posterior_sample = TRUE}).}
 #' }
@@ -73,32 +99,35 @@
 #' @export
 FusionForest <- function(
   y,
-  status                    = NULL,
+  status                      = NULL,
   X_train_control,
   X_train_treat,
   treatment_indicator_train,
   source_indicator_train,
-  X_test_control            = NULL,
-  X_test_treat              = NULL,
-  X_test_deconf             = NULL,
-  treatment_indicator_test  = NULL,
-  source_indicator_test     = NULL,
-  outcome_type              = "continuous",
-  timescale                 = "time",
-  number_of_trees_control   = 200,
-  number_of_trees_treat     = 200,
-  number_of_trees_deconf    = 200,
-  power                     = 2.0,
-  base                      = 0.95,
-  p_grow                    = 0.4,
-  p_prune                   = 0.4,
-  nu                        = 3,
-  q                         = 0.90,
-  sigma                     = NULL,
-  N_post                    = 5000,
-  N_burn                    = 5000,
-  store_posterior_sample    = FALSE,
-  verbose                   = TRUE
+  X_test_control              = NULL,
+  X_test_treat                = NULL,
+  X_test_deconf               = NULL,
+  treatment_indicator_test    = NULL,
+  source_indicator_test       = NULL,
+  outcome_type                = "continuous",
+  timescale                   = "time",
+  decomposition               = "four-forest",
+  number_of_trees_control     = 200,
+  number_of_trees_treat       = 200,
+  number_of_trees_deconf      = 200,
+  number_of_trees_deviation   = 200,
+  k_g                         = 2,
+  power                       = 2.0,
+  base                        = 0.95,
+  p_grow                      = 0.4,
+  p_prune                     = 0.4,
+  nu                          = 3,
+  q                           = 0.90,
+  sigma                       = NULL,
+  N_post                      = 5000,
+  N_burn                      = 5000,
+  store_posterior_sample       = FALSE,
+  verbose                     = TRUE
 ) {
 
   ## ------------------------------------------------------------------
@@ -108,6 +137,10 @@ FusionForest <- function(
   allowed_types <- c("continuous", "right-censored")
   if (!outcome_type %in% allowed_types)
     stop("Invalid outcome_type. Choose 'continuous' or 'right-censored'.")
+
+  allowed_decomp <- c("three-forest", "four-forest")
+  if (!decomposition %in% allowed_decomp)
+    stop("Invalid decomposition. Choose 'three-forest' or 'four-forest'.")
 
   if (outcome_type == "right-censored" && is.null(status))
     stop("outcome_type = 'right-censored' requires a 'status' vector.")
@@ -141,6 +174,21 @@ FusionForest <- function(
   if (n_deconf <= 0L) stop("At least one observational-study (source = 0) row is required.")
   X_train_deconf <- X_train_control[source_indicator_train == 0L, , drop = FALSE]
   p_deconf       <- ncol(X_train_deconf)
+
+  # OS subset for the deviation (g) forest (same rows as deconf)
+  use_four_forest <- (decomposition == "four-forest")
+  n_deviation     <- n_deconf
+  X_train_deviation <- X_train_deconf  # same subset, same covariates
+  p_deviation       <- p_deconf
+
+  # Compute omega for deviation forest via k_g
+  if (use_four_forest && is.infinite(k_g)) {
+    omega_deviation <- 1e-10  # effectively disable g
+  } else if (use_four_forest) {
+    omega_deviation <- 0.5 / (k_g * sqrt(number_of_trees_deviation))
+  } else {
+    omega_deviation <- NULL  # unused in three-forest mode
+  }
 
   # Test data
   if (!is.null(X_test_control) && !is.null(X_test_treat)) {
@@ -179,23 +227,28 @@ FusionForest <- function(
       X_test_deconf
     }
 
-    X_test_control <- as.numeric(t(X_test_control))
-    X_test_treat   <- as.numeric(t(X_test_treat))
-    X_test_deconf  <- as.numeric(t(X_test_deconf))
+    X_test_deviation <- X_test_deconf  # same covariates for g and c
+
+    X_test_control   <- as.numeric(t(X_test_control))
+    X_test_treat     <- as.numeric(t(X_test_treat))
+    X_test_deconf    <- as.numeric(t(X_test_deconf))
+    X_test_deviation <- as.numeric(t(X_test_deviation))
 
   } else {
     n_test                   <- 1L
     X_test_control           <- as.numeric(colMeans(X_train_control))
     X_test_treat             <- as.numeric(colMeans(X_train_treat))
     X_test_deconf            <- X_test_control
+    X_test_deviation         <- X_test_control
     treatment_indicator_test <- 1L
     source_indicator_test    <- 1L
   }
 
   # Flatten training matrices
-  X_train_control <- as.numeric(t(X_train_control))
-  X_train_treat   <- as.numeric(t(X_train_treat))
-  X_train_deconf  <- as.numeric(t(X_train_deconf))
+  X_train_control   <- as.numeric(t(X_train_control))
+  X_train_treat     <- as.numeric(t(X_train_treat))
+  X_train_deconf    <- as.numeric(t(X_train_deconf))
+  X_train_deviation <- as.numeric(t(X_train_deviation))
 
   # Scalar coercions
   N_post  <- as.integer(N_post)[1L]
@@ -231,52 +284,17 @@ FusionForest <- function(
     qchi    <- qchisq(1.0 - q, nu)
     lambda  <- (sigma_hat^2 * qchi) / nu
 
-    fit <- FusionForest_cpp(
-      nSEXP                       = n_train,
-      p_treatSEXP                 = p_treat,
-      p_controlSEXP               = p_control,
-      X_train_treatSEXP           = X_train_treat,
-      X_train_controlSEXP         = X_train_control,
-      ySEXP                       = y,
-      status_indicatorSEXP        = status,
-      is_survivalSEXP             = survival,
-      treatment_indicatorSEXP     = treatment_indicator_train,
-      source_indicatorSEXP        = source_indicator_train,
-      n_testSEXP                  = n_test,
-      X_test_controlSEXP          = X_test_control,
-      X_test_treatSEXP            = X_test_treat,
-      X_test_deconfSEXP           = X_test_deconf,
-      treatment_indicator_testSEXP = treatment_indicator_test,
-      source_indicator_testSEXP   = source_indicator_test,
-      n_deconfSEXP                = n_deconf,
-      p_deconfSEXP                = p_deconf,
-      X_train_deconfSEXP          = X_train_deconf,
-      no_trees_deconfSEXP         = number_of_trees_deconf,
-      power_deconfSEXP            = power,
-      base_deconfSEXP             = base,
-      p_grow_deconfSEXP           = p_grow,
-      p_prune_deconfSEXP          = p_prune,
-      omega_deconfSEXP            = 0.5 / sqrt(number_of_trees_deconf),
-      no_trees_treatSEXP          = number_of_trees_treat,
-      power_treatSEXP             = power,
-      base_treatSEXP              = base,
-      p_grow_treatSEXP            = p_grow,
-      p_prune_treatSEXP           = p_prune,
-      omega_treatSEXP             = 0.5 / sqrt(number_of_trees_treat),
-      no_trees_controlSEXP        = number_of_trees_control,
-      power_controlSEXP           = power,
-      base_controlSEXP            = base,
-      p_grow_controlSEXP          = p_grow,
-      p_prune_controlSEXP         = p_prune,
-      omega_controlSEXP           = 0.5 / sqrt(number_of_trees_control),
-      sigma_knownSEXP             = sigma_known,
-      sigmaSEXP                   = sigma_hat,
-      lambdaSEXP                  = lambda,
-      nuSEXP                      = nu,
-      N_postSEXP                  = N_post,
-      N_burnSEXP                  = N_burn,
-      store_posterior_sampleSEXP  = store_posterior_sample,
-      verboseSEXP                 = verbose
+    fit <- .call_cpp_backend(
+      use_four_forest, n_train, p_treat, p_control, X_train_treat,
+      X_train_control, y, status, survival, treatment_indicator_train,
+      source_indicator_train, n_test, X_test_control, X_test_treat,
+      X_test_deconf, X_test_deviation, treatment_indicator_test,
+      source_indicator_test, n_deconf, p_deconf, X_train_deconf,
+      number_of_trees_deconf, n_deviation, p_deviation,
+      X_train_deviation, number_of_trees_deviation, omega_deviation,
+      number_of_trees_treat, number_of_trees_control,
+      power, base, p_grow, p_prune, sigma_known, sigma_hat, lambda,
+      nu, N_post, N_burn, store_posterior_sample, verbose
     )
 
     # Back-transform predictions
@@ -289,6 +307,10 @@ FusionForest <- function(
       fit$test_predictions_treat    <- exp(fit$test_predictions_treat    * sigma_hat)
       fit$train_predictions_deconf  <- exp(fit$train_predictions_deconf  * sigma_hat)
       fit$test_predictions_deconf   <- exp(fit$test_predictions_deconf   * sigma_hat)
+      if (use_four_forest) {
+        fit$train_predictions_deviation <- exp(fit$train_predictions_deviation * sigma_hat)
+        fit$test_predictions_deviation  <- exp(fit$test_predictions_deviation  * sigma_hat)
+      }
       if (store_posterior_sample) {
         fit$train_predictions_sample_control <- exp(fit$train_predictions_sample_control * sigma_hat + y_mean)
         fit$test_predictions_sample_control  <- exp(fit$test_predictions_sample_control  * sigma_hat + y_mean)
@@ -296,6 +318,10 @@ FusionForest <- function(
         fit$test_predictions_sample_treat    <- exp(fit$test_predictions_sample_treat    * sigma_hat)
         fit$train_predictions_sample_deconf  <- exp(fit$train_predictions_sample_deconf  * sigma_hat)
         fit$test_predictions_sample_deconf   <- exp(fit$test_predictions_sample_deconf   * sigma_hat)
+        if (use_four_forest) {
+          fit$train_predictions_sample_deviation <- exp(fit$train_predictions_sample_deviation * sigma_hat)
+          fit$test_predictions_sample_deviation  <- exp(fit$test_predictions_sample_deviation  * sigma_hat)
+        }
       }
     } else {
       fit$train_predictions         <- fit$train_predictions         * sigma_hat + y_mean
@@ -306,6 +332,10 @@ FusionForest <- function(
       fit$test_predictions_treat    <- fit$test_predictions_treat    * sigma_hat
       fit$train_predictions_deconf  <- fit$train_predictions_deconf  * sigma_hat
       fit$test_predictions_deconf   <- fit$test_predictions_deconf   * sigma_hat
+      if (use_four_forest) {
+        fit$train_predictions_deviation <- fit$train_predictions_deviation * sigma_hat
+        fit$test_predictions_deviation  <- fit$test_predictions_deviation  * sigma_hat
+      }
       if (store_posterior_sample) {
         fit$train_predictions_sample_control <- fit$train_predictions_sample_control * sigma_hat + y_mean
         fit$test_predictions_sample_control  <- fit$test_predictions_sample_control  * sigma_hat + y_mean
@@ -313,6 +343,10 @@ FusionForest <- function(
         fit$test_predictions_sample_treat    <- fit$test_predictions_sample_treat    * sigma_hat
         fit$train_predictions_sample_deconf  <- fit$train_predictions_sample_deconf  * sigma_hat
         fit$test_predictions_sample_deconf   <- fit$test_predictions_sample_deconf   * sigma_hat
+        if (use_four_forest) {
+          fit$train_predictions_sample_deviation <- fit$train_predictions_sample_deviation * sigma_hat
+          fit$test_predictions_sample_deviation  <- fit$test_predictions_sample_deviation  * sigma_hat
+        }
       }
     }
 
@@ -336,52 +370,17 @@ FusionForest <- function(
     y_mean <- mean(y)
     y      <- (y - y_mean) / sigma_hat
 
-    fit <- FusionForest_cpp(
-      nSEXP                       = n_train,
-      p_treatSEXP                 = p_treat,
-      p_controlSEXP               = p_control,
-      X_train_treatSEXP           = X_train_treat,
-      X_train_controlSEXP         = X_train_control,
-      ySEXP                       = y,
-      status_indicatorSEXP        = status,
-      is_survivalSEXP             = FALSE,
-      treatment_indicatorSEXP     = treatment_indicator_train,
-      source_indicatorSEXP        = source_indicator_train,
-      n_testSEXP                  = n_test,
-      X_test_controlSEXP          = X_test_control,
-      X_test_treatSEXP            = X_test_treat,
-      X_test_deconfSEXP           = X_test_deconf,
-      treatment_indicator_testSEXP = treatment_indicator_test,
-      source_indicator_testSEXP   = source_indicator_test,
-      n_deconfSEXP                = n_deconf,
-      p_deconfSEXP                = p_deconf,
-      X_train_deconfSEXP          = X_train_deconf,
-      no_trees_deconfSEXP         = number_of_trees_deconf,
-      power_deconfSEXP            = power,
-      base_deconfSEXP             = base,
-      p_grow_deconfSEXP           = p_grow,
-      p_prune_deconfSEXP          = p_prune,
-      omega_deconfSEXP            = 0.5 / sqrt(number_of_trees_deconf),
-      no_trees_treatSEXP          = number_of_trees_treat,
-      power_treatSEXP             = power,
-      base_treatSEXP              = base,
-      p_grow_treatSEXP            = p_grow,
-      p_prune_treatSEXP           = p_prune,
-      omega_treatSEXP             = 0.5 / sqrt(number_of_trees_treat),
-      no_trees_controlSEXP        = number_of_trees_control,
-      power_controlSEXP           = power,
-      base_controlSEXP            = base,
-      p_grow_controlSEXP          = p_grow,
-      p_prune_controlSEXP         = p_prune,
-      omega_controlSEXP           = 0.5 / sqrt(number_of_trees_control),
-      sigma_knownSEXP             = sigma_known,
-      sigmaSEXP                   = sigma_hat,
-      lambdaSEXP                  = lambda,
-      nuSEXP                      = nu,
-      N_postSEXP                  = N_post,
-      N_burnSEXP                  = N_burn,
-      store_posterior_sampleSEXP  = store_posterior_sample,
-      verboseSEXP                 = verbose
+    fit <- .call_cpp_backend(
+      use_four_forest, n_train, p_treat, p_control, X_train_treat,
+      X_train_control, y, status, survival, treatment_indicator_train,
+      source_indicator_train, n_test, X_test_control, X_test_treat,
+      X_test_deconf, X_test_deviation, treatment_indicator_test,
+      source_indicator_test, n_deconf, p_deconf, X_train_deconf,
+      number_of_trees_deconf, n_deviation, p_deviation,
+      X_train_deviation, number_of_trees_deviation, omega_deviation,
+      number_of_trees_treat, number_of_trees_control,
+      power, base, p_grow, p_prune, sigma_known, sigma_hat, lambda,
+      nu, N_post, N_burn, store_posterior_sample, verbose
     )
 
     # Back-transform
@@ -393,6 +392,10 @@ FusionForest <- function(
     fit$test_predictions_treat    <- fit$test_predictions_treat    * sigma_hat
     fit$train_predictions_deconf  <- fit$train_predictions_deconf  * sigma_hat
     fit$test_predictions_deconf   <- fit$test_predictions_deconf   * sigma_hat
+    if (use_four_forest) {
+      fit$train_predictions_deviation <- fit$train_predictions_deviation * sigma_hat
+      fit$test_predictions_deviation  <- fit$test_predictions_deviation  * sigma_hat
+    }
     if (store_posterior_sample) {
       fit$train_predictions_sample_control <- fit$train_predictions_sample_control * sigma_hat + y_mean
       fit$test_predictions_sample_control  <- fit$test_predictions_sample_control  * sigma_hat + y_mean
@@ -400,6 +403,10 @@ FusionForest <- function(
       fit$test_predictions_sample_treat    <- fit$test_predictions_sample_treat    * sigma_hat
       fit$train_predictions_sample_deconf  <- fit$train_predictions_sample_deconf  * sigma_hat
       fit$test_predictions_sample_deconf   <- fit$test_predictions_sample_deconf   * sigma_hat
+      if (use_four_forest) {
+        fit$train_predictions_sample_deviation <- fit$train_predictions_sample_deviation * sigma_hat
+        fit$test_predictions_sample_deviation  <- fit$test_predictions_sample_deviation  * sigma_hat
+      }
     }
   }
 
@@ -407,4 +414,87 @@ FusionForest <- function(
   if (!sigma_known) fit$sigma <- fit$sigma[-(1:N_burn)]
 
   return(fit)
+}
+
+
+# Internal helper: dispatch to three-forest or four-forest C++ backend
+.call_cpp_backend <- function(
+  use_four_forest, n_train, p_treat, p_control, X_train_treat,
+  X_train_control, y, status, is_survival, treatment_indicator_train,
+  source_indicator_train, n_test, X_test_control, X_test_treat,
+  X_test_deconf, X_test_deviation, treatment_indicator_test,
+  source_indicator_test, n_deconf, p_deconf, X_train_deconf,
+  number_of_trees_deconf, n_deviation, p_deviation,
+  X_train_deviation, number_of_trees_deviation, omega_deviation,
+  number_of_trees_treat, number_of_trees_control,
+  power, base, p_grow, p_prune, sigma_known, sigma_hat, lambda,
+  nu, N_post, N_burn, store_posterior_sample, verbose
+) {
+
+  # Shared arguments for both backends
+  shared <- list(
+    nSEXP                        = n_train,
+    p_treatSEXP                  = p_treat,
+    p_controlSEXP                = p_control,
+    X_train_treatSEXP            = X_train_treat,
+    X_train_controlSEXP          = X_train_control,
+    ySEXP                        = y,
+    status_indicatorSEXP         = status,
+    is_survivalSEXP              = is_survival,
+    treatment_indicatorSEXP      = treatment_indicator_train,
+    source_indicatorSEXP         = source_indicator_train,
+    n_testSEXP                   = n_test,
+    X_test_controlSEXP           = X_test_control,
+    X_test_treatSEXP             = X_test_treat,
+    X_test_deconfSEXP            = X_test_deconf,
+    treatment_indicator_testSEXP = treatment_indicator_test,
+    source_indicator_testSEXP    = source_indicator_test,
+    n_deconfSEXP                 = n_deconf,
+    p_deconfSEXP                 = p_deconf,
+    X_train_deconfSEXP           = X_train_deconf,
+    no_trees_deconfSEXP          = number_of_trees_deconf,
+    power_deconfSEXP             = power,
+    base_deconfSEXP              = base,
+    p_grow_deconfSEXP            = p_grow,
+    p_prune_deconfSEXP           = p_prune,
+    omega_deconfSEXP             = 0.5 / sqrt(number_of_trees_deconf),
+    no_trees_treatSEXP           = number_of_trees_treat,
+    power_treatSEXP              = power,
+    base_treatSEXP               = base,
+    p_grow_treatSEXP             = p_grow,
+    p_prune_treatSEXP            = p_prune,
+    omega_treatSEXP              = 0.5 / sqrt(number_of_trees_treat),
+    no_trees_controlSEXP         = number_of_trees_control,
+    power_controlSEXP            = power,
+    base_controlSEXP             = base,
+    p_grow_controlSEXP           = p_grow,
+    p_prune_controlSEXP          = p_prune,
+    omega_controlSEXP            = 0.5 / sqrt(number_of_trees_control),
+    sigma_knownSEXP              = sigma_known,
+    sigmaSEXP                    = sigma_hat,
+    lambdaSEXP                   = lambda,
+    nuSEXP                       = nu,
+    N_postSEXP                   = N_post,
+    N_burnSEXP                   = N_burn,
+    store_posterior_sampleSEXP   = store_posterior_sample,
+    verboseSEXP                  = verbose
+  )
+
+  if (use_four_forest) {
+    extra <- list(
+      X_test_deviationSEXP     = X_test_deviation,
+      n_deviationSEXP          = n_deviation,
+      p_deviationSEXP          = p_deviation,
+      X_train_deviationSEXP    = X_train_deviation,
+      no_trees_deviationSEXP   = number_of_trees_deviation,
+      power_deviationSEXP      = power,
+      base_deviationSEXP       = base,
+      p_grow_deviationSEXP     = p_grow,
+      p_prune_deviationSEXP    = p_prune,
+      omega_deviationSEXP      = omega_deviation
+    )
+    do.call(FusionForest4_cpp, c(shared, extra))
+  } else {
+    do.call(FusionForest_cpp, shared)
+  }
 }

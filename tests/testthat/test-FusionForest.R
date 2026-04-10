@@ -129,3 +129,115 @@ test_that("FusionForest errors when no OS rows present", {
     regexp = "observational"
   )
 })
+
+# ---------------------------------------------------------------------------
+# Four-forest decomposition tests
+# ---------------------------------------------------------------------------
+
+test_that("FusionForest four-forest runs on continuous outcomes", {
+  fit <- FusionForest(
+    y                         = y_cnt,
+    X_train_control           = X,
+    X_train_treat             = X,
+    treatment_indicator_train = trt,
+    source_indicator_train    = src,
+    decomposition             = "four-forest",
+    N_post = N_post, N_burn = N_burn, verbose = FALSE
+  )
+
+  expect_type(fit, "list")
+  expect_true("train_predictions"           %in% names(fit))
+  expect_true("train_predictions_control"   %in% names(fit))
+  expect_true("train_predictions_treat"     %in% names(fit))
+  expect_true("train_predictions_deconf"    %in% names(fit))
+  expect_true("train_predictions_deviation" %in% names(fit))
+  expect_true("sigma"                       %in% names(fit))
+  expect_true("acceptance_ratio_deviation"  %in% names(fit))
+  expect_length(fit$train_predictions, n)
+  expect_true(all(is.finite(fit$train_predictions)))
+})
+
+test_that("FusionForest four-forest deviation length equals n_deconf", {
+  n_os <- sum(src == 0L)
+  fit <- FusionForest(
+    y                         = y_cnt,
+    X_train_control           = X,
+    X_train_treat             = X,
+    treatment_indicator_train = trt,
+    source_indicator_train    = src,
+    decomposition             = "four-forest",
+    N_post = N_post, N_burn = N_burn, verbose = FALSE
+  )
+
+  expect_length(fit$train_predictions_deviation, n_os)
+  expect_true(all(is.finite(fit$train_predictions_deviation)))
+})
+
+test_that("FusionForest four-forest runs on right-censored outcomes", {
+  fit <- FusionForest(
+    y                         = y_srv,
+    status                    = stat,
+    X_train_control           = X,
+    X_train_treat             = X,
+    treatment_indicator_train = trt,
+    source_indicator_train    = src,
+    outcome_type              = "right-censored",
+    decomposition             = "four-forest",
+    N_post = N_post, N_burn = N_burn, verbose = FALSE
+  )
+
+  expect_type(fit, "list")
+  expect_length(fit$train_predictions, n)
+  expect_true(all(is.finite(fit$train_predictions)))
+  expect_true(all(fit$train_predictions > 0))
+  expect_true("train_predictions_deviation" %in% names(fit))
+})
+
+test_that("FusionForest three-forest still works with explicit arg", {
+  fit <- FusionForest(
+    y                         = y_cnt,
+    X_train_control           = X,
+    X_train_treat             = X,
+    treatment_indicator_train = trt,
+    source_indicator_train    = src,
+    decomposition             = "three-forest",
+    N_post = N_post, N_burn = N_burn, verbose = FALSE
+  )
+
+  expect_type(fit, "list")
+  expect_length(fit$train_predictions, n)
+  expect_true(all(is.finite(fit$train_predictions)))
+  expect_false("train_predictions_deviation" %in% names(fit))
+})
+
+test_that("FusionForest four-forest posterior samples when requested", {
+  n_os <- sum(src == 0L)
+  fit <- FusionForest(
+    y                         = y_cnt,
+    X_train_control           = X,
+    X_train_treat             = X,
+    treatment_indicator_train = trt,
+    source_indicator_train    = src,
+    decomposition             = "four-forest",
+    store_posterior_sample     = TRUE,
+    N_post = N_post, N_burn = N_burn, verbose = FALSE
+  )
+
+  expect_true("train_predictions_sample_deviation" %in% names(fit))
+  expect_equal(nrow(fit$train_predictions_sample_deviation), N_post)
+  expect_equal(ncol(fit$train_predictions_sample_deviation), n_os)
+})
+
+test_that("FusionForest errors on invalid decomposition", {
+  expect_error(
+    FusionForest(
+      y                         = y_cnt,
+      X_train_control           = X,
+      X_train_treat             = X,
+      treatment_indicator_train = trt,
+      source_indicator_train    = src,
+      decomposition             = "five-forest"
+    ),
+    regexp = "decomposition"
+  )
+})
