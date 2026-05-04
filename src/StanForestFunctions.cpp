@@ -82,63 +82,82 @@ double GetBirthProbability(StanTree& tree, CutpointMatrix& cutpoints,
   return prior_info.prob_birth;
 }
 
-// Compute sufficient statistics for the two children of a proposed split.
+// Compute weighted sufficient statistics for the two children of a proposed
+// split.  When data_info.weights == nullptr, weights are taken to be 1.
 void GetSufficientStatistics(StanTree& tree, StanTree* target_leaf,
                              size_t split_var, size_t cut_val,
                              CutpointMatrix& cutpoints, DataInfo& data_info,
-                             size_t& left_count, double& left_sum,
-                             size_t& right_count, double& right_sum)
+                             size_t& left_count,
+                             double& left_weight_sum,
+                             double& left_weighted_residual_sum,
+                             size_t& right_count,
+                             double& right_weight_sum,
+                             double& right_weighted_residual_sum)
 {
-  left_count = 0;  left_sum  = 0.0;
-  right_count = 0; right_sum = 0.0;
+  left_count = 0;  left_weight_sum  = 0.0; left_weighted_residual_sum  = 0.0;
+  right_count = 0; right_weight_sum = 0.0; right_weighted_residual_sum = 0.0;
+  const double* w = data_info.weights;
 
   for (size_t i = 0; i < data_info.n; i++) {
     double* x_row = data_info.X + i * data_info.p;
     if (target_leaf == tree.FindLeaf(x_row, cutpoints)) {
+      double weight = (w == nullptr) ? 1.0 : w[i];
       if (x_row[split_var] < cutpoints[split_var][cut_val]) {
         left_count++;
-        left_sum += data_info.residuals[i];
+        left_weight_sum            += weight;
+        left_weighted_residual_sum += weight * data_info.residuals[i];
       } else {
         right_count++;
-        right_sum += data_info.residuals[i];
+        right_weight_sum            += weight;
+        right_weighted_residual_sum += weight * data_info.residuals[i];
       }
     }
   }
 }
 
-// Compute sufficient statistics for an existing left/right leaf pair.
+// Compute weighted sufficient statistics for an existing left/right leaf pair.
 void GetSufficientStatistics(StanTree& tree, StanTree* left_leaf,
                              StanTree* right_leaf,
                              CutpointMatrix& cutpoints, DataInfo& data_info,
-                             size_t& left_count, double& left_sum,
-                             size_t& right_count, double& right_sum)
+                             size_t& left_count,
+                             double& left_weight_sum,
+                             double& left_weighted_residual_sum,
+                             size_t& right_count,
+                             double& right_weight_sum,
+                             double& right_weighted_residual_sum)
 {
-  left_count = 0;  left_sum  = 0.0;
-  right_count = 0; right_sum = 0.0;
+  left_count = 0;  left_weight_sum  = 0.0; left_weighted_residual_sum  = 0.0;
+  right_count = 0; right_weight_sum = 0.0; right_weighted_residual_sum = 0.0;
+  const double* w = data_info.weights;
 
   for (size_t i = 0; i < data_info.n; i++) {
     double* x_row = data_info.X + i * data_info.p;
     const StanTree* leaf = tree.FindLeaf(x_row, cutpoints);
+    double weight = (w == nullptr) ? 1.0 : w[i];
     if (leaf == left_leaf) {
       left_count++;
-      left_sum += data_info.residuals[i];
+      left_weight_sum            += weight;
+      left_weighted_residual_sum += weight * data_info.residuals[i];
     }
     if (leaf == right_leaf) {
       right_count++;
-      right_sum += data_info.residuals[i];
+      right_weight_sum            += weight;
+      right_weighted_residual_sum += weight * data_info.residuals[i];
     }
   }
 }
 
-// Log-likelihood contribution of n observations whose residuals sum to
-// sum_residuals, given noise std dev sigma and leaf prior std dev eta.
-double LogLikelihood(size_t n, double sum_residuals, double sigma, double eta)
+// Weighted Gaussian leaf-marginal log-likelihood.  When weight_sum equals
+// the observation count (i.e. all weights are 1), this reduces to the
+// standard BART formula.
+double LogLikelihood(double weight_sum, double weighted_residual_sum,
+                     double sigma, double eta)
 {
   double sigma_squared  = sigma * sigma;
   double prior_variance = eta * eta;
-  double precision_sum  = n * prior_variance + sigma_squared;
+  double precision_sum  = weight_sum * prior_variance + sigma_squared;
   return -0.5 * std::log(precision_sum)
-         + (prior_variance * sum_residuals * sum_residuals)
+         + (prior_variance * weighted_residual_sum * weighted_residual_sum)
            / (2.0 * sigma_squared * precision_sum);
 }
 
@@ -154,33 +173,36 @@ double ProbabilityNodeGrows(StanTree* node, CutpointMatrix& cutpoints,
   }
 }
 
-// Compute sufficient statistics for every leaf in a single data pass.
+// Compute weighted sufficient statistics for every leaf in a single data
+// pass.  Each leaf's weight_sum is Sum w_i and weighted_residual_sum is
+// Sum w_i * r_i (or, when weights == nullptr, the observation count and
+// the unweighted residual sum).
 void GetAllLeafStatistics(StanTree& tree, CutpointMatrix& cutpoints,
                           DataInfo& data_info,
                           std::vector<StanTree*>& leaves,
-                          std::vector<size_t>& observation_counts,
-                          std::vector<double>& residual_sums)
+                          std::vector<double>& weight_sums,
+                          std::vector<double>& weighted_residual_sums)
 {
   leaves.clear();
   tree.CollectLeaves(leaves);
 
   size_t num_leaves = leaves.size();
-  observation_counts.resize(num_leaves);
-  residual_sums.resize(num_leaves);
+  weight_sums.assign(num_leaves, 0.0);
+  weighted_residual_sums.assign(num_leaves, 0.0);
 
   std::map<const StanTree*, size_t> leaf_index_map;
   for (size_t i = 0; i < num_leaves; i++) {
     leaf_index_map[leaves[i]] = i;
-    observation_counts[i]     = 0;
-    residual_sums[i]          = 0.0;
   }
 
+  const double* w = data_info.weights;
   for (size_t i = 0; i < data_info.n; i++) {
     double* x_row        = data_info.X + i * data_info.p;
     const StanTree* leaf = tree.FindLeaf(x_row, cutpoints);
     size_t leaf_index    = leaf_index_map[leaf];
-    observation_counts[leaf_index]++;
-    residual_sums[leaf_index] += data_info.residuals[i];
+    double weight        = (w == nullptr) ? 1.0 : w[i];
+    weight_sums[leaf_index]            += weight;
+    weighted_residual_sums[leaf_index] += weight * data_info.residuals[i];
   }
 }
 
@@ -190,14 +212,14 @@ void DrawAllLeafMeans(StanTree& tree, CutpointMatrix& cutpoints,
                       double sigma, Random& random)
 {
   std::vector<StanTree*> leaves;
-  std::vector<size_t>    observation_counts;
-  std::vector<double>    residual_sums;
+  std::vector<double>    weight_sums;
+  std::vector<double>    weighted_residual_sums;
   GetAllLeafStatistics(tree, cutpoints, data_info, leaves,
-                       observation_counts, residual_sums);
+                       weight_sums, weighted_residual_sums);
 
   for (size_t i = 0; i < leaves.size(); i++) {
     leaves[i]->SetStepHeight(
-      DrawLeafMean(observation_counts[i], residual_sums[i],
+      DrawLeafMean(weight_sums[i], weighted_residual_sums[i],
                    prior_info.eta, sigma, random));
   }
 }
@@ -368,14 +390,18 @@ void DeathProposal(StanTree& tree, CutpointMatrix& cutpoints,
      prob_choose_nog_current);
 }
 
-// Draw a single leaf mean from its Gaussian posterior.
-double DrawLeafMean(size_t n, double sum_residuals, double eta,
-                    double sigma, Random& random)
+// Draw a single leaf mean from its Gaussian posterior using weighted
+// sufficient statistics (weight_sum = Sum w_i,
+// weighted_residual_sum = Sum w_i * r_i).  When all weights are 1, this
+// reduces to the standard BART leaf-mean update.
+double DrawLeafMean(double weight_sum, double weighted_residual_sum,
+                    double eta, double sigma, Random& random)
 {
   double sigma_squared   = sigma * sigma;
-  double precision_data  = n / sigma_squared;
+  double precision_data  = weight_sum / sigma_squared;
   double precision_prior = 1.0 / (eta * eta);
-  return (sum_residuals / sigma_squared) / (precision_prior + precision_data)
+  return (weighted_residual_sum / sigma_squared)
+           / (precision_prior + precision_data)
          + random.normal() / std::sqrt(precision_prior + precision_data);
 }
 

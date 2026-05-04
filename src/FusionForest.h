@@ -20,7 +20,10 @@ Rcpp::List FusionForest_cpp(
   SEXP sigma_knownSEXP, SEXP sigmaSEXP, SEXP lambdaSEXP, SEXP nuSEXP,
   SEXP N_postSEXP, SEXP N_burnSEXP,
   SEXP store_posterior_sampleSEXP,
-  SEXP verboseSEXP
+  SEXP verboseSEXP,
+  SEXP treatment_codingSEXP,
+  SEXP propensity_trainSEXP,
+  SEXP propensity_testSEXP
 );
 
 #endif // FUSIONFOREST_H

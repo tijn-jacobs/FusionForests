@@ -18,9 +18,12 @@ FusionForest(
   source_indicator_test = NULL,
   outcome_type = "continuous",
   timescale = "time",
+  decomposition = "four-forest",
   number_of_trees_control = 200,
   number_of_trees_treat = 200,
   number_of_trees_deconf = 200,
+  number_of_trees_deviation = 200,
+  k_g = 2,
   power = 2,
   base = 0.95,
   p_grow = 0.4,
@@ -30,6 +33,9 @@ FusionForest(
   sigma = NULL,
   N_post = 5000,
   N_burn = 5000,
+  treatment_coding = c("centered", "binary", "adaptive"),
+  propensity_train = NULL,
+  propensity_test = NULL,
   store_posterior_sample = FALSE,
   verbose = TRUE
 )
@@ -41,8 +47,8 @@ FusionForest(
 \code{0} = censored).  Required when \code{outcome_type = "right-censored"}.}
 
 \item{X_train_control}{Numeric matrix of covariates for the prognostic
-(\eqn{m_0}) and deconfounding (\eqn{c}) forests.  One row per training
-observation.}
+(\eqn{m_0} or \eqn{\mu}) and deconfounding (\eqn{c}) forests.  One row
+per training observation.}
 
 \item{X_train_treat}{Numeric matrix of covariates for the treatment-effect
 (\eqn{\tau}) forest.  Must have the same number of rows as
@@ -67,7 +73,19 @@ for the test set (same coding as the training-set equivalents).}
 \item{timescale}{Character; \code{"time"} (raw survival times, will be
 log-transformed internally) or \code{"log"} (already on log scale).}
 
-\item{number_of_trees_control, number_of_trees_treat, number_of_trees_deconf}{Number of trees in each of the three BART ensembles.  Default 200.}
+\item{decomposition}{Character; \code{"four-forest"} (default) for the
+\eqn{\mu + g} decomposition or \code{"three-forest"} for the original
+single-\eqn{m_0} model.}
+
+\item{number_of_trees_control, number_of_trees_treat, number_of_trees_deconf}{Number of trees in each BART ensemble.  Default 200.}
+
+\item{number_of_trees_deviation}{Number of trees for the \eqn{g} forest
+(four-forest mode only).  Default 200.}
+
+\item{k_g}{Leaf-prior scale for the deviation forest \eqn{g}.
+Larger values shrink \eqn{g} toward zero (stronger borrowing).
+\code{k_g = Inf} disables \eqn{g} entirely (full pooling).
+Default 2 (standard BART scale).  Ignored in three-forest mode.}
 
 \item{power, base}{Tree topology prior parameters.  The probability that a
 node at depth \eqn{d} is non-terminal is
@@ -87,9 +105,33 @@ error-variance prior.}
 
 \item{N_post, N_burn}{Number of posterior and burn-in MCMC iterations.}
 
+\item{treatment_coding}{Character; how the binary treatment indicator
+\eqn{Z \in \{0,1\}} is mapped to the regression weight \eqn{b_i} in the
+BCF parameterisation \eqn{y = \mu(X) + b\,\tau(X) + \dots} (and similarly
+for the deconfounding term).  One of:
+\describe{
+\item{\code{"centered"} (default)}{\eqn{b = 0.5} if treated,
+\eqn{b = -0.5} if control.  Both arms inform \eqn{\tau}; \eqn{\mu}
+is the average-arm mean function.}
+\item{\code{"binary"}}{\eqn{b = 1} if treated, \eqn{b = 0} if control.
+Only treated rows inform \eqn{\tau}; \eqn{\mu} is the control-arm
+mean function.}
+\item{\code{"adaptive"}}{\eqn{b_i = z_i - \pi_i}, the propensity-score
+residual (Hahn et al., 2020).  Requires \code{propensity_train} and
+\code{propensity_test}.}
+}
+The \eqn{\tau} and deconfounding (\eqn{c}) forests are fit with
+per-observation weights \eqn{w_i = b_i^2} so that the weighted
+sufficient statistics match the full-data likelihood; rows with
+\eqn{|b_i|} essentially zero are excluded from those updates.}
+
+\item{propensity_train, propensity_test}{Numeric vectors of estimated
+propensity scores in (0, 1) for the training and test rows.  Required
+when \code{treatment_coding = "adaptive"}; ignored otherwise.}
+
 \item{store_posterior_sample}{Logical; if \code{TRUE}, the full
 \eqn{N_{\text{post}} \times n} posterior sample matrices are returned for
-all three component forests.}
+all component forests.}
 
 \item{verbose}{Logical; print a progress bar and summary statistics.}
 }
@@ -97,28 +139,45 @@ all three component forests.}
 A named list with components:
 \describe{
 \item{train_predictions, test_predictions}{Posterior mean of the total
-fitted values \eqn{\hat{y} = m_0 + b[\tau + (1-S)c]}.}
+fitted values.}
 \item{train_predictions_control, test_predictions_control}{Posterior mean
-of the prognostic component \eqn{m_0(X)}.}
+of the shared baseline \eqn{\mu(X)} (four-forest) or \eqn{m_0(X)}
+(three-forest).}
 \item{train_predictions_treat, test_predictions_treat}{Posterior mean of
 the CATE \eqn{\tau(X)}.}
 \item{train_predictions_deconf, test_predictions_deconf}{Posterior mean of
 the confounding function \eqn{c(X)} (OS rows only for training).}
+\item{train_predictions_deviation, test_predictions_deviation}{Posterior
+mean of the RWD deviation \eqn{g(X)} (four-forest only; OS rows only
+for training).}
 \item{sigma}{Posterior sample of \eqn{\sigma} (or the fixed value if
 \code{sigma} was supplied).}
-
 \item{acceptance_ratio_control, acceptance_ratio_treat,
 acceptance_ratio_deconf}{Tree-update acceptance rates.}
+\item{acceptance_ratio_deviation}{Acceptance rate for \eqn{g}
+(four-forest only).}
 \item{train_predictions_sample_control, ...}{Full posterior sample matrices
 (only present when \code{store_posterior_sample = TRUE}).}
 }
 }
 \description{
 Bayesian data-fusion model combining an RCT and an observational study to
-estimate heterogeneous treatment effects.  Three BART ensembles are fitted
-jointly under an AFT decomposition:
-\deqn{\log(T) = m_0(X,S) + A\,\tau(X) + A\,(1-S)\,c(X) + \sigma\varepsilon}
-where \eqn{m_0} is the prognostic function, \eqn{\tau} is the CATE,
-\eqn{c} is the confounding function (active only in the OS treated arm),
-and \eqn{\eta = 0} (sources share a common baseline).
+estimate heterogeneous treatment effects.
+}
+\details{
+Two decompositions are available, selected via
+\code{decomposition}:
+\describe{
+\item{\code{"three-forest"}}{The original model with a single prognostic
+forest:
+\deqn{\log(T) = m_0(X) + b\,[\tau(X) + (1-S)\,c(X)] +
+      \sigma\varepsilon}}
+\item{\code{"four-forest"} (default)}{Replaces \eqn{m_0} with a
+MAP-prior decomposition:
+\deqn{\log(T) = \mu(X) + (1-S)\,g(X) + b\,[\tau(X) + (1-S)\,c(X)] +
+      \sigma\varepsilon}
+where \eqn{\mu(X)} is a shared baseline (all data) and \eqn{g(X)}
+captures the RWD-specific deviation (RWD only).  The borrowing
+parameter \code{k_g} controls shrinkage of \eqn{g} toward zero.}
+}
 }

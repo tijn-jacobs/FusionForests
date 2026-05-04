@@ -21,7 +21,10 @@ Rcpp::List FusionForest4_cpp(
   SEXP sigma_knownSEXP, SEXP sigmaSEXP, SEXP lambdaSEXP, SEXP nuSEXP,
   SEXP N_postSEXP, SEXP N_burnSEXP,
   SEXP store_posterior_sampleSEXP,
-  SEXP verboseSEXP
+  SEXP verboseSEXP,
+  SEXP treatment_codingSEXP,
+  SEXP propensity_trainSEXP,
+  SEXP propensity_testSEXP
 ) {
 
   // ---- Argument conversion ----
@@ -119,6 +122,71 @@ Rcpp::List FusionForest4_cpp(
 
   bool verbose = Rcpp::as<bool>(verboseSEXP);
 
+  // Treatment-effect coding b_i (see FusionForest_cpp for full documentation):
+  //   "binary"   : b = 1 if treated, 0 if control
+  //   "centered" : b = 0.5 / -0.5
+  //   "adaptive" : b = z_i - propensity_i
+  // The tau and c forests use weights b_i^2 to recover the correct full-data
+  // likelihood; tiny |b| are floored to weight 0 to avoid 0/0.
+  std::string treatment_coding = Rcpp::as<std::string>(treatment_codingSEXP);
+  Rcpp::NumericVector propensity_train_vector(propensity_trainSEXP);
+  double* propensity_train = (propensity_train_vector.size() > 0)
+    ? &propensity_train_vector[0] : nullptr;
+  Rcpp::NumericVector propensity_test_vector(propensity_testSEXP);
+  double* propensity_test = (propensity_test_vector.size() > 0)
+    ? &propensity_test_vector[0] : nullptr;
+
+  const double b_eps = 1e-10;
+
+  double* b_train = new double[n];
+  double* b_test  = n_test ? new double[n_test] : nullptr;
+
+  if (treatment_coding == "binary") {
+    for (size_t k = 0; k < n; ++k)
+      b_train[k] = (treatment_indicator[k] == 1) ? 1.0 : 0.0;
+    for (size_t k = 0; k < n_test; ++k)
+      b_test[k]  = (treatment_indicator_test[k] == 1) ? 1.0 : 0.0;
+  } else if (treatment_coding == "adaptive") {
+    if (propensity_train == nullptr || propensity_test == nullptr) {
+      delete[] b_train; if (b_test) delete[] b_test;
+      Rcpp::stop("treatment_coding = 'adaptive' requires propensity_train "
+                 "and propensity_test.");
+    }
+    for (size_t k = 0; k < n; ++k)
+      b_train[k] = static_cast<double>(treatment_indicator[k])
+                   - propensity_train[k];
+    for (size_t k = 0; k < n_test; ++k)
+      b_test[k]  = static_cast<double>(treatment_indicator_test[k])
+                   - propensity_test[k];
+  } else if (treatment_coding == "centered") {
+    for (size_t k = 0; k < n; ++k)
+      b_train[k] = (treatment_indicator[k] == 1) ? 0.5 : -0.5;
+    for (size_t k = 0; k < n_test; ++k)
+      b_test[k]  = (treatment_indicator_test[k] == 1) ? 0.5 : -0.5;
+  } else {
+    delete[] b_train; if (b_test) delete[] b_test;
+    Rcpp::stop("Unknown treatment_coding: '%s'. "
+               "Use 'binary', 'centered', or 'adaptive'.",
+               treatment_coding.c_str());
+  }
+
+  // Per-observation weights b_i^2 for the tau forest (length n) and the
+  // deconfounding c forest (length n_deconf, RWD subset only).  These are
+  // fixed for the whole MCMC run.
+  double* weights_treat  = new double[n];
+  double* weights_deconf = n_deconf ? new double[n_deconf] : nullptr;
+  {
+    size_t j = 0;
+    for (size_t k = 0; k < n; ++k) {
+      double bk = b_train[k];
+      weights_treat[k] = (std::abs(bk) < b_eps) ? 0.0 : bk * bk;
+      if (source_indicator[k] == 0) {
+        weights_deconf[j] = weights_treat[k];
+        ++j;
+      }
+    }
+  }
+
 
   // ---- Storage containers ----
 
@@ -213,6 +281,7 @@ Rcpp::List FusionForest4_cpp(
                           true, false, 1.0);
   forest_tau.SetUpForest(p_treat, n, X_train_treat,
                          augmented_outcome_treat, nullptr, omega_treat);
+  forest_tau.SetWeights(weights_treat);
 
   // c: deconfounding forest (RWD observations only)
   ForestEngine forest_c(no_trees_deconf);
@@ -222,6 +291,7 @@ Rcpp::List FusionForest4_cpp(
                         true, false, 1.0);
   forest_c.SetUpForest(p_deconf, n_deconf, X_train_deconf,
                        augmented_outcome_deconf, nullptr, omega_deconf);
+  forest_c.SetWeights(weights_deconf);
 
 
   // ---- Timing ----
@@ -256,8 +326,8 @@ Rcpp::List FusionForest4_cpp(
     {
       size_t j = 0;  // index into RWD subset
       for (size_t k = 0; k < n; ++k) {
-        const double b =
-          (treatment_indicator[k] == 1) ? 0.5 : -0.5;
+        const double b      = b_train[k];
+        const bool   b_zero = (std::abs(b) < b_eps);
         const double s =
           (source_indicator[k] == 1) ? 1.0 : 0.0;
 
@@ -268,15 +338,15 @@ Rcpp::List FusionForest4_cpp(
           augmented_outcome_deviation[j] =
             y[k] - forest_mu.GetPrediction(k)
                  - b * (forest_tau.GetPrediction(k) + c_k);
-          augmented_outcome_deconf[j] =
-            (y[k] - forest_mu.GetPrediction(k) - g_k
-                  - b * forest_tau.GetPrediction(k)) / b;
+          augmented_outcome_deconf[j] = b_zero ? 0.0
+            : (y[k] - forest_mu.GetPrediction(k) - g_k
+                    - b * forest_tau.GetPrediction(k)) / b;
           ++j;
         }
-        augmented_outcome_treat[k] =
-          (y[k] - forest_mu.GetPrediction(k)
-                - (1.0 - s) * g_k
-                - b * (1.0 - s) * c_k) / b;
+        augmented_outcome_treat[k] = b_zero ? 0.0
+          : (y[k] - forest_mu.GetPrediction(k)
+                  - (1.0 - s) * g_k
+                  - b * (1.0 - s) * c_k) / b;
       }
     }
 
@@ -287,8 +357,8 @@ Rcpp::List FusionForest4_cpp(
     {
       size_t j = 0;
       for (size_t k = 0; k < n; ++k) {
-        const double b =
-          (treatment_indicator[k] == 1) ? 0.5 : -0.5;
+        const double b      = b_train[k];
+        const bool   b_zero = (std::abs(b) < b_eps);
         const double s =
           (source_indicator[k] == 1) ? 1.0 : 0.0;
 
@@ -296,19 +366,19 @@ Rcpp::List FusionForest4_cpp(
         if (source_indicator[k] == 0) {
           g_k = forest_g.GetPrediction(j);
           c_k = forest_c.GetPrediction(j);
-          augmented_outcome_deconf[j] =
-            (y[k] - forest_mu.GetPrediction(k) - g_k
-                  - b * forest_tau.GetPrediction(k)) / b;
+          augmented_outcome_deconf[j] = b_zero ? 0.0
+            : (y[k] - forest_mu.GetPrediction(k) - g_k
+                    - b * forest_tau.GetPrediction(k)) / b;
           ++j;
         }
         augmented_outcome_control[k] =
           y[k] - (1.0 - s) * g_k
                - b * (forest_tau.GetPrediction(k)
                      + (1.0 - s) * c_k);
-        augmented_outcome_treat[k] =
-          (y[k] - forest_mu.GetPrediction(k)
-                - (1.0 - s) * g_k
-                - b * (1.0 - s) * c_k) / b;
+        augmented_outcome_treat[k] = b_zero ? 0.0
+          : (y[k] - forest_mu.GetPrediction(k)
+                  - (1.0 - s) * g_k
+                  - b * (1.0 - s) * c_k) / b;
       }
     }
 
@@ -319,8 +389,8 @@ Rcpp::List FusionForest4_cpp(
     {
       size_t j = 0;
       for (size_t k = 0; k < n; ++k) {
-        const double b =
-          (treatment_indicator[k] == 1) ? 0.5 : -0.5;
+        const double b      = b_train[k];
+        const bool   b_zero = (std::abs(b) < b_eps);
         const double s =
           (source_indicator[k] == 1) ? 1.0 : 0.0;
 
@@ -331,9 +401,9 @@ Rcpp::List FusionForest4_cpp(
           augmented_outcome_deviation[j] =
             y[k] - forest_mu.GetPrediction(k)
                  - b * (forest_tau.GetPrediction(k) + c_k);
-          augmented_outcome_deconf[j] =
-            (y[k] - forest_mu.GetPrediction(k) - g_k
-                  - b * forest_tau.GetPrediction(k)) / b;
+          augmented_outcome_deconf[j] = b_zero ? 0.0
+            : (y[k] - forest_mu.GetPrediction(k) - g_k
+                    - b * forest_tau.GetPrediction(k)) / b;
           ++j;
         }
         augmented_outcome_control[k] =
@@ -350,8 +420,8 @@ Rcpp::List FusionForest4_cpp(
     {
       size_t j = 0;
       for (size_t k = 0; k < n; ++k) {
-        const double b =
-          (treatment_indicator[k] == 1) ? 0.5 : -0.5;
+        const double b      = b_train[k];
+        const bool   b_zero = (std::abs(b) < b_eps);
         const double s =
           (source_indicator[k] == 1) ? 1.0 : 0.0;
 
@@ -368,10 +438,10 @@ Rcpp::List FusionForest4_cpp(
           y[k] - (1.0 - s) * g_k
                - b * (forest_tau.GetPrediction(k)
                      + (1.0 - s) * c_k);
-        augmented_outcome_treat[k] =
-          (y[k] - forest_mu.GetPrediction(k)
-                - (1.0 - s) * g_k
-                - b * (1.0 - s) * c_k) / b;
+        augmented_outcome_treat[k] = b_zero ? 0.0
+          : (y[k] - forest_mu.GetPrediction(k)
+                  - (1.0 - s) * g_k
+                  - b * (1.0 - s) * c_k) / b;
       }
     }
 
@@ -379,8 +449,7 @@ Rcpp::List FusionForest4_cpp(
     {
       size_t j = 0;
       for (size_t k = 0; k < n; ++k) {
-        const double b =
-          (treatment_indicator[k] == 1) ? 0.5 : -0.5;
+        const double b = b_train[k];
         double g_k = 0.0, c_k = 0.0, s = 1.0;
         if (source_indicator[k] == 0) {
           s   = 0.0;
@@ -409,8 +478,7 @@ Rcpp::List FusionForest4_cpp(
 
       size_t j_os = 0;
       for (size_t k = 0; k < n; ++k) {
-        const double b =
-          (treatment_indicator[k] == 1) ? 0.5 : -0.5;
+        const double b = b_train[k];
         const double mu_k  = forest_mu.GetPrediction(k);
         const double tau_k = forest_tau.GetPrediction(k);
         double g_k = 0.0, c_k = 0.0, s = 1.0;
@@ -472,8 +540,7 @@ Rcpp::List FusionForest4_cpp(
         }
 
         for (size_t k = 0; k < n_test; ++k) {
-          const double b =
-            (treatment_indicator_test[k] == 1) ? 0.5 : -0.5;
+          const double b = b_test[k];
           const double s =
             (source_indicator_test[k] == 1) ? 1.0 : 0.0;
           const double g_k = testpred_deviation[k];
@@ -604,6 +671,10 @@ Rcpp::List FusionForest4_cpp(
   delete[] augmented_outcome_treat;
   delete[] augmented_outcome_deconf;
   delete[] augmented_outcome_deviation;
+  delete[] b_train;
+  if (b_test) delete[] b_test;
+  delete[] weights_treat;
+  if (weights_deconf) delete[] weights_deconf;
 
   return results;
 }

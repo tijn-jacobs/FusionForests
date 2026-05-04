@@ -64,6 +64,28 @@
 #' @param sigma Optional fixed value for \eqn{\sigma}.  If \code{NULL} (default),
 #'   \eqn{\sigma} is estimated from the data and updated each MCMC iteration.
 #' @param N_post,N_burn Number of posterior and burn-in MCMC iterations.
+#' @param treatment_coding Character; how the binary treatment indicator
+#'   \eqn{Z \in \{0,1\}} is mapped to the regression weight \eqn{b_i} in the
+#'   BCF parameterisation \eqn{y = \mu(X) + b\,\tau(X) + \dots} (and similarly
+#'   for the deconfounding term).  One of:
+#'   \describe{
+#'     \item{\code{"centered"} (default)}{\eqn{b = 0.5} if treated,
+#'       \eqn{b = -0.5} if control.  Both arms inform \eqn{\tau}; \eqn{\mu}
+#'       is the average-arm mean function.}
+#'     \item{\code{"binary"}}{\eqn{b = 1} if treated, \eqn{b = 0} if control.
+#'       Only treated rows inform \eqn{\tau}; \eqn{\mu} is the control-arm
+#'       mean function.}
+#'     \item{\code{"adaptive"}}{\eqn{b_i = z_i - \pi_i}, the propensity-score
+#'       residual (Hahn et al., 2020).  Requires \code{propensity_train} and
+#'       \code{propensity_test}.}
+#'   }
+#'   The \eqn{\tau} and deconfounding (\eqn{c}) forests are fit with
+#'   per-observation weights \eqn{w_i = b_i^2} so that the weighted
+#'   sufficient statistics match the full-data likelihood; rows with
+#'   \eqn{|b_i|} essentially zero are excluded from those updates.
+#' @param propensity_train,propensity_test Numeric vectors of estimated
+#'   propensity scores in (0, 1) for the training and test rows.  Required
+#'   when \code{treatment_coding = "adaptive"}; ignored otherwise.
 #' @param store_posterior_sample Logical; if \code{TRUE}, the full
 #'   \eqn{N_{\text{post}} \times n} posterior sample matrices are returned for
 #'   all component forests.
@@ -126,6 +148,9 @@ FusionForest <- function(
   sigma                       = NULL,
   N_post                      = 5000,
   N_burn                      = 5000,
+  treatment_coding            = c("centered", "binary", "adaptive"),
+  propensity_train            = NULL,
+  propensity_test             = NULL,
   store_posterior_sample       = FALSE,
   verbose                     = TRUE
 ) {
@@ -141,6 +166,9 @@ FusionForest <- function(
   allowed_decomp <- c("three-forest", "four-forest")
   if (!decomposition %in% allowed_decomp)
     stop("Invalid decomposition. Choose 'three-forest' or 'four-forest'.")
+
+  treatment_coding <- match.arg(treatment_coding,
+                                c("centered", "binary", "adaptive"))
 
   if (outcome_type == "right-censored" && is.null(status))
     stop("outcome_type = 'right-censored' requires a 'status' vector.")
@@ -168,6 +196,18 @@ FusionForest <- function(
   if (!all(source_indicator_train %in% c(0L, 1L)))
     stop("source_indicator_train must be 0 (OS) or 1 (RCT).")
   source_indicator_train <- as.integer(source_indicator_train)
+
+  if (treatment_coding == "adaptive") {
+    if (is.null(propensity_train))
+      stop("treatment_coding = 'adaptive' requires propensity_train.")
+    if (length(propensity_train) != length(y))
+      stop("propensity_train must match length(y).")
+    if (any(propensity_train <= 0 | propensity_train >= 1))
+      stop("propensity_train must lie strictly in (0, 1).")
+    propensity_train <- as.numeric(propensity_train)
+  } else {
+    propensity_train <- numeric(0)
+  }
 
   # OS subset for the deconfounding forest
   n_deconf <- sum(source_indicator_train == 0L)
@@ -218,6 +258,18 @@ FusionForest <- function(
       t
     }
 
+    if (treatment_coding == "adaptive") {
+      if (is.null(propensity_test))
+        stop("treatment_coding = 'adaptive' requires propensity_test.")
+      if (length(propensity_test) != n_test)
+        stop("propensity_test must match the number of test rows.")
+      if (any(propensity_test <= 0 | propensity_test >= 1))
+        stop("propensity_test must lie strictly in (0, 1).")
+      propensity_test <- as.numeric(propensity_test)
+    } else {
+      propensity_test <- numeric(0)
+    }
+
     X_test_deconf <- if (is.null(X_test_deconf)) {
       X_test_control
     } else {
@@ -242,6 +294,15 @@ FusionForest <- function(
     X_test_deviation         <- X_test_control
     treatment_indicator_test <- 1L
     source_indicator_test    <- 1L
+    if (treatment_coding == "adaptive") {
+      if (is.null(propensity_test))
+        stop("treatment_coding = 'adaptive' requires propensity_test.")
+      propensity_test <- as.numeric(propensity_test)[1L]
+      if (length(propensity_test) != 1L)
+        stop("propensity_test must have one entry when no test data is given.")
+    } else {
+      propensity_test <- numeric(0)
+    }
   }
 
   # Flatten training matrices
@@ -294,7 +355,8 @@ FusionForest <- function(
       X_train_deviation, number_of_trees_deviation, omega_deviation,
       number_of_trees_treat, number_of_trees_control,
       power, base, p_grow, p_prune, sigma_known, sigma_hat, lambda,
-      nu, N_post, N_burn, store_posterior_sample, verbose
+      nu, N_post, N_burn, store_posterior_sample, verbose,
+      treatment_coding, propensity_train, propensity_test
     )
 
     # Back-transform predictions
@@ -380,7 +442,8 @@ FusionForest <- function(
       X_train_deviation, number_of_trees_deviation, omega_deviation,
       number_of_trees_treat, number_of_trees_control,
       power, base, p_grow, p_prune, sigma_known, sigma_hat, lambda,
-      nu, N_post, N_burn, store_posterior_sample, verbose
+      nu, N_post, N_burn, store_posterior_sample, verbose,
+      treatment_coding, propensity_train, propensity_test
     )
 
     # Back-transform
@@ -428,7 +491,8 @@ FusionForest <- function(
   X_train_deviation, number_of_trees_deviation, omega_deviation,
   number_of_trees_treat, number_of_trees_control,
   power, base, p_grow, p_prune, sigma_known, sigma_hat, lambda,
-  nu, N_post, N_burn, store_posterior_sample, verbose
+  nu, N_post, N_burn, store_posterior_sample, verbose,
+  treatment_coding, propensity_train, propensity_test
 ) {
 
   # Shared arguments for both backends
@@ -477,7 +541,10 @@ FusionForest <- function(
     N_postSEXP                   = N_post,
     N_burnSEXP                   = N_burn,
     store_posterior_sampleSEXP   = store_posterior_sample,
-    verboseSEXP                  = verbose
+    verboseSEXP                  = verbose,
+    treatment_codingSEXP         = treatment_coding,
+    propensity_trainSEXP         = propensity_train,
+    propensity_testSEXP          = propensity_test
   )
 
   if (use_four_forest) {

@@ -30,9 +30,9 @@ struct ForestEngine {
     stan_forest->SetData(p, n, X, augment_outcome, nc);
   }
 
-  // Set per-observation weights for weighted regression (e.g., b_i^2 in BCF)
-  // Note: StanForest does not currently support per-observation weights
-  void SetWeights(double* w) {}
+  // Set per-observation weights for weighted regression (e.g., b_i^2 in BCF).
+  // Pass nullptr to clear and revert to the unweighted (uniform) likelihood.
+  void SetWeights(double* w) { stan_forest->SetWeights(w); }
 
   void StartDirichlet() {
     stan_forest->ToggleDart();

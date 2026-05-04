@@ -19,33 +19,48 @@ double GetBirthProbability(StanTree& tree, CutpointMatrix& cutpoints,
                            PriorInfo& prior_info,
                            std::vector<StanTree*>& splittable_leaves);
 
-// Compute observation counts and residual sums for the left and right
-// partitions induced by splitting target_leaf on (split_var, cut_val).
+// Compute weighted sufficient statistics for the left and right partitions
+// induced by splitting target_leaf on (split_var, cut_val).  When
+// data_info.weights == nullptr, every observation is treated as having
+// weight 1, so left_weight_sum equals left_count (and likewise for the
+// residual sum).  weighted_residual_sum holds Sum_{i in side} w_i * r_i.
 void GetSufficientStatistics(StanTree& tree, StanTree* target_leaf,
                              size_t split_var, size_t cut_val,
                              CutpointMatrix& cutpoints, DataInfo& data_info,
-                             size_t& left_count, double& left_sum,
-                             size_t& right_count, double& right_sum);
+                             size_t& left_count,
+                             double& left_weight_sum,
+                             double& left_weighted_residual_sum,
+                             size_t& right_count,
+                             double& right_weight_sum,
+                             double& right_weighted_residual_sum);
 
-// Compute observation counts and residual sums for an existing left/right
-// leaf pair (used during a death proposal).
+// Same for an existing left/right leaf pair (used during a death proposal).
 void GetSufficientStatistics(StanTree& tree, StanTree* left_leaf,
                              StanTree* right_leaf,
                              CutpointMatrix& cutpoints, DataInfo& data_info,
-                             size_t& left_count, double& left_sum,
-                             size_t& right_count, double& right_sum);
+                             size_t& left_count,
+                             double& left_weight_sum,
+                             double& left_weighted_residual_sum,
+                             size_t& right_count,
+                             double& right_weight_sum,
+                             double& right_weighted_residual_sum);
 
-// Compute sufficient statistics for every leaf in the tree in a single pass
-// over the data.  Populates leaves, observation_counts, and residual_sums.
+// Compute weighted sufficient statistics for every leaf in the tree in a
+// single pass over the data.  Populates leaves, weight_sums (Sum w_i),
+// and weighted_residual_sums (Sum w_i * r_i).
 void GetAllLeafStatistics(StanTree& tree, CutpointMatrix& cutpoints,
                           DataInfo& data_info,
                           std::vector<StanTree*>& leaves,
-                          std::vector<size_t>& observation_counts,
-                          std::vector<double>& residual_sums);
+                          std::vector<double>& weight_sums,
+                          std::vector<double>& weighted_residual_sums);
 
-// Log-likelihood of n residuals with sum sum_residuals under a Gaussian
-// model with noise std dev sigma and leaf prior std dev eta.
-double LogLikelihood(size_t n, double sum_residuals, double sigma, double eta);
+// Log-likelihood contribution of a leaf whose observations have weighted
+// total Sum w_i = weight_sum and weighted residual sum
+// Sum w_i * r_i = weighted_residual_sum, under Gaussian noise std dev sigma
+// and leaf prior std dev eta.  When all weights are 1, weight_sum equals the
+// observation count and the formula reduces to the standard BART likelihood.
+double LogLikelihood(double weight_sum, double weighted_residual_sum,
+                     double sigma, double eta);
 
 // Probability that a node at the given depth grows; 0 if no valid split
 // variable is available.
@@ -77,9 +92,12 @@ void DeathProposal(StanTree& tree, CutpointMatrix& cutpoints,
                    double& prob_birth, StanTree*& nog_node,
                    double& log_proposal_ratio, Random& random);
 
-// Draw a single leaf mean from its Gaussian posterior.
-double DrawLeafMean(size_t n, double sum_residuals, double eta,
-                    double sigma, Random& random);
+// Draw a single leaf mean from its Gaussian posterior given the weighted
+// sufficient statistics (Sum w_i, Sum w_i * r_i).  When all weights are 1,
+// weight_sum equals the observation count and the draw matches the standard
+// BART leaf-mean posterior.
+double DrawLeafMean(double weight_sum, double weighted_residual_sum,
+                    double eta, double sigma, Random& random);
 
 // Draw the vector of splitting probabilities from a Dirichlet posterior
 // (Linero, 2018).  Updates log_split_probabilities in-place.

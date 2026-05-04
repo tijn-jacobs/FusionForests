@@ -37,6 +37,12 @@ public:
   void SetData(size_t p, size_t n, double* x, double* y, size_t nc = 100);
   void SetData(size_t p, size_t n, double* x, double* y, int* nc);
 
+  // Set per-observation weights for weighted regression (e.g., b_i^2 in BCF).
+  // Pass nullptr to clear weights and revert to the standard, homoscedastic
+  // BART likelihood.  The pointer is stored, not copied: the caller must keep
+  // the array alive until weights are changed or cleared.
+  void SetWeights(double* w) { data_info.weights = w; }
+
   void SetPriorInfo(PriorInfo& info)  { this->prior_info = info; }
   void SetPriorParameters(double base, double power, double eta) {
     prior_info.base  = base;
