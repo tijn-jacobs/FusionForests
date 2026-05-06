@@ -9,6 +9,8 @@
 ## Metrics (training sample): RMSE of CATE, 95% CI coverage, CI width
 ## Parallelised with foreach + doParallel over 6 cores.
 
+setwd("~/Library/CloudStorage/OneDrive-VrijeUniversiteitAmsterdam/Documents/GitHub/FusionForests")
+
 library(FusionForests)
 library(foreach)
 library(doParallel)
@@ -16,12 +18,12 @@ library(doParallel)
 # -------------------------------------------------------------------------
 # 1. SETTINGS
 # -------------------------------------------------------------------------
-n_rep   <- 50
+n_rep   <- 36
 n_cores <- 6
 
 # DGP — matches examples/fusion_vs_rct_hte.R
-n_rct      <- 50
-n_rwd      <- 250
+n_rct      <- 100
+n_rwd      <- 100
 p          <- 10
 sigma_true <- 2
 
@@ -38,8 +40,8 @@ n_trees_dev    <- 50
 k_g <- 2
 
 # MCMC
-N_post <- 3000
-N_burn <- 2000
+N_post <- 2000
+N_burn <- 1000
 
 # Shared tree-prior and error-variance parameters
 power   <- 2.0
@@ -81,10 +83,11 @@ run_one_rep <- function(rep_id) {
   # --- Metrics helper ----------------------------------------------------
   eval_cate <- function(cate_hat, cate_samples, truth) {
     rmse <- sqrt(mean((cate_hat - truth)^2))
+    bias <- mean(cate_hat - truth)
     ci   <- apply(cate_samples, 2, quantile, probs = c(0.025, 0.975))
     cov  <- mean(truth >= ci[1, ] & truth <= ci[2, ])
     wid  <- mean(ci[2, ] - ci[1, ])
-    c(rmse = rmse, coverage = cov, width = wid)
+    c(rmse = rmse, bias = bias, coverage = cov, width = wid)
   }
 
   # --- Model 1: Two-forest BCF (RCT only) -------------------------------
@@ -204,15 +207,15 @@ res_list <- foreach(rep_id = seq_len(n_rep)) %dopar% run_one_rep(rep_id)
 elapsed <- (proc.time() - t0)["elapsed"]
 cat(sprintf("Done in %.1f s (%.1f s / rep).\n\n", elapsed, elapsed / n_rep))
 
-res <- do.call(rbind, res_list)   # n_rep x 12
+res <- do.call(rbind, res_list)   # n_rep x 16
 
 # -------------------------------------------------------------------------
 # 4. SUMMARY TABLE
 # -------------------------------------------------------------------------
 models   <- c("RCT only", "OS only", "Three-forest", "Four-forest")
 prefixes <- c("rct", "os", "three", "four")
-met_keys <- c("rmse", "coverage", "width")
-met_labs <- c("RMSE", "Coverage", "CI Width")
+met_keys <- c("rmse", "bias", "coverage", "width")
+met_labs <- c("RMSE", "Bias", "Coverage", "CI Width")
 
 summary_tab <- data.frame(Model = models)
 for (k in seq_along(met_keys)) {

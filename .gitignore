@@ -38,3 +38,8 @@ docs/
 
 # testthat output
 tests/testthat/_snaps/
+
+# Large PDS data folders (too big for GitHub)
+**/MACS PDS/
+**/WIHS PDS/
+**/MWCCS PDS/
