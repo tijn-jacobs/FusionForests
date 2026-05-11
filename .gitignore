@@ -35,6 +35,7 @@ src/RcppExports.cpp
 
 # pkgdown site output
 docs/
+inst/
 
 # testthat output
 tests/testthat/_snaps/

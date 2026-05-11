@@ -1,0 +1,312 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{bm}
+\usepackage{mathtools}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{natbib}
+
+\newcommand{\indep}{\perp\!\!\!\perp}
+\newcommand{\given}{\,|\,}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\mathrm{Var}}
+\newcommand{\1}{\mathbf{1}}
+\newcommand{\R}{\mathbb{R}}
+
+\title{A Hierarchical Centered Dirichlet Process Mixture\\
+       for Error Distributions in Bayesian Data Fusion\\
+       under Unmeasured Confounding}
+\author{Tijn Jacobs}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We extend the Bayesian nonparametric framework for combining randomized and observational data under unmeasured confounding by allowing the residual distribution in the accelerated failure time outcome model to differ across data sources. Building on the centered Dirichlet process (CDP) construction of \citet{yang2010semiparametric}, used in a single-source AFT--BART setting by \citet{henderson2020individualized}, we place a hierarchical Dirichlet process (HDP) prior \citep{teh2006hierarchical} on the source-specific mixing measures, with shared atoms but source-specific weights. The mean-zero constraint required for identifiability of the regression components is enforced separately within each source by recentering. We derive a blocked Gibbs sampler that preserves conjugacy with the BART updates of the prognostic, treatment-effect, and confounding-function components.
+\end{abstract}
+
+\section{Motivation}
+
+In our framework for combining randomized and observational data under unmeasured confounding \citep{jacobs2026framework}, the conditional expectation of the observed log-survival outcome admits the decomposition
+\begin{equation}
+\E[Y \given A, X, S] \;=\; m_0(X, S) + \tau(X)\, A + (1 - S) A\, c(X),
+\label{eq:cmean}
+\end{equation}
+under SUTVA, randomization in the RCT, and transportability of potential outcomes. The corresponding individual-level model takes the form
+\begin{equation}
+Y_i \;=\; m_0(X_i, S_i) + A_i\, \tau(X_i) + A_i(1 - S_i)\, c(X_i) + W_i, \qquad W_i \sim F_{S_i},
+\label{eq:outcome}
+\end{equation}
+where $F_s$ is the error distribution within data source $s \in \{0, 1\}$ ($s=1$ for the RCT, $s=0$ for the observational study). For $m_0$, $\tau$, and $c$ to be identified as the conditional-mean components defined in our framework, each $F_s$ must have mean zero.
+
+\citet{henderson2020individualized} model the residual distribution in a single-source AFT model as a location mixture of normals with a centered Dirichlet process prior on the mixing measure, leveraging the construction of \citet{yang2010semiparametric}. In their setting, a single CDP is sufficient because there is only one source. In ours, the natural question is whether $F_0$ and $F_1$ should be assumed equal. We argue they should not: real-world data and randomized trials typically differ in measurement quality, follow-up protocols, and the prevalence of extreme outcomes, and these differences plausibly enter the error distribution rather than the structural mean. At the same time, the two error distributions are unlikely to be entirely unrelated, and pooling information across them through a shared base measure is desirable.
+
+A hierarchical Dirichlet process \citep{teh2006hierarchical} resolves this tension: $F_0$ and $F_1$ share a common pool of latent ``residual types'' through a top-level random measure, while admitting source-specific weights. Combined with the centering construction of \citet{yang2010semiparametric}, applied within each source, this yields source-specific, mean-zero, nonparametric error distributions that borrow information through their shared atoms.
+
+\section{Notation and observed data}
+
+We observe data $\mathcal{D} = \{(Y_i^{\mathrm{obs}}, \delta_i, A_i, X_i, S_i) : i = 1, \ldots, n\}$, where $Y_i^{\mathrm{obs}} = \min(Y_i, \log C_i)$ is the log of the observed time, $\delta_i = \1\{Y_i \le \log C_i\}$ is the event indicator, $A_i \in \{0, 1\}$ is treatment, $X_i \in \R^p$ is a vector of observed covariates, and $S_i \in \{0, 1\}$ is the source indicator. Write $n_s = \sum_i \1\{S_i = s\}$.
+
+The model is~\eqref{eq:outcome}. The latent complete-data log-survival time $Y_i$ equals $Y_i^{\mathrm{obs}}$ if $\delta_i = 1$ and is unobserved if $\delta_i = 0$, in which case we know $Y_i > \log C_i$.
+
+\section{Error model}
+
+\subsection{Per-source location mixture of Gaussians}
+
+Conditional on the source $S_i = s$, we model the residual as a location mixture of Gaussians with common scale $\sigma > 0$ and source-specific mixing measure $G_s$:
+\begin{equation}
+W_i \given S_i = s, G_s, \sigma \;\sim\; f_s(w) \;=\; \int \frac{1}{\sigma}\, \phi\!\left(\frac{w - \theta}{\sigma}\right) dG_s(\theta).
+\label{eq:fs}
+\end{equation}
+Introducing a latent location $\theta_i$ for each observation gives the hierarchical representation
+\begin{equation}
+W_i \given \theta_i, \sigma^2 \;\sim\; N(\theta_i, \sigma^2), \qquad \theta_i \given G_{S_i} \;\sim\; G_{S_i}.
+\label{eq:hierarchical-w}
+\end{equation}
+The mean-zero constraint $\E[W_i \given S_i = s, G_s, \sigma] = 0$ is enforced by requiring $\int \theta\, dG_s(\theta) = 0$ for both $s$.
+
+A shared scale across sources is the most parsimonious choice and parallels \citet{henderson2020individualized}; a source-specific $\sigma_s$ requires only a one-line change and is discussed in Section~\ref{sec:extensions}.
+
+\subsection{Hierarchical Dirichlet process prior on the mixing measures}
+
+We place a hierarchical Dirichlet process prior \citep{teh2006hierarchical} on $(G_0^*, G_1^*)$ via a top-level random measure $G^*$:
+\begin{align}
+G^* &\sim \mathrm{DP}(\gamma, H), \\
+G_s^* \given G^*, M_s &\sim \mathrm{DP}(M_s, G^*), \qquad s \in \{0, 1\},
+\end{align}
+where $H = N(0, \sigma_\theta^2)$ is the base distribution on $\R$, $\gamma > 0$ is the top-level concentration, and $M_0, M_1 > 0$ are source-specific concentrations. We refer to $G_s^*$ as the \emph{unconstrained} version of $G_s$; the centering described in Section~\ref{sec:centering} produces $G_s$.
+
+By Sethuraman's stick-breaking representation \citep{sethuraman1994constructive}, the top-level measure can be written as
+\begin{equation}
+G^* \;=\; \sum_{k=1}^\infty \beta_k\, \delta_{\theta_k^*}, \qquad
+\theta_k^* \stackrel{\mathrm{iid}}{\sim} H, \qquad
+\beta_k = u_k \prod_{l < k}(1 - u_l), \qquad
+u_k \stackrel{\mathrm{iid}}{\sim} \mathrm{Beta}(1, \gamma).
+\end{equation}
+Conditional on $G^*$, each $G_s^*$ shares the same atoms but has its own weights:
+\begin{equation}
+G_s^* \;=\; \sum_{k=1}^\infty \pi_{sk}\, \delta_{\theta_k^*},
+\end{equation}
+with the source-specific weight vector $\bm{\pi}_s = (\pi_{sk})_{k \ge 1}$ distributed according to the conditional law $\mathrm{DP}(M_s, G^*)$ projected onto the atoms.
+
+\subsection{Mean-zero centering}\label{sec:centering}
+
+For each source $s$, define the mean of the unconstrained measure:
+\begin{equation}
+\mu_s \;=\; \int \theta\, dG_s^*(\theta) \;=\; \sum_{k=1}^\infty \pi_{sk}\, \theta_k^*.
+\end{equation}
+Following \citet{yang2010semiparametric}, the \emph{centered} measure is
+\begin{equation}
+G_s \;=\; \sum_{k=1}^\infty \pi_{sk}\, \delta_{\theta_k^* - \mu_s}.
+\end{equation}
+By construction $\int \theta\, dG_s(\theta) = 0$ almost surely, so~\eqref{eq:fs} satisfies $\E[W_i \given S_i = s, G_s, \sigma] = 0$ as required.
+
+Although the unconstrained atoms $\theta_k^*$ are shared between sources, the centered atoms $\theta_{sk} := \theta_k^* - \mu_s$ are source-specific: they share their unconstrained location $\theta_k^*$ but are shifted by source-specific amounts $\mu_0$ and $\mu_1$. This is the precise sense in which the two error distributions borrow information while retaining flexibility: the \emph{shapes} of $F_0$ and $F_1$ are linked through the shared $\theta_k^*$, while the \emph{weights} on those shapes (and the resulting mean shifts) are source-specific.
+
+\subsection{Truncation for posterior computation}
+
+For computation we truncate the top-level stick-breaking at a finite level $K$ \citep{ishwaran2001gibbs}: $u_K = 1$, so $\beta_K = 1 - \sum_{k < K} \beta_k$ and $\beta_k = 0$ for $k > K$. Conditional on the truncated $\bm{\beta} \in \Delta^{K-1}$ we use the finite-dimensional approximation
+\begin{equation}
+\bm{\pi}_s \given \bm{\beta}, M_s \;\sim\; \mathrm{Dirichlet}(M_s \beta_1, \ldots, M_s \beta_K),
+\label{eq:pi-prior}
+\end{equation}
+which is the standard truncated representation of the HDP \citep{teh2006hierarchical, wang2009variational}; the approximation becomes exact as $K \to \infty$. We monitor the largest occupied component index across iterations and increase $K$ if it approaches the truncation bound (default $K = 50$, following \citet{henderson2020individualized}).
+
+\section{Full hierarchical model}
+
+Introducing latent cluster assignments $Z_i \in \{1, \ldots, K\}$ such that $\theta_i = \theta_{Z_i}^* - \mu_{S_i}$, the full hierarchical model is:
+\begin{align}
+Y_i \given Z_i, \bm{\theta}^*, \sigma^2, m_0, \tau, c &\sim N\!\big(m_0(X_i, S_i) + A_i \tau(X_i) + A_i(1 - S_i)\, c(X_i) + \theta_{Z_i}^* - \mu_{S_i},\; \sigma^2\big), \label{eq:lik} \\
+Z_i \given \bm{\pi}_{S_i} &\sim \mathrm{Categorical}(\bm{\pi}_{S_i}), \\
+\bm{\pi}_s \given \bm{\beta}, M_s &\sim \mathrm{Dirichlet}(M_s \beta_1, \ldots, M_s \beta_K), \qquad s \in \{0, 1\}, \\
+\bm{\beta} \given \gamma &\sim \mathrm{Stick}_K(\gamma), \\
+\theta_k^* &\stackrel{\mathrm{iid}}{\sim} N(0, \sigma_\theta^2), \qquad k = 1, \ldots, K, \\
+m_0, \tau, c &\sim \mathrm{BART}, \\
+\sigma^2 &\sim \kappa\nu / \chi^2_\nu, \\
+\gamma &\sim \mathrm{Gamma}(a_\gamma, b_\gamma), \\
+M_s &\sim \mathrm{Gamma}(a_M, b_M), \qquad s \in \{0, 1\},
+\end{align}
+with $\mu_s = \sum_k \pi_{sk} \theta_k^*$ a deterministic function of $\bm{\pi}_s$ and $\bm{\theta}^*$. Here $\mathrm{Stick}_K(\gamma)$ denotes the truncated stick-breaking distribution with $\mathrm{Beta}(1, \gamma)$ breaks.
+
+For the BART components we follow \citet{chipman2010bart} with the AFT-specific adaptations of \citet{henderson2020individualized}: $J = 200$ trees, $\alpha = 0.95$, $\beta = 2$, response transformation $y_i^{\mathrm{tr}} = y_i \exp(-\hat\mu_{\mathrm{AFT}})$ based on a preliminary parametric log-normal AFT fit, and calibration of $\kappa$, $\sigma_\theta^2$ via the Yamato-type approximation described in \citet[Section 2.4]{henderson2020individualized}. For the concentration hyperpriors we set $a_\gamma = a_M = 2$, $b_\gamma = b_M = 0.1$, mirroring Henderson's defaults; the resulting prior on each concentration has mean $20$ and prior mode $10$.
+
+\section{Posterior computation via blocked Gibbs sampling}
+
+Let $\bm{\Theta}$ denote the full state of the sampler:
+\begin{itemize}[noitemsep]
+\item BART parameters (trees and node values) for $m_0$, $\tau$, $c$;
+\item Cluster assignments $\bm{Z} = (Z_1, \ldots, Z_n)$;
+\item Unconstrained atoms $\bm{\theta}^* = (\theta_1^*, \ldots, \theta_K^*)$;
+\item Top-level stick parameters $\bm{u}$ (equivalently $\bm{\beta}$);
+\item Source-specific weights $\bm{\pi}_0, \bm{\pi}_1$;
+\item Concentration parameters $\gamma, M_0, M_1$;
+\item Error scale $\sigma^2$;
+\item Imputed log-survival times $\{Y_i : \delta_i = 0\}$.
+\end{itemize}
+The source means $\bm{\mu} = (\mu_0, \mu_1)$ are recomputed deterministically as $\mu_s = \sum_k \pi_{sk} \theta_k^*$ whenever $\bm{\pi}$ or $\bm{\theta}^*$ change.
+
+For notational economy, define the \emph{partial residual} for individual $i$:
+\begin{equation}
+R_i \;:=\; Y_i - m_0(X_i, S_i) - A_i\, \tau(X_i) - A_i(1 - S_i)\, c(X_i).
+\label{eq:Ri}
+\end{equation}
+Conditional on the BART components and $Z_i = k$, we have $R_i \sim N(\theta_k^* - \mu_{S_i}, \sigma^2)$.
+
+One sweep of the Gibbs sampler updates each block in turn. We describe the steps in the order in which they should be executed.
+
+\subsection{Step 1: Data augmentation for censored observations}
+
+For each $i$ with $\delta_i = 0$, draw the imputed log-survival time
+\begin{equation}
+Y_i \given \cdot \;\sim\; \mathrm{TruncatedNormal}(\eta_i,\, \sigma^2;\, [\log C_i, \infty)),
+\end{equation}
+where $\eta_i = m_0(X_i, S_i) + A_i \tau(X_i) + A_i(1 - S_i)\, c(X_i) + \theta_{Z_i}^* - \mu_{S_i}$ is the current conditional mean of $Y_i$.
+
+\subsection{Step 2: BART backfitting}
+
+The three BART components are updated sequentially via Bayesian backfitting \citep{chipman2010bart}. For each component, the working response is the partial residual obtained by subtracting the contributions of all other components from $Y_i$, along with the current cluster shift $\theta_{Z_i}^* - \mu_{S_i}$.
+
+\paragraph{Update $m_0$.} Working response:
+\begin{equation}
+R_i^{(m_0)} \;=\; Y_i - A_i\, \tau(X_i) - A_i(1 - S_i)\, c(X_i) - \big(\theta_{Z_i}^* - \mu_{S_i}\big).
+\end{equation}
+Treat $R_i^{(m_0)} \sim N(m_0(X_i, S_i), \sigma^2)$ and apply the standard MH tree moves and conjugate node-value updates on the predictor vector $(X_i, S_i)$.
+
+\paragraph{Update $\tau$.} Active only for treated observations ($A_i = 1$). Working response:
+\begin{equation}
+R_i^{(\tau)} \;=\; Y_i - m_0(X_i, S_i) - (1 - S_i)\, c(X_i) - \big(\theta_{Z_i}^* - \mu_{S_i}\big), \qquad i \text{ with } A_i = 1.
+\end{equation}
+Treat $R_i^{(\tau)} \sim N(\tau(X_i), \sigma^2)$ and update the BART for $\tau$ on this subset. Control observations carry no information about $\tau$.
+
+\paragraph{Update $c$.} Active only for treated observations in the OS ($A_i = 1, S_i = 0$). Working response:
+\begin{equation}
+R_i^{(c)} \;=\; Y_i - m_0(X_i, 0) - \tau(X_i) - \big(\theta_{Z_i}^* - \mu_0\big), \qquad i \text{ with } A_i = 1, S_i = 0.
+\end{equation}
+Treat $R_i^{(c)} \sim N(c(X_i), \sigma^2)$ and update the BART for $c$ on this subset.
+
+After updating all three BART components, recompute $R_i$ as in~\eqref{eq:Ri} for use in the remaining steps.
+
+\subsection{Step 3: Cluster assignments}
+
+For each $i$, sample $Z_i \in \{1, \ldots, K\}$ from
+\begin{equation}
+P(Z_i = k \given \cdot) \;\propto\; \pi_{S_i, k}\, \phi\!\left(\frac{R_i - (\theta_k^* - \mu_{S_i})}{\sigma}\right), \qquad k = 1, \ldots, K.
+\end{equation}
+
+\subsection{Step 4: Unconstrained atoms}
+
+Following \citet{henderson2020individualized}, atoms are updated in the unconstrained parameterization and the centering is reapplied deterministically afterwards. Let $n_k = \sum_i \1\{Z_i = k\}$ be the total number of observations in cluster $k$ across both sources, and define the cluster sum $\bar R_k = \sum_{i : Z_i = k} R_i$.
+
+The conjugate Gaussian update is
+\begin{equation}
+\theta_k^* \given \cdot \;\sim\; N\!\left(\frac{\sigma^{-2}\, \bar R_k}{\sigma_\theta^{-2} + n_k\, \sigma^{-2}},\; \frac{1}{\sigma_\theta^{-2} + n_k\, \sigma^{-2}}\right), \qquad k = 1, \ldots, K.
+\label{eq:theta-update}
+\end{equation}
+After updating all $\theta_k^*$, recompute the source means and centered atoms:
+\begin{equation}
+\mu_s \;=\; \sum_{k=1}^K \pi_{sk}\, \theta_k^*, \qquad \theta_{sk} \;=\; \theta_k^* - \mu_s, \qquad s \in \{0, 1\}.
+\end{equation}
+
+\paragraph{Remark.} The update~\eqref{eq:theta-update} is the standard Gibbs step for the unconstrained mixing measure; the centering acts as a deterministic transformation between an unidentified parameterization $(m_0^{\mathrm{unc}}, \bm{\theta}^*)$ and the identified $(m_0, \bm{\theta})$. As discussed by \citet{yang2010semiparametric} and \citet{henderson2020individualized}, this parameter-expansion strategy preserves the correct marginal posterior for the centered quantities.
+
+\subsection{Step 5: Top-level stick weights}
+
+The HDP update for the top-level stick-breaking weights uses the auxiliary table-count augmentation of \citet{teh2006hierarchical}, originally derived from \citet{antoniak1974mixtures}.
+
+\paragraph{Step 5a: Sample table counts.} Let $n_{sk} = \sum_i \1\{S_i = s, Z_i = k\}$. For each $(s, k)$ with $n_{sk} > 0$, sample the auxiliary table count $t_{sk} \in \{1, \ldots, n_{sk}\}$. The marginal distribution is
+\begin{equation}
+P(t_{sk} = t \given \cdot) \;\propto\; |s(n_{sk}, t)|\, (M_s \beta_k)^t,
+\end{equation}
+where $|s(n, t)|$ are unsigned Stirling numbers of the first kind. In practice $t_{sk}$ is generated via the equivalent representation
+\begin{equation}
+t_{sk} \;=\; \sum_{j=1}^{n_{sk}} B_{sk,j}, \qquad B_{sk,j} \;\sim\; \mathrm{Bernoulli}\!\left(\frac{M_s \beta_k}{M_s \beta_k + j - 1}\right),
+\end{equation}
+which avoids the Stirling-number evaluation. Set $t_{sk} = 0$ if $n_{sk} = 0$.
+
+\paragraph{Step 5b: Sample stick weights.} Let $t_{\cdot k} = t_{0k} + t_{1k}$. Sample the truncated sticks
+\begin{equation}
+u_k \given \cdot \;\sim\; \mathrm{Beta}\!\left(1 + t_{\cdot k},\; \gamma + \sum_{l > k} t_{\cdot l}\right), \qquad k = 1, \ldots, K - 1,
+\end{equation}
+and set $u_K = 1$. Recompute $\beta_k = u_k \prod_{l < k}(1 - u_l)$ for $k = 1, \ldots, K$.
+
+\subsection{Step 6: Source-specific weights}
+
+Given $\bm{\beta}$ and the cluster assignments, $\bm{\pi}_s$ has a conjugate Dirichlet update:
+\begin{equation}
+\bm{\pi}_s \given \cdot \;\sim\; \mathrm{Dirichlet}(M_s \beta_1 + n_{s1},\, \ldots,\, M_s \beta_K + n_{sK}), \qquad s \in \{0, 1\}.
+\end{equation}
+After this step, recompute $\mu_s$ and $\theta_{sk} = \theta_k^* - \mu_s$.
+
+\subsection{Step 7: Concentration parameters}
+
+Both $\gamma$ and $M_s$ are updated using the auxiliary-variable approach of \citet{escobar1995bayesian}.
+
+\paragraph{Update $\gamma$.} Let $K^*$ denote the number of occupied top-level components and let $t_{\cdot\cdot} = \sum_{s,k} t_{sk}$ denote the total number of tables across both restaurants.
+\begin{enumerate}[noitemsep]
+\item Sample $\eta_\gamma \given \gamma, t_{\cdot\cdot} \sim \mathrm{Beta}(\gamma + 1, t_{\cdot\cdot})$.
+\item Sample $\gamma \given \eta_\gamma, K^*$ from the two-component mixture
+\begin{align*}
+\gamma \given \cdot &\sim \omega_\gamma\, \mathrm{Gamma}(a_\gamma + K^*,\; b_\gamma - \log \eta_\gamma) \\
+&\quad + (1 - \omega_\gamma)\, \mathrm{Gamma}(a_\gamma + K^* - 1,\; b_\gamma - \log \eta_\gamma),
+\end{align*}
+with
+$$\frac{\omega_\gamma}{1 - \omega_\gamma} \;=\; \frac{a_\gamma + K^* - 1}{t_{\cdot\cdot}(b_\gamma - \log \eta_\gamma)}.$$
+\end{enumerate}
+
+\paragraph{Update $M_s$.} For each $s \in \{0, 1\}$, with $t_{s\cdot} = \sum_k t_{sk}$ source-specific table counts:
+\begin{enumerate}[noitemsep]
+\item Sample $\eta_{M,s} \given M_s, n_s \sim \mathrm{Beta}(M_s + 1, n_s)$.
+\item Sample $M_s \given \eta_{M,s}, t_{s\cdot}$ from the analogous two-component Gamma mixture with $t_{s\cdot}$ in place of $K^*$ and $n_s$ implicit in $\eta_{M,s}$.
+\end{enumerate}
+See \citet[Appendix A]{teh2006hierarchical} for the full derivation in the HDP setting.
+
+\subsection{Step 8: Error scale}
+
+Conditional on assignments, atoms, and BART components,
+\begin{equation}
+\sigma^2 \given \cdot \;\sim\; \mathrm{InverseGamma}\!\left(\frac{\nu + n}{2},\; \frac{\kappa\nu + \hat s^2}{2}\right), \qquad \hat s^2 = \sum_{i=1}^n \big(R_i - (\theta_{Z_i}^* - \mu_{S_i})\big)^2.
+\end{equation}
+
+\subsection{Algorithmic summary}
+
+One sweep of the Gibbs sampler consists of:
+\begin{enumerate}[label=(\arabic*), noitemsep]
+\item Impute $Y_i$ for censored $i$ (Step~1).
+\item Update the BART components $m_0$, then $\tau$, then $c$, recomputing $R_i$ at the end (Step~2).
+\item Update cluster assignments $\bm{Z}$ (Step~3).
+\item Update the unconstrained atoms $\bm{\theta}^*$ and recompute $\mu_s$, $\theta_{sk}$ (Step~4).
+\item Update top-level table counts $\{t_{sk}\}$ and sticks $\bm{u}$, then $\bm{\beta}$ (Step~5).
+\item Update source weights $\bm{\pi}_0, \bm{\pi}_1$ and recompute $\mu_s$, $\theta_{sk}$ (Step~6).
+\item Update concentration parameters $\gamma$, $M_0$, $M_1$ (Step~7).
+\item Update $\sigma^2$ (Step~8).
+\end{enumerate}
+
+\section{Practical considerations}
+
+\paragraph{Truncation.} The default $K = 50$ follows \citet{henderson2020individualized}. Monitor $\max_i Z_i$ across iterations; if it equals $K$ in more than a small fraction of iterations, $K$ is too small.
+
+\paragraph{Hyperparameter calibration.} The induced prior on $\Var(W \given S = s)$ under the HDP-CDP has the same structural form as in the single-source case of \citet{henderson2020individualized}, with source-specific contributions. The Yamato-type approximation \citep{yamato1984characteristic} they use to obtain a tractable approximation for $\sum_k \pi_{sk}(\theta_k^* - \mu_s)^2 / \sigma_\theta^2$ extends without modification to each source separately. Calibration to a preliminary $\hat\sigma_W^2$ obtained from a parametric log-normal AFT fit is recommended, with default tail probability $q = 0.5$.
+
+\paragraph{Initialization.} Initialize the BART components via the standard \citet{chipman2010bart} initialization; assign cluster labels by $k$-means on residuals from an initial parametric fit; set $\bm{\beta} = (1/K, \ldots, 1/K)$, $\bm{\pi}_s = \bm{\beta}$, $\gamma = M_0 = M_1 = 1$.
+
+\paragraph{Diagnostics.} The source-specific means $\mu_0, \mu_1$ and the variances $\Var(W \given S = s)$ are derived quantities of the posterior and serve as natural diagnostics of how much source-specific structure the HDP is exploiting. Posterior summaries of $|\mu_0 - \mu_1|$ and of the source-specific residual variances communicate the extent to which $F_0$ and $F_1$ differ in their first two moments; the full residual densities $\hat f_s(w) = K^{-1} \sum_k \pi_{sk}\, \phi((w - \theta_{sk})/\sigma)/\sigma$ can be plotted for direct visual comparison.
+
+\section{Extensions}\label{sec:extensions}
+
+Several extensions follow naturally from this construction.
+
+\paragraph{Source-specific scales.} Replacing $\sigma$ by $\sigma_s$ requires only stratifying Steps~3 and~8 by source. This is appropriate when RWD has notably different noise magnitude than the RCT.
+
+\paragraph{Nested rather than hierarchical Dirichlet process.} A nested Dirichlet process \citep{rodriguez2008nested} on $(G_0^*, G_1^*)$ would cluster the residual \emph{distributions themselves}, identifying subpopulations within the OS whose residual structure matches the RCT and subpopulations whose does not. This is thematically aligned with the confounding-function decomposition: the bias function $c(X)$ absorbs the conditional-mean shift, and the nested DP would absorb the residual-shape shift.
+
+\paragraph{Covariate-dependent error distribution.} A dependent Dirichlet process \citep{maceachern1999dependent} with covariate-dependent weights would extend the construction to fully heteroscedastic errors. Combining with the heteroskedastic AFT-BART approach of \citet{sparapani2023nonparametric}, in which a second BART models $\log \sigma(X)$, yields an even more flexible alternative.
+
+\paragraph{Connection to Bayesian borrowing diagnostics.} Source-specific concentration parameters $M_s$, jointly with the source-specific table counts $t_{s\cdot}$ produced as a by-product of the sampler, function as effective-sample-size-style summaries of how much the OS-specific residual distribution borrows from the shared base measure $G^*$. This connects the construction to the broader Bayesian-borrowing literature on dynamic information-sharing diagnostics \citep{hupf2021bayesian}.
+
+\bibliographystyle{apalike}
+\bibliography{references}
+
+\end{document}
