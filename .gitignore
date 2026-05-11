@@ -39,6 +39,44 @@ docs/
 # testthat output
 tests/testthat/_snaps/
 
+# LaTeX build byproducts (keep only .tex and .pdf)
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.synctex(busy)
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+*.nav
+*.snm
+*.vrb
+*.dvi
+*.ps
+*.idx
+*.ilg
+*.ind
+*.glo
+*.gls
+*.glg
+*.acn
+*.acr
+*.alg
+*.xdy
+*.tdo
+*.figlist
+*.makefile
+*.thm
+*.brf
+*-blx.bib
+*.xml
+
 # Large PDS data folders (too big for GitHub)
 **/MACS PDS/
 **/WIHS PDS/
