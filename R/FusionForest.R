@@ -86,6 +86,41 @@
 #' @param propensity_train,propensity_test Numeric vectors of estimated
 #'   propensity scores in (0, 1) for the training and test rows.  Required
 #'   when \code{treatment_coding = "adaptive"}; ignored otherwise.
+#' @param error_dist Character; residual-distribution prior.  One of:
+#'   \describe{
+#'     \item{\code{"gaussian"} (default)}{Single normal residual,
+#'       \eqn{\varepsilon_i \sim N(0, \sigma^2)}.}
+#'     \item{\code{"shared_dp"}}{Centred Dirichlet-process mixture of
+#'       Gaussians on the residual, pooled across data sources (AFTrees-style;
+#'       Henderson et al., 2020).  Atoms are recentred to weighted mean zero
+#'       to identify the structural mean components.}
+#'     \item{\code{"source_dp"}}{Independent centred Dirichlet-process
+#'       mixtures per source (Stage A of the HDP-CDP plan).  RCT and OS get
+#'       their own atoms, weights, and concentration; \eqn{\sigma} is shared.}
+#'     \item{\code{"source_dp_scale"}}{Same as \code{"source_dp"} but with
+#'       per-source error scales \eqn{\sigma_s}.  Each source gets its own
+#'       inverse-gamma conjugate update for \eqn{\sigma_s}, and the per-source
+#'       precision is propagated to the forest backfitting via per-observation
+#'       precision weights.}
+#'     \item{\code{"source_hdp"}}{Hierarchical centred Dirichlet process
+#'       (Stage B): atoms \eqn{\theta_k^*} are shared across sources via a
+#'       top-level \eqn{DP(\gamma, H)}; per-source weights \eqn{\pi_{sk}} and
+#'       means \eqn{\mu_s} restore identifiability of the structural
+#'       components.  Concentration parameters \eqn{\gamma, M_0, M_1} are
+#'       updated via Escobar-West auxiliary-variable steps; the top-level
+#'       sticks \eqn{\beta} use the Antoniak-Teh table-count augmentation.}
+#'   }
+#' @param error_truncation_K Integer; truncation level for the stick-breaking
+#'   representation.  Default 50.  Increase if the number of occupied components
+#'   approaches the bound during MCMC.
+#' @param error_atom_scale Numeric; prior standard deviation for each atom on
+#'   the standardised response scale, so each atom has prior
+#'   \eqn{N(0, \texttt{error\_atom\_scale}^2)}.  Default 0.5 (so atoms are
+#'   expected within roughly \eqn{\pm 1} on the standardised scale).
+#' @param error_mass_init Numeric; starting value for the concentration
+#'   parameter \eqn{\alpha} (or each \eqn{M_s} under \code{"source_dp"}).
+#'   Updated by the sampler via an AFTrees-style Gamma conjugate step with
+#'   fixed hyperprior \eqn{\mathrm{Gamma}(2, 0.1)}.  Default 1.
 #' @param store_posterior_sample Logical; if \code{TRUE}, the full
 #'   \eqn{N_{\text{post}} \times n} posterior sample matrices are returned for
 #'   all component forests.
@@ -151,6 +186,11 @@ FusionForest <- function(
   treatment_coding            = c("centered", "binary", "adaptive"),
   propensity_train            = NULL,
   propensity_test             = NULL,
+  error_dist                  = c("gaussian", "shared_dp", "source_dp",
+                                  "source_dp_scale", "source_hdp"),
+  error_truncation_K          = 50L,
+  error_atom_scale            = 0.5,
+  error_mass_init             = 1.0,
   store_posterior_sample       = FALSE,
   verbose                     = TRUE
 ) {
@@ -169,6 +209,27 @@ FusionForest <- function(
 
   treatment_coding <- match.arg(treatment_coding,
                                 c("centered", "binary", "adaptive"))
+
+  error_dist <- match.arg(error_dist,
+                          c("gaussian", "shared_dp", "source_dp",
+                            "source_dp_scale", "source_hdp"))
+  mixture_mode <- switch(error_dist,
+                         "gaussian"         = 0L,
+                         "shared_dp"        = 1L,
+                         "source_dp"        = 2L,
+                         "source_dp_scale"  = 3L,
+                         "source_hdp"       = 4L)
+  error_truncation_K <- as.integer(error_truncation_K)[1L]
+  if (error_truncation_K < 2L)
+    stop("error_truncation_K must be at least 2.")
+  if (!is.numeric(error_atom_scale) || length(error_atom_scale) != 1L ||
+      !is.finite(error_atom_scale) || error_atom_scale <= 0)
+    stop("error_atom_scale must be a single positive number.")
+  if (!is.numeric(error_mass_init) || length(error_mass_init) != 1L ||
+      !is.finite(error_mass_init) || error_mass_init <= 0)
+    stop("error_mass_init must be a single positive number.")
+  mixture_prior_atom_variance <- as.numeric(error_atom_scale) ^ 2
+  mixture_mass_init           <- as.numeric(error_mass_init)
 
   if (outcome_type == "right-censored" && is.null(status))
     stop("outcome_type = 'right-censored' requires a 'status' vector.")
@@ -356,7 +417,9 @@ FusionForest <- function(
       number_of_trees_treat, number_of_trees_control,
       power, base, p_grow, p_prune, sigma_known, sigma_hat, lambda,
       nu, N_post, N_burn, store_posterior_sample, verbose,
-      treatment_coding, propensity_train, propensity_test
+      treatment_coding, propensity_train, propensity_test,
+      mixture_mode, error_truncation_K,
+      mixture_prior_atom_variance, mixture_mass_init
     )
 
     # Back-transform predictions
@@ -443,7 +506,9 @@ FusionForest <- function(
       number_of_trees_treat, number_of_trees_control,
       power, base, p_grow, p_prune, sigma_known, sigma_hat, lambda,
       nu, N_post, N_burn, store_posterior_sample, verbose,
-      treatment_coding, propensity_train, propensity_test
+      treatment_coding, propensity_train, propensity_test,
+      mixture_mode, error_truncation_K,
+      mixture_prior_atom_variance, mixture_mass_init
     )
 
     # Back-transform
@@ -476,6 +541,37 @@ FusionForest <- function(
   # Discard burn-in sigma draws
   if (!sigma_known) fit$sigma <- fit$sigma[-(1:N_burn)]
 
+  # Back-transform DP atoms onto the response scale (multiply by sigma_hat).
+  # Atoms are mean-zero shifts so no y_mean offset is needed.  Mass and stick
+  # weights are scale-free and pass through unchanged.  Per-source sigma_g
+  # (SOURCE_DP_SCALE) is also rescaled to the response scale.
+  if (!is.null(fit$dp_locations)) {
+    fit$dp_locations <- lapply(fit$dp_locations, function(m) m * sigma_hat)
+    fit$error_dist   <- error_dist
+  }
+  if (!is.null(fit$dp_sigma_g)) {
+    fit$dp_sigma_g <- lapply(fit$dp_sigma_g, function(v) v * sigma_hat)
+  }
+  # HDP-only posterior fields: shared atoms and per-source means are on the
+  # standardised residual scale and need rescaling.  beta (stick weights) and
+  # gamma (concentration) are scale-free.
+  if (!is.null(fit$dp_locations_shared))
+    fit$dp_locations_shared <- fit$dp_locations_shared * sigma_hat
+  if (!is.null(fit$dp_mu_g))
+    fit$dp_mu_g <- lapply(fit$dp_mu_g, function(v) v * sigma_hat)
+
+  # Metadata consumed by fusion_estimand().  sigma is stored on the standardised
+  # scale; sigma * sigma_hat recovers the response (log-time) scale residual SD.
+  fit$meta <- list(
+    sigma_hat     = sigma_hat,
+    y_mean        = y_mean,
+    timescale     = timescale,
+    outcome_type  = outcome_type,
+    decomposition = decomposition,
+    error_dist    = error_dist
+  )
+  class(fit) <- c("FusionForest", class(fit))
+
   return(fit)
 }
 
@@ -492,7 +588,8 @@ FusionForest <- function(
   number_of_trees_treat, number_of_trees_control,
   power, base, p_grow, p_prune, sigma_known, sigma_hat, lambda,
   nu, N_post, N_burn, store_posterior_sample, verbose,
-  treatment_coding, propensity_train, propensity_test
+  treatment_coding, propensity_train, propensity_test,
+  mixture_mode, mixture_K, mixture_prior_atom_variance, mixture_mass_init
 ) {
 
   # Shared arguments for both backends
@@ -544,7 +641,11 @@ FusionForest <- function(
     verboseSEXP                  = verbose,
     treatment_codingSEXP         = treatment_coding,
     propensity_trainSEXP         = propensity_train,
-    propensity_testSEXP          = propensity_test
+    propensity_testSEXP          = propensity_test,
+    mixture_modeSEXP             = as.integer(mixture_mode),
+    mixture_KSEXP                = as.integer(mixture_K),
+    mixture_prior_atom_varianceSEXP = as.numeric(mixture_prior_atom_variance),
+    mixture_mass_initSEXP        = as.numeric(mixture_mass_init)
   )
 
   if (use_four_forest) {

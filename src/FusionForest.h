@@ -23,7 +23,11 @@ Rcpp::List FusionForest_cpp(
   SEXP verboseSEXP,
   SEXP treatment_codingSEXP,
   SEXP propensity_trainSEXP,
-  SEXP propensity_testSEXP
+  SEXP propensity_testSEXP,
+  SEXP mixture_modeSEXP,
+  SEXP mixture_KSEXP,
+  SEXP mixture_prior_atom_varianceSEXP,
+  SEXP mixture_mass_initSEXP
 );
 
 #endif // FUSIONFOREST_H

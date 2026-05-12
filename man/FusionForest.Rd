@@ -36,6 +36,10 @@ FusionForest(
   treatment_coding = c("centered", "binary", "adaptive"),
   propensity_train = NULL,
   propensity_test = NULL,
+  error_dist = c("gaussian", "shared_dp", "source_dp", "source_dp_scale", "source_hdp"),
+  error_truncation_K = 50L,
+  error_atom_scale = 0.5,
+  error_mass_init = 1,
   store_posterior_sample = FALSE,
   verbose = TRUE
 )
@@ -128,6 +132,45 @@ sufficient statistics match the full-data likelihood; rows with
 \item{propensity_train, propensity_test}{Numeric vectors of estimated
 propensity scores in (0, 1) for the training and test rows.  Required
 when \code{treatment_coding = "adaptive"}; ignored otherwise.}
+
+\item{error_dist}{Character; residual-distribution prior.  One of:
+\describe{
+\item{\code{"gaussian"} (default)}{Single normal residual,
+\eqn{\varepsilon_i \sim N(0, \sigma^2)}.}
+\item{\code{"shared_dp"}}{Centred Dirichlet-process mixture of
+Gaussians on the residual, pooled across data sources (AFTrees-style;
+Henderson et al., 2020).  Atoms are recentred to weighted mean zero
+to identify the structural mean components.}
+\item{\code{"source_dp"}}{Independent centred Dirichlet-process
+mixtures per source (Stage A of the HDP-CDP plan).  RCT and OS get
+their own atoms, weights, and concentration; \eqn{\sigma} is shared.}
+\item{\code{"source_dp_scale"}}{Same as \code{"source_dp"} but with
+per-source error scales \eqn{\sigma_s}.  Each source gets its own
+inverse-gamma conjugate update for \eqn{\sigma_s}, and the per-source
+precision is propagated to the forest backfitting via per-observation
+precision weights.}
+\item{\code{"source_hdp"}}{Hierarchical centred Dirichlet process
+(Stage B): atoms \eqn{\theta_k^*} are shared across sources via a
+top-level \eqn{DP(\gamma, H)}; per-source weights \eqn{\pi_{sk}} and
+means \eqn{\mu_s} restore identifiability of the structural
+components.  Concentration parameters \eqn{\gamma, M_0, M_1} are
+updated via Escobar-West auxiliary-variable steps; the top-level
+sticks \eqn{\beta} use the Antoniak-Teh table-count augmentation.}
+}}
+
+\item{error_truncation_K}{Integer; truncation level for the stick-breaking
+representation.  Default 50.  Increase if the number of occupied components
+approaches the bound during MCMC.}
+
+\item{error_atom_scale}{Numeric; prior standard deviation for each atom on
+the standardised response scale, so each atom has prior
+\eqn{N(0, \texttt{error\_atom\_scale}^2)}.  Default 0.5 (so atoms are
+expected within roughly \eqn{\pm 1} on the standardised scale).}
+
+\item{error_mass_init}{Numeric; starting value for the concentration
+parameter \eqn{\alpha} (or each \eqn{M_s} under \code{"source_dp"}).
+Updated by the sampler via an AFTrees-style Gamma conjugate step with
+fixed hyperprior \eqn{\mathrm{Gamma}(2, 0.1)}.  Default 1.}
 
 \item{store_posterior_sample}{Logical; if \code{TRUE}, the full
 \eqn{N_{\text{post}} \times n} posterior sample matrices are returned for

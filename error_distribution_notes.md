@@ -2,13 +2,13 @@
 
 ## 1. Purpose
 
-These notes document how the reference package `inst/AFTrees-master/` (Henderson, Louis, Rosner, Varadhan, *Biostatistics* 2020) implements its single-source **centered Dirichlet process** (CDP) mixture on the residual distribution of an AFT-BART model, and sketch a forward-looking three-way switch for FusionForests:
+These notes document how the reference package `inst/AFTrees-master/` (Henderson, Louis, Rosner, Varadhan, _Biostatistics_ 2020) implements its single-source **centered Dirichlet process** (CDP) mixture on the residual distribution of an AFT-BART model, and sketch a forward-looking three-way switch for FusionForests:
 
 1. `error_dist = "gaussian"` — current behaviour (single normal residual).
 2. `error_dist = "shared_dp"` — one DP pooled across data sources, AFTrees-style.
 3. `error_dist = "source_dp"` — per-source DPs, eventually linked by an HDP as described in [`notes/error_distribution.tex`](../notes/error_distribution.tex).
 
-These are notes for *future* implementation; nothing in the FusionForests sampler changes yet.
+These are notes for _future_ implementation; nothing in the FusionForests sampler changes yet.
 
 ---
 
@@ -16,15 +16,15 @@ These are notes for *future* implementation; nothing in the FusionForests sample
 
 ### 2.1 State ownership
 
-| State | Owner | Field |
-|---|---|---|
-| Cluster labels $Z_i$ | `Mixdev` | `labels[]` |
-| Stick weights $\pi_h$ | `Mixdev` | `mix_prop[]` |
-| Atoms $\theta_h$ | `Mixdev` | `locations[]` |
-| Concentration $\alpha$ | `Mixdev` | `mass[0]` |
-| Error scale $\sigma$ (DP branch) | `Mixdev` | `sig[0]` |
-| Error scale $\sigma$ (Gaussian branch) | `Sdev` | `s` |
-| BART leaf-mean updates | `MuS` | unchanged by DP |
+| State                                  | Owner    | Field           |
+| -------------------------------------- | -------- | --------------- |
+| Cluster labels $Z_i$                   | `Mixdev` | `labels[]`      |
+| Stick weights $\pi_h$                  | `Mixdev` | `mix_prop[]`    |
+| Atoms $\theta_h$                       | `Mixdev` | `locations[]`   |
+| Concentration $\alpha$                 | `Mixdev` | `mass[0]`       |
+| Error scale $\sigma$ (DP branch)       | `Mixdev` | `sig[0]`        |
+| Error scale $\sigma$ (Gaussian branch) | `Sdev`   | `s`             |
+| BART leaf-mean updates                 | `MuS`    | unchanged by DP |
 
 `Mixdev` is defined entirely in [`inst/AFTrees-master/src/Mixdev.h`](AFTrees-master/src/Mixdev.h) — it is a small header-only class, 150 lines.
 
@@ -85,13 +85,13 @@ A search for `source`, `group`, `strata`, `S` across `inst/AFTrees-master/{src,R
 
 Where our existing code lines up with the AFTrees hooks (so the eventual extension knows what it touches):
 
-| AFTrees hook | FusionForests analogue |
-|---|---|
-| Outer Gibbs loop, `mbart.cpp:329-428` | [`src/OuterGibbsFunctions.cpp`](../src/OuterGibbsFunctions.cpp) |
+| AFTrees hook                                       | FusionForests analogue                                                                                                           |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Outer Gibbs loop, `mbart.cpp:329-428`              | [`src/OuterGibbsFunctions.cpp`](../src/OuterGibbsFunctions.cpp)                                                                  |
 | Backfit residual construction, `mbart.cpp:339-346` | Per-forest residual loops inside `OuterGibbsFunctions.cpp` (the analogous BLAS-style subtractions feeding `StanForestFunctions`) |
-| `Sdev::drawPost` / `Mixdev::updateSigma` | `UpdateSigma` in `OuterGibbsFunctions.cpp:123` |
-| `truncNormImpute` / `_SP` | `AugmentCensoredObservations` overloads in `OuterGibbsFunctions.cpp:3,41` |
-| R entry `aftrees.R` + `FindKappa.R` | [`R/FusionForest.R`](../R/FusionForest.R), helpers in `R/helpers.R` |
+| `Sdev::drawPost` / `Mixdev::updateSigma`           | `UpdateSigma` in `OuterGibbsFunctions.cpp:123`                                                                                   |
+| `truncNormImpute` / `_SP`                          | `AugmentCensoredObservations` overloads in `OuterGibbsFunctions.cpp:3,41`                                                        |
+| R entry `aftrees.R` + `FindKappa.R`                | [`R/FusionForest.R`](../R/FusionForest.R), helpers in `R/helpers.R`                                                              |
 
 There is currently no `Mixdev`-equivalent class in `src/` and no DP-related state anywhere in the sampler.
 
@@ -136,10 +136,10 @@ Stage B reuses Stage A's per-source state — Stage A is a working prefix, not a
 
 ## 5. Open design questions (deferred)
 
-- **Truncation level K.** AFTrees uses $K = 200$ in `aftrees.R` but $K = 50$ in `IndivAFTNew.R`. Should we expose it as an argument or fix it? Either is fine; the LaTeX note defaults to 50.
-- **Source-specific $\sigma_s$ vs shared $\sigma$.** [`notes/error_distribution.tex`](../notes/error_distribution.tex) §Extensions notes that splitting $\sigma$ by source is a one-line change. Cheap; doubles state. Defer to empirical evidence.
+- **Truncation level K.** AFTrees uses $K = 200$ in `aftrees.R` but $K = 50$ in `IndivAFTNew.R`. Should we expose it as an argument or fix it? Either is fine; the LaTeX note defaults to 50. Yes, expose as argument. Then we can fine-tune later.
+- **Source-specific $\sigma_s$ vs shared $\sigma$.** [`notes/error_distribution.tex`](../notes/error_distribution.tex) §Extensions notes that splitting $\sigma$ by source is a one-line change. Cheap; doubles state. Defer to empirical evidence. Leave this as one for now. We can extend it later.
 - **DP-aware censoring in `shared_dp`.** AFTrees splits `truncNormImpute` from `truncNormImpute_SP` — the cluster shift is part of the imputation mean. Our `AugmentCensoredObservations` would need an analogous "with cluster shift" overload as soon as any DP option is active.
-- **Posterior return shape.** Where do `mix.prop / locations / mass` (or per-source versions) live in the `FusionForest()` return list? Need to decide before exposing them at the R level. Easiest: a nested `error_dist` sublist alongside `train_predictions_*`.
+- **Posterior return shape.** Where do `mix.prop / locations / mass` (or per-source versions) live in the `FusionForest()` return list? Need to decide before exposing them at the R level. Easiest: a nested `error_dist` sublist alongside `train_predictions_*`. What does AFTrees do?
 
 ---
 
