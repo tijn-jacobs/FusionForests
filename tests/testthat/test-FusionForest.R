@@ -5,7 +5,7 @@ n     <- 60
 p     <- 3
 X     <- matrix(rnorm(n * p), n, p)
 trt   <- as.integer(rbinom(n, 1, 0.5))
-src   <- as.integer(c(rep(1L, 30), rep(0L, 30)))   # first 30 RCT, last 30 OS
+src   <- as.integer(c(rep(1L, 30), rep(0L, 30)))   # first 30 RCT, last 30 RWD
 y_cnt <- 1 + X[, 1] + trt * X[, 2] + rnorm(n)
 y_srv <- exp(y_cnt)
 stat  <- as.integer(rbinom(n, 1, 0.8))
@@ -116,7 +116,7 @@ test_that("FusionForest errors on invalid outcome_type", {
   )
 })
 
-test_that("FusionForest errors when no OS rows present", {
+test_that("FusionForest errors when no RWD rows present", {
   src_rct_only <- rep(1L, n)
   expect_error(
     FusionForest(
@@ -126,7 +126,7 @@ test_that("FusionForest errors when no OS rows present", {
       treatment_indicator_train = trt,
       source_indicator_train    = src_rct_only
     ),
-    regexp = "observational"
+    regexp = "real-world-data"
   )
 })
 
@@ -158,7 +158,7 @@ test_that("FusionForest four-forest runs on continuous outcomes", {
 })
 
 test_that("FusionForest four-forest deviation length equals n_deconf", {
-  n_os <- sum(src == 0L)
+  n_rwd <- sum(src == 0L)
   fit <- FusionForest(
     y                         = y_cnt,
     X_train_control           = X,
@@ -169,7 +169,7 @@ test_that("FusionForest four-forest deviation length equals n_deconf", {
     N_post = N_post, N_burn = N_burn, verbose = FALSE
   )
 
-  expect_length(fit$train_predictions_deviation, n_os)
+  expect_length(fit$train_predictions_deviation, n_rwd)
   expect_true(all(is.finite(fit$train_predictions_deviation)))
 })
 
@@ -211,7 +211,7 @@ test_that("FusionForest three-forest still works with explicit arg", {
 })
 
 test_that("FusionForest four-forest posterior samples when requested", {
-  n_os <- sum(src == 0L)
+  n_rwd <- sum(src == 0L)
   fit <- FusionForest(
     y                         = y_cnt,
     X_train_control           = X,
@@ -225,7 +225,7 @@ test_that("FusionForest four-forest posterior samples when requested", {
 
   expect_true("train_predictions_sample_deviation" %in% names(fit))
   expect_equal(nrow(fit$train_predictions_sample_deviation), N_post)
-  expect_equal(ncol(fit$train_predictions_sample_deviation), n_os)
+  expect_equal(ncol(fit$train_predictions_sample_deviation), n_rwd)
 })
 
 test_that("FusionForest errors on invalid decomposition", {

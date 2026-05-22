@@ -24,7 +24,7 @@ with HDP error}
 \newcommand{\mzero}{m_{0}}
 \newcommand{\Spot}{S}
 \newcommand{\RCT}{\mathrm{RCT}}
-\newcommand{\OS}{\mathrm{OS}}
+\newcommand{\RWD}{\mathrm{RWD}}
 \newcommand{\RMST}{\mathrm{RMST}}
 \newcommand{\SD}{\mathrm{SD}}
 \newcommand{\AF}{\mathrm{AF}}
@@ -204,100 +204,275 @@ conservative: the central methodological point is to extrapolate beyond
 the RCT follow-up, so $t^{*}$ should deliberately exceed it.
 
 \paragraph{Limitations.} The RMST depends on $t^{*}$, and substantive
-conclusions can shift when $t^{*}$ is varied. Beyond the OS follow-up,
+conclusions can shift when $t^{*}$ is varied. Beyond the RWD follow-up,
 $\Delta_{\RMST}$ inherits the full extrapolation uncertainty of the
 posterior and should be reported with appropriate credible intervals.
 
-\section{The acceleration factor $\AF$}
+\section{The acceleration factor and the CATE (log AF)}
+\label{sec:AF}
+
+Going forward we focus on the acceleration factor $\AF$ and the
+conditional log acceleration factor $\tauf$. These are the same object on
+two scales --- $\tauf(x) = \log \AF(x)$ --- and they are the natural
+causal estimands under the AFT structural model. They are interpretable,
+horizon-free, and (as we will see) free of the built-in selection bias
+that plagues the hazard ratio.
 
 \subsection{Definition}
 
-Under the AFT model \eqref{eq:model}, the contrast between treatment and
-control at fixed covariates $x$ is a constant additive shift on the
-log-time scale. Equivalently, on the time scale it is a multiplicative
-\emph{acceleration factor}. The causal acceleration factor at $x$ is
+Under the AFT model \eqref{eq:model}, the treatment-versus-control contrast
+at fixed covariates $x$ is a constant additive shift on the log-time scale.
+Equivalently, on the time scale it is a multiplicative \emph{acceleration
+factor}. The causal acceleration factor at $x$ is
 \begin{equation}
-  \AF(x) := \exp\bigl\{\eta_{1}(x, s_{t}) - \eta_{0}(x, s_{t})\bigr\}
-         = \exp\bigl\{\tauf(x) + (1 - s_{t})\,\cf(x)\bigr\}.
-\end{equation}
-For the causal contrast in either population, we use $s_{t} = 1$ (where
-\eqref{eq:model} is unconfounded by construction) and the confounding
-term vanishes:
-\begin{equation}
-  \boxed{\;
-    \AF_{\mathrm{causal}}(x) = \exp\{\tauf(x)\}.
-  \;}
+  \AF_{\mathrm{causal}}(x) := \exp\bigl\{\tauf(x)\bigr\}, \qquad
+  \tauf(x) = \log \AF_{\mathrm{causal}}(x),
   \label{eq:AF-causal}
 \end{equation}
-By transportability of potential outcomes (Assumption~4 of the framework
-document), $\AF_{\mathrm{causal}}(x)$ is the same in the RCT and OS
-populations: it is a property of the causal mechanism, not of the source.
+i.e.\ the conditional log acceleration factor is the CATE on the log-time
+scale.
 
-The corresponding observed contrast in the OS,
-$\AF_{\mathrm{obs, OS}}(x) = \exp\{\tauf(x) + \cf(x)\}$, is the
-confounded analogue. Its discrepancy from $\AF_{\mathrm{causal}}(x)$ is
-precisely $\exp\{\cf(x)\}$ and quantifies the multiplicative bias on the
-time scale due to unmeasured confounding in the OS.
+The implied relationship between potential survival functions is the
+quantile-shifting identity
+\begin{equation}
+  \Spot_{1}(t \mid x) = \Spot_{0}\bigl(\AF_{\mathrm{causal}}(x)\cdot t \mid x\bigr),
+  \label{eq:AF-shift}
+\end{equation}
+so that survival under treatment at time $t$ equals survival under control
+at the rescaled time $\AF_{\mathrm{causal}}(x)\,t$ \citep{CoxOakes1984,
+Wei1992, KalbfleischPrentice2002}. The acceleration factor parameterises the entire
+contrast between the two survival curves through a single multiplicative
+time-scale parameter.
+
+\paragraph{Causal versus observed contrast in the RWD.}
+The corresponding \emph{observed} contrast in the RWD is
+$\AF_{\mathrm{obs, RWD}}(x) = \exp\{\tauf(x) + \cf(x)\}$. The discrepancy
+$\AF_{\mathrm{obs, RWD}}(x) / \AF_{\mathrm{causal}}(x) = \exp\{\cf(x)\}$
+quantifies the multiplicative bias on the time scale due to unmeasured
+confounding in the RWD. By transportability of potential outcomes
+(Assumption~4 of the framework document), $\AF_{\mathrm{causal}}(x)$ is the
+same in the RCT and RWD populations: it is a property of the causal
+mechanism, not of the source.
 
 \subsection{Closed form and HDP-independence}
 
 The acceleration factor is a direct functional of the BART forest for
-$\tauf$ and does not involve the error distribution. In particular,
+$\tauf$ and does not involve the error distribution:
 \begin{equation}
-  \AF_{\mathrm{causal}}(x) = \exp\{\tauf(x)\}
+  \boxed{\;\AF_{\mathrm{causal}}(x) = \exp\{\tauf(x)\}.\;}
 \end{equation}
-is computable at each MCMC iteration as $\exp\{\tauf^{(r)}(x)\}$, without
-reference to the cluster atoms or weights of the HDP. The full
-posterior of $\AF_{\mathrm{causal}}(x)$ is therefore available at the
-same cost as the posterior of $\tauf(x)$.
+At each MCMC iteration, $\exp\{\tauf^{(r)}(x)\}$ yields a posterior draw of
+$\AF_{\mathrm{causal}}(x)$ without reference to the cluster atoms or
+weights of the HDP. Equivalently, posterior inference for $\tauf(x)$
+\emph{is} posterior inference for the log acceleration factor. In the
+context of long-term extrapolation (goal G2 of the project), this means
+the acceleration factor is the one causal estimand that is unaffected by
+the HDP tail and the extrapolation uncertainty it carries, in contrast to
+$\Delta_{\SD}$ and $\Delta_{\RMST}$.
 
-\subsection{Interpretation}
+\subsection{Causal validity in the presence of unmeasured heterogeneity}
+\label{subsec:af-causal-validity}
 
-$\AF_{\mathrm{causal}}(x)$ is the ratio by which treatment multiplies an
-individual's time scale: a unit with covariates $x$ assigned treatment
-experiences event times that are $\AF_{\mathrm{causal}}(x)$ times those
-under control. The reading is symmetric: $\AF_{\mathrm{causal}}(x) = 1.5$
-means treatment extends time-to-event by 50\%; $\AF_{\mathrm{causal}}(x) =
-0.8$ means treatment shortens it by 20\%.
+The clinical and methodological appeal of the acceleration factor rests on
+its causal interpretation, which has recently been formalised by
+\citet{Brathovde2024} under a structural-causal-model formulation of the
+AFT. We summarise their result here because it is central to the
+positioning of this work.
 
-The acceleration-factor interpretation is the defining feature of AFT
-models and is articulated in detail in \citet{Wei1992},
-\citet{KalbfleischPrentice2002}, and \citet{CoxOakes1984}. Compared with
-the hazard ratio, the AF has the advantages that (i) it is directly
-interpretable on the time scale rather than on the hazard scale, (ii) it
-is meaningful even when hazards are non-proportional, and (iii) under
-AFT it equals the ratio of median (and any other quantile) survival
-times:
+\citet{Brathovde2024} consider structural assignments for the potential
+outcomes
+\begin{equation}
+  T^{0} := \exp\{f_{0}(U_{0}) + N_{T}\}, \qquad
+  T^{a} := T^{0}/\exp\{f_{1}(U_{1}, a)\},
+  \label{eq:scm}
+\end{equation}
+where $U_{0}$ represents \emph{frailty} (unmeasured heterogeneity in the
+baseline hazard), $U_{1}$ represents \emph{effect heterogeneity}
+(unmeasured modification of the treatment effect), and $N_{T}$ is residual
+noise with $N_{T} \perp\!\!\!\perp (U_{0}, U_{1})$. The conditional causal
+acceleration factor at $(U_{0}, U_{1}) = (u_{0}, u_{1})$ is then
+$\theta_{c}(u_{0}, u_{1}) = \exp\{f_{1}(u_{1}, a)\}$ and is invariant in
+$u_{0}$: frailty does not affect the causal AF interpretation
+\citep{Keiding1997, Aalen2015}.
+
+Their key identification result \citep[Theorem~3.1]{Brathovde2024} states
+that, under no confounding, the \emph{observed} acceleration factor
+\begin{equation}
+  \theta_{m}(t) := \frac{1}{t}\,
+  S^{-1}_{T \mid A=0}\!\bigl(S_{T \mid A=a}(t)\bigr)
+\end{equation}
+equals the marginal causal acceleration factor at every $t$ in the support
+of the survival times. Equivalently, the AFT estimand identifies the
+causal contrast even when both frailty and effect heterogeneity are
+present in the population --- a property the hazard ratio does \emph{not}
+share \citep[see also][]{Hernan2010, MartinussenVansteelandtAndersen2020,
+Post2024b}.
+
+Under unmeasured confounding, $\theta_{m}$ no longer identifies $\theta$
+directly. The standard remedy --- conditioning on a sufficient adjustment
+set $L$ --- yields a conditional observed acceleration factor that equals
+the conditional causal AF, and integrating over $F_{L}$ recovers $\theta$
+\citep{Brathovde2024}. In our setup the same logic applies to $X$ in the
+RCT (Assumption~2); in the RWD, the residual bias is encoded in $\cf(x)$,
+and $\AF_{\mathrm{causal}}(x) = \exp\{\tauf(x)\}$ is identified from the
+joint RCT$+$RWD data by the decomposition \eqref{eq:model}.
+
+\subsection{The acceleration factor versus the hazard ratio}
+
+The hazard ratio is the conventional summary in survival analysis, but it
+is now well-understood to be a problematic causal estimand under
+unmeasured heterogeneity. The literature on this point is mature:
+
+\begin{itemize}[leftmargin=*]
+  \item \citet{Hernan2010} (``The hazards of hazard ratios'') argues that
+        the HR is selection-biased because it conditions on survival,
+        so that the survivor populations being compared at time $t > 0$
+        no longer have exchangeable distributions of unmeasured
+        prognostic variables.
+  \item \citet{Aalen2015} formalise this: even in a randomised
+        trial, the HR estimated by Cox regression does not in general
+        coincide with the causal hazard ratio when frailty is present.
+  \item \citet{MartinussenVansteelandtAndersen2020} review the subtleties
+        and give worked examples in which the HR moves over time as a
+        direct consequence of selection on frailty.
+  \item \citet{Post2024b} prove that the Cox estimand differs from the
+        causal effect of interest under frailty and effect heterogeneity,
+        and that the AF maintains the causal interpretation in both
+        cases.
+\end{itemize}
+
+The acceleration factor avoids this problem because it is defined on the
+survival scale (a contrast between full marginal distributions) rather
+than on the hazard scale (a contrast between conditional rates among
+survivors). It does not require conditioning on survival, and is therefore
+not subject to built-in selection bias \citep{Brathovde2024}. For a
+project whose central methodological aim is to combine an RCT with an
+real-world data --- both of which carry unmeasured heterogeneity ---
+the acceleration factor is the most defensible causal target.
+
+\subsection{Quantile equivariance}
+
+Under the AFT model, the acceleration factor equals the ratio of
+survival quantiles at every level:
 \begin{equation}
   \frac{\mathrm{Quantile}_{q}\bigl(T(1) \mid x\bigr)}
        {\mathrm{Quantile}_{q}\bigl(T(0) \mid x\bigr)}
   = \AF_{\mathrm{causal}}(x)
   \qquad \text{for all } q \in (0, 1),
 \end{equation}
-a property sometimes called \emph{quantile equivariance}
-\citep{Wei1992, Hougaard1999}.
+a property called \emph{quantile equivariance} \citep{Wei1992,
+Hougaard1999}. Three operational consequences:
+\begin{enumerate}[leftmargin=*]
+  \item \emph{Median survival ratio.} The most clinically natural
+        instance: the AF is the ratio of treated to control median
+        survival times. ``Treatment increases median survival by
+        $(\AF_{\mathrm{causal}}(x) - 1)\times 100\%$'' is a direct reading.
+  \item \emph{Any quantile, same number.} The 25th-percentile ratio, the
+        90th-percentile ratio, and the median ratio all equal
+        $\AF_{\mathrm{causal}}(x)$. The summary is therefore robust to the
+        choice of survival quantile, in contrast to time-point survival
+        differences.
+  \item \emph{Direct comparability of curves.} Equation
+        \eqref{eq:AF-shift} states that the treated and control survival
+        curves differ by a horizontal stretch on the log-time axis, with
+        stretch factor $\AF_{\mathrm{causal}}(x)$. This makes
+        visualisation of the effect straightforward: overlay the two
+        curves on a log-time axis, and the AF is the horizontal
+        displacement.
+\end{enumerate}
 
-\paragraph{When to use.} The AF is the natural estimand whenever the goal
-is to summarise the treatment effect by \emph{a single number per
-covariate value}, free of horizon, free of error-distribution assumptions,
-and on a transparent scale. In data-fusion settings, this is particularly
-convenient: $\AF_{\mathrm{causal}}(x)$ depends only on $\tauf(x)$ and is
-therefore unaffected by the extrapolation uncertainty that enters the
-RMST and SD via the HDP tail. It can be reported alongside the SD and
-RMST as a horizon-free summary.
+\subsection{Conditional, marginal, and time-varying AFs under heterogeneity}
 
-\paragraph{Limitations.} The AF carries the full weight of the AFT
-structural assumption: that the treatment effect is a single time-scale
-acceleration that does not vary with $t$. When the true effect waxes or
-wanes over time --- as for some immune-mediated therapies --- a single
-$\AF_{\mathrm{causal}}(x)$ misrepresents the effect. In such cases,
-SD and RMST at multiple $t$ or $t^{*}$ are more informative.
+In the present framework $\tauf(x) = \log\AF_{\mathrm{causal}}(x)$ is a
+\emph{conditional} log acceleration factor, conditional on the observed
+covariates $X = x$. Two subtleties about marginalising over the
+population deserve attention.
 
-A second caveat is that the AF is a multiplicative-on-time-scale measure
-and does not by itself communicate absolute benefit. A 50\% acceleration
-on a baseline median of one month and on a baseline median of ten years
-have very different clinical implications. Pairing the AF with the SD
-or RMST closes this gap.
+\paragraph{Time-invariance is a property of the conditional AF.}
+Under \eqref{eq:model}, $\AF_{\mathrm{causal}}(x)$ does not depend on $t$:
+treatment is a single time-scale acceleration at each $x$. This is the
+AFT shift assumption, and it is what makes extrapolation beyond the RCT
+follow-up tractable.
+
+\paragraph{Marginal AFs can be time-varying even when conditional AFs
+are not.}
+\citet{Brathovde2024} show, however, that even when each individual has
+a time-invariant causal acceleration factor, the \emph{marginal} (i.e.\
+population-level) AF can be time-varying when there is heterogeneity in
+the AF across the population. This is a consequence of the marginalisation
+itself: at early survival times, the population contains a different mix
+of low-AF and high-AF individuals than at late survival times, because
+survival probabilities at any fixed $t$ differ across the AF strata. The
+practical consequence is that a constant individual AF cannot be
+distinguished from a time-varying homogeneous AF on the basis of
+population-level data alone. Conditioning on $X$ (and ideally on as much
+of the relevant heterogeneity as can be measured) is therefore central.
+
+For our reporting strategy, this implies:
+\begin{itemize}[leftmargin=*]
+  \item The headline summaries should be on the \emph{conditional} AF
+        $\AF_{\mathrm{causal}}(x)$, e.g.\ via posterior projections of
+        $\tauf(x)$ onto a small basis (cf.\ Woody--Carvalho--Murray
+        projection summaries in the framing document).
+  \item Population-averaged summaries should distinguish
+        $\mathbb{E}[\AF_{\mathrm{causal}}(X)]$ from
+        $\exp\{\mathbb{E}[\tauf(X)]\}$; the two coincide only under
+        degenerate heterogeneity.
+  \item Time-varying acceleration factor models
+        \citep{Crowther2023, Pang2021} are available if the AFT shift
+        assumption is itself questionable; we view these as a sensitivity
+        analysis rather than a default.
+\end{itemize}
+
+\subsection{Clinical use and reporting}
+
+The acceleration factor has a direct clinical reading that requires no
+training in survival analysis. ``$\AF_{\mathrm{causal}}(x) = 1.5$ means
+that, for a patient with profile $x$, treatment extends time-to-event by
+50\% relative to control'' is communicable, transparent, and on the same
+scale as the outcome itself. We recommend the following reporting
+practices:
+
+\begin{enumerate}[leftmargin=*]
+  \item Report $\AF_{\mathrm{causal}}(x)$ on the multiplicative scale
+        (e.g., $\AF = 1.5$) and the CATE $\tauf(x)$ on the log scale
+        side by side. The log scale is preferred for inference (additive,
+        symmetric posterior); the multiplicative scale is preferred for
+        clinical communication.
+  \item Report subgroup or covariate-conditional AFs via posterior
+        projection of $\tauf(x)$ onto an interpretable basis, with
+        credible intervals derived from the projection posterior.
+  \item Pair AFs with at least one absolute summary --- the SD at a
+        clinically meaningful $t$, or $\Delta_{\RMST}(t^{*})$ at a
+        clinically meaningful $t^{*}$ --- to communicate the
+        \emph{magnitude} of the absolute benefit. A 50\% time-scale
+        acceleration on a baseline median of one month and on a baseline
+        median of ten years have very different clinical implications.
+  \item Where extrapolation is concerned (goal G2), prefer the AF as the
+        headline summary at long horizons: it is the estimand least
+        contaminated by tail uncertainty.
+\end{enumerate}
+
+\paragraph{Caveat: AFT shift as a structural assumption.}
+The acceleration-factor framework depends on the AFT shift structure of
+\eqref{eq:model}: that the treatment effect at fixed $x$ is a single
+multiplicative acceleration of the time scale that does not vary with
+$t$. When this is doubtful (waning treatment effects, mode-of-failure
+shifts, late-emerging benefits), one can either (i) accept the AFT
+summary as a parsimonious approximation and discuss in sensitivity, or
+(ii) generalise to a time-varying acceleration factor
+$\AF(x, t)$ via the flexible parametric approach of
+\citet{Crowther2023} or the time-dependent AFT extensions of
+\citet{Pang2021}. The latter generalisation comes at the cost of giving
+up the single-number summary that motivates the AF in the first place.
+
+\paragraph{Note on time-varying treatment regimes.}
+For studies with time-varying treatments and treatment--confounder
+feedback, the structural-causal-AFT framework of
+\citet{HernanColeStrAFT2005} (using $g$-estimation) is required. Our
+setting --- a single point-in-time treatment assignment --- falls within
+the scope of \citet{Brathovde2024}'s simpler structural AFT and does not
+require this generalisation.
 
 \section{Population-averaged versions}
 
@@ -341,6 +516,17 @@ weights if covariate-distribution uncertainty is to be propagated.
 
 \begin{thebibliography}{99}
 
+\bibitem[Aalen et al.(2015)]{Aalen2015}
+Aalen, O.~O., Cook, R.~J., and R{\o}ysland, K. (2015).
+\newblock Does Cox analysis of a randomized survival study yield a
+causal treatment effect?
+\newblock \emph{Lifetime Data Analysis}, 21:579--593.
+
+\bibitem[Brathovde et al.(2024)]{Brathovde2024}
+Brathovde, M., Putter, H., Valberg, M., and Post, R.~A.~J. (2024).
+\newblock The causal interpretation of acceleration factors.
+\newblock \emph{arXiv preprint} arXiv:2409.01983.
+
 \bibitem[Cook and Sackett(1995)]{Cook1995}
 Cook, R.~J.\ and Sackett, D.~L. (1995).
 \newblock The number needed to treat: a clinically useful measure of
@@ -352,6 +538,24 @@ Cox, D.~R.\ and Oakes, D. (1984).
 \newblock \emph{Analysis of Survival Data}.
 \newblock Chapman \& Hall, London.
 
+\bibitem[Crowther et al.(2023)]{Crowther2023}
+Crowther, M.~J., Royston, P., and Clements, M. (2023).
+\newblock A flexible parametric accelerated failure time model and the
+extension to time-dependent acceleration factors.
+\newblock \emph{Biostatistics}, 24(3):811--831.
+
+\bibitem[Hern\'an(2010)]{Hernan2010}
+Hern\'an, M.~A. (2010).
+\newblock The hazards of hazard ratios.
+\newblock \emph{Epidemiology}, 21(1):13--15.
+
+\bibitem[Hern\'an et al.(2005)]{HernanColeStrAFT2005}
+Hern\'an, M.~A., Cole, S.~R., Margolick, J., Cohen, M., and Robins, J.~M.
+(2005).
+\newblock Structural accelerated failure time models for survival analysis
+in studies with time-varying treatments.
+\newblock \emph{Pharmacoepidemiology and Drug Safety}, 14(7):477--491.
+
 \bibitem[Hougaard(1999)]{Hougaard1999}
 Hougaard, P. (1999).
 \newblock Fundamentals of survival data.
@@ -361,6 +565,30 @@ Hougaard, P. (1999).
 Kalbfleisch, J.~D.\ and Prentice, R.~L. (2002).
 \newblock \emph{The Statistical Analysis of Failure Time Data}, 2nd ed.
 \newblock Wiley, New York.
+
+\bibitem[Keiding et al.(1997)]{Keiding1997}
+Keiding, N., Andersen, P.~K., and Klein, J.~P. (1997).
+\newblock The role of frailty models and accelerated failure time models
+in describing heterogeneity due to omitted covariates.
+\newblock \emph{Statistics in Medicine}, 16(2):215--224.
+
+\bibitem[Martinussen et al.(2020)]{MartinussenVansteelandtAndersen2020}
+Martinussen, T., Vansteelandt, S., and Andersen, P.~K. (2020).
+\newblock Subtleties in the interpretation of hazard contrasts.
+\newblock \emph{Lifetime Data Analysis}, 26:833--855.
+
+\bibitem[Pang et al.(2021)]{Pang2021}
+Pang, M., Platt, R.~W., Schuster, T., and Abrahamowicz, M. (2021).
+\newblock Flexible extension of the accelerated failure time model to
+account for nonlinear and time-dependent effects of covariates on the
+hazard.
+\newblock \emph{Statistical Methods in Medical Research}, 30(11):2526--2542.
+
+\bibitem[Post et al.(2024)]{Post2024b}
+Post, R.~A.~J., van~den Heuvel, E.~R., and Putter, H. (2024).
+\newblock The built-in selection bias of hazard ratios formalized using
+structural causal models.
+\newblock \emph{Lifetime Data Analysis}, 30:1--35.
 
 \bibitem[Royston and Parmar(2011)]{Royston2011}
 Royston, P.\ and Parmar, M.~K.~B. (2011).

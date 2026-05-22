@@ -142,7 +142,7 @@ Gaussians on the residual, pooled across data sources (AFTrees-style;
 Henderson et al., 2020).  Atoms are recentred to weighted mean zero
 to identify the structural mean components.}
 \item{\code{"source_dp"}}{Independent centred Dirichlet-process
-mixtures per source (Stage A of the HDP-CDP plan).  RCT and OS get
+mixtures per source (Stage A of the HDP-CDP plan).  RCT and RWD get
 their own atoms, weights, and concentration; \eqn{\sigma} is shared.}
 \item{\code{"source_dp_scale"}}{Same as \code{"source_dp"} but with
 per-source error scales \eqn{\sigma_s}.  Each source gets its own
@@ -189,9 +189,9 @@ of the shared baseline \eqn{\mu(X)} (four-forest) or \eqn{m_0(X)}
 \item{train_predictions_treat, test_predictions_treat}{Posterior mean of
 the CATE \eqn{\tau(X)}.}
 \item{train_predictions_deconf, test_predictions_deconf}{Posterior mean of
-the confounding function \eqn{c(X)} (OS rows only for training).}
+the confounding function \eqn{c(X)} (RWD rows only for training).}
 \item{train_predictions_deviation, test_predictions_deviation}{Posterior
-mean of the RWD deviation \eqn{g(X)} (four-forest only; OS rows only
+mean of the RWD deviation \eqn{g(X)} (four-forest only; RWD rows only
 for training).}
 \item{sigma}{Posterior sample of \eqn{\sigma} (or the fixed value if
 \code{sigma} was supplied).}

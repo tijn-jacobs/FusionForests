@@ -27,7 +27,7 @@
 #   1. Three-forest FusionForest (RCT + RWD, single m0)
 #   2. Four-forest  FusionForest (RCT + RWD, mu + g decomposition, k_g = 2)
 #   3. Four-forest  FusionForest with large k_g (k_g = 10, strong borrowing)
-#   4. BCF-style RCT-only (FusionForest on RCT data + minimal OS dummy)
+#   4. BCF-style RCT-only (FusionForest on RCT data + minimal RWD dummy)
 #   5. BCF-style RWD-only (FusionForest on RWD data + minimal RCT dummy)
 #
 # Metrics: Bias, RMSE, 95% CI coverage on training and test sets
@@ -222,8 +222,8 @@ cat(sprintf("  Done in %.1f seconds.\n", t3["elapsed"]))
 
 
 # ---- Model 4: RCT-only BCF-style -----------------------------------------
-# Use FusionForest on RCT data only.  The function requires >= 1 OS row,
-# so we add 2 dummy OS observations at the RCT column means with y at
+# Use FusionForest on RCT data only.  The function requires >= 1 RWD row,
+# so we add 2 dummy RWD observations at the RCT column means with y at
 # the RCT mean.  These carry negligible information.
 cat("Fitting Model 4: RCT-only BCF...\n")
 n_dummy  <- 2L

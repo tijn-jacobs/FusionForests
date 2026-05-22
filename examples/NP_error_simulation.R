@@ -1,13 +1,13 @@
 # =============================================================================
 # Simulation study: error_dist = gaussian / shared_dp / source_dp /
-# source_dp_scale under three misspecified residual distributions in the OS arm.
+# source_dp_scale under three misspecified residual distributions in the RWD arm.
 #
 # Design
 #   nRep replicates per scenario, 3 scenarios, 4 methods =>
 #   3 * 4 * nRep model fits in total.
 #   Parallelised over nCores cores via parallel::mclapply (forks; macOS / Linux).
 #
-# Scenarios (OS residuals; RCT residuals are always Gaussian N(0, 0.5^2))
+# Scenarios (RWD residuals; RCT residuals are always Gaussian N(0, 0.5^2))
 #   bimodal  : 0.5 N(-1, 0.2^2) + 0.5 N(+1, 0.2^2)         — symmetric, two modes
 #   gumbel   : centred standard Gumbel scaled to SD 1.0    — right-skewed (Weibull
 #              event times on the log scale).  SD=1.0 gives a noise-to-signal
@@ -42,7 +42,7 @@ scenarios   <- c("bimodal", "gumbel", "logistic")
 errorDists <- c("gaussian", "shared_dp", "source_dp", "source_dp_scale", "source_hdp")
 
 n_rct  <- 100L
-n_os   <- 200L
+n_rwd   <- 200L
 p      <- 5L
 q      <- 2L
 N_post <- 2500L
@@ -53,46 +53,46 @@ outFile <- "examples/NP_error_simulation_results.rds"
 # ---- Data-generating process ----------------------------------------
 gen_data <- function(scenario) {
   X_rct <- matrix(runif(n_rct * p), n_rct, p)
-  X_os  <- matrix(runif(n_os  * p), n_os,  p)
-  U_os  <- matrix(rnorm(n_os * q), n_os, q)
+  X_rwd  <- matrix(runif(n_rwd  * p), n_rwd,  p)
+  U_rwd  <- matrix(rnorm(n_rwd * q), n_rwd, q)
 
   m0   <- function(X) 2*X[,1] - X[,2] + 0.5*X[,3]
   tau  <- function(X) X[,1] + 0.5 * X[,2]^2
   conf <- function(U) -0.5*U[,1] + 0.25*U[,2]
 
   A_rct <- rbinom(n_rct, 1, 0.5)
-  A_os  <- rbinom(n_os,  1, plogis(X_os[,1] + U_os[,1] + U_os[,2]))
+  A_rwd  <- rbinom(n_rwd,  1, plogis(X_rwd[,1] + U_rwd[,1] + U_rwd[,2]))
 
   eps_rct <- rnorm(n_rct, 0, 0.5)
 
-  eps_os <- switch(scenario,
+  eps_rwd <- switch(scenario,
     bimodal = {
-      m <- rbinom(n_os, 1, 0.5)
-      ifelse(m == 1, rnorm(n_os,  1, 0.2),
-                     rnorm(n_os, -1, 0.2))
+      m <- rbinom(n_rwd, 1, 0.5)
+      ifelse(m == 1, rnorm(n_rwd,  1, 0.2),
+                     rnorm(n_rwd, -1, 0.2))
     },
     gumbel = {
-      g       <- -log(-log(runif(n_os)))               # standard Gumbel(0, 1)
+      g       <- -log(-log(runif(n_rwd)))               # standard Gumbel(0, 1)
       gamma_E <- 0.5772156649015329                    # mean of standard Gumbel
       sd_g    <- pi / sqrt(6)                          # SD of standard Gumbel
       (g - gamma_E) * (1.0 / sd_g)                     # mean-zero, SD = 1.0
     },
     logistic = {
-      qlogis(runif(n_os)) * (1.0 / (pi / sqrt(3)))     # mean-zero, SD = 1.0
+      qlogis(runif(n_rwd)) * (1.0 / (pi / sqrt(3)))     # mean-zero, SD = 1.0
     },
     stop("unknown scenario: ", scenario)
   )
 
   y_rct <- m0(X_rct) + A_rct * tau(X_rct) + eps_rct
-  y_os  <- m0(X_os)  + A_os  * tau(X_os) + A_os * conf(U_os) + eps_os
+  y_rwd  <- m0(X_rwd)  + A_rwd  * tau(X_rwd) + A_rwd * conf(U_rwd) + eps_rwd
 
   list(
-    X_train       = rbind(X_rct, X_os),
-    A_train       = c(A_rct, A_os),
-    S_train       = c(rep(1L, n_rct), rep(0L, n_os)),
-    y_train       = c(y_rct, y_os),
+    X_train       = rbind(X_rct, X_rwd),
+    A_train       = c(A_rct, A_rwd),
+    S_train       = c(rep(1L, n_rct), rep(0L, n_rwd)),
+    y_train       = c(y_rct, y_rwd),
     true_cate_rct = tau(X_rct),
-    true_cate_os  = tau(X_os)
+    true_cate_rwd  = tau(X_rwd)
   )
 }
 
@@ -119,15 +119,15 @@ fit_one <- function(dat, error_dist) {
 
   cate_hat  <- fit$train_predictions_treat
   idx_rct   <- seq_len(n_rct)
-  idx_os    <- (n_rct + 1L):(n_rct + n_os)
-  truth_all <- c(dat$true_cate_rct, dat$true_cate_os)
+  idx_rwd    <- (n_rct + 1L):(n_rct + n_rwd)
+  truth_all <- c(dat$true_cate_rct, dat$true_cate_rwd)
 
   data.frame(
     error_dist = error_dist,
     runtime_s  = elapsed,
     sigma_mean = mean(fit$sigma),
     rmse_rct   = sqrt(mean((cate_hat[idx_rct] - dat$true_cate_rct)^2)),
-    rmse_rwd   = sqrt(mean((cate_hat[idx_os]  - dat$true_cate_os )^2)),
+    rmse_rwd   = sqrt(mean((cate_hat[idx_rwd]  - dat$true_cate_rwd )^2)),
     rmse_all   = sqrt(mean((cate_hat          - truth_all       )^2)),
     stringsAsFactors = FALSE
   )

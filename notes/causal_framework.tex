@@ -28,7 +28,7 @@
 \newcommand{\cf}{c}
 \DeclareMathOperator{\Var}{Var}
 
-\title{Framework for Combining Randomized and\\Observational Data under Unmeasured Confounding}
+\title{Framework for Combining Randomized and\\Real-World Data under Unmeasured Confounding}
 \author{Tijn Jacobs}
 \date{\today}
 
@@ -37,13 +37,13 @@
 
 \subsection*{Executive summary}
 \noindent
-We develop a Bayesian nonparametric framework for estimating heterogeneous treatment effects by combining data from randomized controlled trials and observational studies. The approach does not require unconfoundedness of the observational data; instead, unmeasured confounding is explicitly modeled through a confounding function. The outcome is decomposed into a prognostic baseline, a causal treatment effect, and a confounding bias, each modeled by Bayesian Additive Regression Trees. To accommodate block-wise and sporadic missing covariates arising from data fusion, we propose \emph{informed random splitting}, a novel method for handling missing data within BART that makes stochastic routing decisions at ambiguous tree nodes using posterior predictive matching. We show that informed random splitting corresponds to exact Gibbs sampling under a well-defined augmented posterior, thereby providing valid uncertainty quantification without requiring an external imputation model.
+We develop a Bayesian nonparametric framework for estimating heterogeneous treatment effects by combining data from randomized controlled trials and real-world data sources. The approach does not require unconfoundedness of the real-world data; instead, unmeasured confounding is explicitly modeled through a confounding function. The outcome is decomposed into a prognostic baseline, a causal treatment effect, and a confounding bias, each modeled by Bayesian Additive Regression Trees. To accommodate block-wise and sporadic missing covariates arising from data fusion, we propose \emph{informed random splitting}, a novel method for handling missing data within BART that makes stochastic routing decisions at ambiguous tree nodes using posterior predictive matching. We show that informed random splitting corresponds to exact Gibbs sampling under a well-defined augmented posterior, thereby providing valid uncertainty quantification without requiring an external imputation model.
 
 %% ============================================================
 \section{Setup and notation}
 %% ============================================================
 
-Consider a setting in which data are available from two sources: a randomized controlled trial (RCT) and an observational study~(OS). Let $S \in \{0,1\}$ denote the data-source indicator, with $S=1$ for the RCT and $S=0$ for the OS. Let $A \in \{0,1\}$ denote the binary treatment assignment, $X \in \mathcal{X} \subseteq \R^p$ a vector of observed baseline covariates, and $U \in \mathcal{U}$ a vector of unmeasured covariates. Write $T(a)$ for the potential survival time under treatment~$a$, and define $Y(a) = \log T(a)$.
+Consider a setting in which data are available from two sources: a randomized controlled trial (RCT) and real-world data~(RWD). Let $S \in \{0,1\}$ denote the data-source indicator, with $S=1$ for the RCT and $S=0$ for the RWD. Let $A \in \{0,1\}$ denote the binary treatment assignment, $X \in \mathcal{X} \subseteq \R^p$ a vector of observed baseline covariates, and $U \in \mathcal{U}$ a vector of unmeasured covariates. Write $T(a)$ for the potential survival time under treatment~$a$, and define $Y(a) = \log T(a)$.
 
 %% ============================================================
 \section{Accelerated failure time model}
@@ -89,13 +89,13 @@ We impose the following conditions. Assumptions~\ref{as:sutva}--\ref{as:positivi
   \end{equation}
 \end{assumption}
 
-\begin{remark}[No unconfoundedness in the OS]
-  We deliberately \emph{do not} assume unconfoundedness in the observational study. That is, we allow
-  \begin{equation}\label{eq:confounded_os}
+\begin{remark}[No unconfoundedness in the RWD]
+  We deliberately \emph{do not} assume unconfoundedness in the real-world data. That is, we allow
+  \begin{equation}\label{eq:confounded_rwd}
     A \;\not\!\indep\; \bigl(Y(0),\, Y(1)\bigr) \;\Big|\; X,\; S = 0
   \end{equation}
-  in general. This arises because treatment assignment in the OS may depend on the unmeasured covariates $U$:
-  \begin{equation}\label{eq:os_treatment}
+  in general. This arises because treatment assignment in the RWD may depend on the unmeasured covariates $U$:
+  \begin{equation}\label{eq:rwd_treatment}
     \p(A = 1 \mid X, U, S = 0) \;\neq\; \p(A = 1 \mid X, S = 0) \quad \text{in general}.
   \end{equation}
 \end{remark}
@@ -139,7 +139,7 @@ representing the risk difference at time $t$ and the difference in restricted me
 \section{The confounding function}
 %% ============================================================
 
-Because unconfoundedness does not hold in the OS, the observed treatment--control contrast in the OS does not equal the CATE. The discrepancy is captured by the following quantity.
+Because unconfoundedness does not hold in the RWD, the observed treatment--control contrast in the RWD does not equal the CATE. The discrepancy is captured by the following quantity.
 
 \begin{definition}[Confounding function]\label{def:cf}
   The confounding function is
@@ -191,7 +191,7 @@ Because unconfoundedness does not hold in the OS, the observed treatment--contro
 \end{proof}
 
 \begin{remark}[Interpretation]
-  Equation~\eqref{eq:cf_structural} decomposes the confounding function into two sources of bias: (i)~an imbalance in the baseline prognostic function $f_0(X,U)$ across treatment arms in the OS, arising because treated and control subjects have systematically different distributions of $U$ given $X$; and (ii)~a term $\delta_\tau(x)$ that captures effect modification by $U$, which is nonzero when the treatment effect itself depends on unobservables. Under the simplifying condition $\CATE^*(X,U) = \CATE(X)$---i.e.\ no unobserved effect modification---the confounding function reflects purely baseline prognostic imbalance.
+  Equation~\eqref{eq:cf_structural} decomposes the confounding function into two sources of bias: (i)~an imbalance in the baseline prognostic function $f_0(X,U)$ across treatment arms in the RWD, arising because treated and control subjects have systematically different distributions of $U$ given $X$; and (ii)~a term $\delta_\tau(x)$ that captures effect modification by $U$, which is nonzero when the treatment effect itself depends on unobservables. Under the simplifying condition $\CATE^*(X,U) = \CATE(X)$---i.e.\ no unobserved effect modification---the confounding function reflects purely baseline prognostic imbalance.
 \end{remark}
 
 %% ============================================================
@@ -217,7 +217,7 @@ We now derive the key decomposition that motivates our modeling strategy.
     &\;=\; m_0(X, 1) + \CATE(X), \label{eq:pf_rct}
   \end{align}
   where the last equality uses Assumption~\ref{as:rct_unconf} (so that $\E[Y(0) \mid X, S{=}1] = \E[Y \mid A{=}0, X, S{=}1] = m_0(X,1)$) and Assumption~\ref{as:transport} (so that the conditional treatment effect equals $\CATE(x)$). The right-hand side of~\eqref{eq:decomp} with $A=1$, $S=1$ gives $m_0(X,1) + \CATE(X)$, matching~\eqref{eq:pf_rct}.\\[6pt]
-  \emph{Case $A=1$, $S=0$ (OS).} By the definition of $\cf(X)$ in \eqref{eq:cf},
+  \emph{Case $A=1$, $S=0$ (RWD).} By the definition of $\cf(X)$ in \eqref{eq:cf},
   \begin{equation*}
     \E[Y \mid A{=}1, X, S{=}0] \;=\; m_0(X, 0) + \CATE(X) + \cf(X),
   \end{equation*}
@@ -240,20 +240,20 @@ We now derive the key decomposition that motivates our modeling strategy.
     \begin{equation}\label{eq:ident_tau}
       \CATE(x) \;=\; \E[Y \mid X{=}x, A{=}1, S{=}1] - \E[Y \mid X{=}x, A{=}0, S{=}1].
     \end{equation}
-    \item[\emph{(ii)}] Given identification of $\CATE(x)$, the confounding function $\cf(x)$ is identified from the OS data:
+    \item[\emph{(ii)}] Given identification of $\CATE(x)$, the confounding function $\cf(x)$ is identified from the RWD:
     \begin{equation}\label{eq:ident_c}
       \cf(x) \;=\; \E[Y \mid X{=}x, A{=}1, S{=}0] - \E[Y \mid X{=}x, A{=}0, S{=}0] - \CATE(x).
     \end{equation}
-    \item[\emph{(iii)}] Neither $\CATE(x)$ nor $\cf(x)$ is identified from the OS data alone.
+    \item[\emph{(iii)}] Neither $\CATE(x)$ nor $\cf(x)$ is identified from the RWD alone.
   \end{enumerate}
 \end{proposition}
 
 \begin{proof}
-  Part~(i) follows from Assumptions~\ref{as:rct_unconf} and~\ref{as:transport}, as shown in~\eqref{eq:pf_rct}. Part~(ii) is immediate from Definition~\ref{def:cf}. For part~(iii), note that the OS data identify only the composite $\CATE(x) + \cf(x)$; without external information (the RCT), the two components are not separately identifiable.
+  Part~(i) follows from Assumptions~\ref{as:rct_unconf} and~\ref{as:transport}, as shown in~\eqref{eq:pf_rct}. Part~(ii) is immediate from Definition~\ref{def:cf}. For part~(iii), note that the RWD identify only the composite $\CATE(x) + \cf(x)$; without external information (the RCT), the two components are not separately identifiable.
 \end{proof}
 
-\begin{remark}[Role of the observational data]
-  Although $\CATE(x)$ is identifiable from the RCT alone, joint estimation using both sources can improve efficiency. The decomposition~\eqref{eq:individual} enables the OS to contribute to the estimation of $\CATE(x)$ through the shared baseline function $m_0(X,S)$ and through the additional treated observations, while the confounding function $\cf(x)$ absorbs the bias. The efficiency gain is largest when $\cf(x)$ is small or smoothly varying, so that few degrees of freedom are consumed by the bias correction.
+\begin{remark}[Role of the real-world data]
+  Although $\CATE(x)$ is identifiable from the RCT alone, joint estimation using both sources can improve efficiency. The decomposition~\eqref{eq:individual} enables the RWD to contribute to the estimation of $\CATE(x)$ through the shared baseline function $m_0(X,S)$ and through the additional treated observations, while the confounding function $\cf(x)$ absorbs the bias. The efficiency gain is largest when $\cf(x)$ is small or smoothly varying, so that few degrees of freedom are consumed by the bias correction.
 \end{remark}
 
 %% ============================================================
@@ -266,7 +266,7 @@ Substituting $Y_i = \log T_i$ and denoting by $\Phi$ the CDF of the (nonparametr
   S_0(t \mid x, s) &\;=\; 1 - \Phi\!\left(\frac{\log t - m_0(x,s)}{\sigma}\right). \label{eq:surv0}
 \end{align}
 
-\noindent When the target population is the OS ($s = 0$), the survival-scale estimands become
+\noindent When the target population is the RWD ($s = 0$), the survival-scale estimands become
 \begin{align}
   \Delta_{\mathrm{RD}}(t, x) 
   &\;=\; \Phi\!\left(\frac{\log t - m_0(x, 0)}{\sigma}\right) 
@@ -279,11 +279,11 @@ Substituting $Y_i = \log T_i$ and denoting by $\Phi$ the CDF of the (nonparametr
 \end{align}
 
 \begin{remark}[Causal estimands in the target population]
-  In equations~\eqref{eq:rd_aft}--\eqref{eq:rmst_aft}, the confounding function $\cf(x)$ appears because the target population is the OS ($s=0$). If instead one targets the RCT population ($s=1$), the $\cf(x)$ term drops out and the estimands depend only on $m_0(x,1)$ and $\CATE(x)$.
+  In equations~\eqref{eq:rd_aft}--\eqref{eq:rmst_aft}, the confounding function $\cf(x)$ appears because the target population is the RWD ($s=0$). If instead one targets the RCT population ($s=1$), the $\cf(x)$ term drops out and the estimands depend only on $m_0(x,1)$ and $\CATE(x)$.
 \end{remark}
 
 \begin{remark}[Causal interpretation of the survival estimands]
-  The risk difference~\eqref{eq:rd_aft} and RMST difference~\eqref{eq:rmst_aft} involving $\cf(x)$ reflect the \emph{causal} treatment effect in the OS population. The confounding function enters through the survival curve under treatment, $S_1$, because the observed outcomes of the treated group in the OS are distorted by unmeasured confounding. The decomposition~\eqref{eq:individual} ensures that $\CATE(x)$ captures the true causal effect while $\cf(x)$ absorbs the bias, so that the survival contrasts computed from~\eqref{eq:surv1}--\eqref{eq:surv0} with $\cf$ removed yield the correct causal comparison.
+  The risk difference~\eqref{eq:rd_aft} and RMST difference~\eqref{eq:rmst_aft} involving $\cf(x)$ reflect the \emph{causal} treatment effect in the RWD population. The confounding function enters through the survival curve under treatment, $S_1$, because the observed outcomes of the treated group in the RWD are distorted by unmeasured confounding. The decomposition~\eqref{eq:individual} ensures that $\CATE(x)$ captures the true causal effect while $\cf(x)$ absorbs the bias, so that the survival contrasts computed from~\eqref{eq:surv1}--\eqref{eq:surv0} with $\cf$ removed yield the correct causal comparison.
 \end{remark}
 
 

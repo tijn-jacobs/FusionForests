@@ -1,6 +1,6 @@
 # Non-parametric error priors in FusionForest — simulation findings
 
-**Setup.** 25 replicates, 3 OS-residual scenarios, 3 priors (`gaussian` / `shared_dp` / `source_dp`). n_RCT = 100, n_OS = 200. RCT residuals always Gaussian; OS residuals misspecified. Metric: CATE RMSE.
+**Setup.** 25 replicates, 3 RWD-residual scenarios, 3 priors (`gaussian` / `shared_dp` / `source_dp`). n_RCT = 100, n_RWD = 200. RCT residuals always Gaussian; RWD residuals misspecified. Metric: CATE RMSE.
 
 ## Results
 
@@ -18,9 +18,9 @@
 
 ## Findings
 
-1. **`source_dp` wins under shape misspecification.** Bimodal OS noise: 15% RMSE reduction over Gaussian with the same SD across reps. σ drops 0.72 → 0.31, exactly the misspecification cost paid by Gaussian.
+1. **`source_dp` wins under shape misspecification.** Bimodal RWD noise: 15% RMSE reduction over Gaussian with the same SD across reps. σ drops 0.72 → 0.31, exactly the misspecification cost paid by Gaussian.
 
-2. **`shared_dp` is *unstable* when sources differ in residual shape.** RMSE 0.312 with SD 0.264 (CV ≈ 0.85) — heavy-tailed across replicates. Cause: global centring couples a RCT-near-zero atom to OS atoms at ±1; with n_RCT = 100 some reps land in mislabelled regimes. Motivates the full HDP-CDP (Stage B): shared atoms with *per-source* centring.
+2. **`shared_dp` is *unstable* when sources differ in residual shape.** RMSE 0.312 with SD 0.264 (CV ≈ 0.85) — heavy-tailed across replicates. Cause: global centring couples a RCT-near-zero atom to RWD atoms at ±1; with n_RCT = 100 some reps land in mislabelled regimes. Motivates the full HDP-CDP (Stage B): shared atoms with *per-source* centring.
 
 3. **Skew or heavy tails alone — no CATE gain.** Gumbel and logistic: DPs cut σ by 25–35% but RMSE is identical across the three priors. BART's structural flexibility already absorbs symmetric / mildly-skewed residual shape; the DP only earns its keep on *multi-modality* the means can't fit away.
 

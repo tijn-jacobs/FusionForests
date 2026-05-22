@@ -30,7 +30,7 @@
 \section{Source-specific errors via a hierarchical centered Dirichlet process}
 \label{sec:hdp}
 
-The decomposition in~\eqref{eq:outcome} models the conditional mean of the log-survival time as the sum of a prognostic baseline, a treatment effect, and a source-dependent confounding bias, with the remaining residual $W_i$ absorbed into a source-specific error term $F_{S_i}$. The standard practice in the data-fusion literature is either to assume $F_0 = F_1$ outright or, more commonly, to leave the error distribution implicit by adopting a single Gaussian likelihood. Both choices are unsatisfactory in our setting. Randomized trials and observational data sources typically differ in measurement protocol, follow-up quality, and the prevalence of extreme outcomes, and these differences plausibly enter the residual distribution rather than the structural mean. At the same time, the two error distributions are unlikely to be entirely unrelated, and a model that treats them as fully independent forfeits useful pooling, particularly when one source is small.
+The decomposition in~\eqref{eq:outcome} models the conditional mean of the log-survival time as the sum of a prognostic baseline, a treatment effect, and a source-dependent confounding bias, with the remaining residual $W_i$ absorbed into a source-specific error term $F_{S_i}$. The standard practice in the data-fusion literature is either to assume $F_0 = F_1$ outright or, more commonly, to leave the error distribution implicit by adopting a single Gaussian likelihood. Both choices are unsatisfactory in our setting. Randomized trials and real-world data sources typically differ in measurement protocol, follow-up quality, and the prevalence of extreme outcomes, and these differences plausibly enter the residual distribution rather than the structural mean. At the same time, the two error distributions are unlikely to be entirely unrelated, and a model that treats them as fully independent forfeits useful pooling, particularly when one source is small.
 
 We address this tension with a hierarchical Dirichlet process \citep{teh2006hierarchical} prior on the source-specific mixing measures, combined with a centering construction \citep{yang2010semiparametric} that enforces the mean-zero constraint required for identifiability of the regression components. The resulting model allows $F_0$ and $F_1$ to differ flexibly while sharing information about which residual ``types'' are present in either source.
 
@@ -99,7 +99,7 @@ For computation we truncate the top-level stick-breaking at a finite level $K$ \
 \bm{\pi}_s \given \bm{\beta}, M_s \;\sim\; \mathrm{Dirichlet}(M_s \beta_1, \ldots, M_s \beta_K),
 \label{eq:hdp-pi-prior}
 \end{equation}
-which is the standard truncated representation of the HDP \citep{teh2006hierarchical, wang2009variational}; the approximation becomes exact as $K \to \infty$. The default $K = 50$ follows \citet{henderson2020individualized}; in our simulations under $n_{\mathrm{RCT}} = 100$, $n_{\mathrm{OS}} = 200$, the number of occupied components rarely exceeds twenty, and the largest occupied component index is monitored across iterations to confirm that the truncation does not bind.
+which is the standard truncated representation of the HDP \citep{teh2006hierarchical, wang2009variational}; the approximation becomes exact as $K \to \infty$. The default $K = 50$ follows \citet{henderson2020individualized}; in our simulations under $n_{\mathrm{RCT}} = 100$, $n_{\mathrm{RWD}} = 200$, the number of occupied components rarely exceeds twenty, and the largest occupied component index is monitored across iterations to confirm that the truncation does not bind.
 
 Introducing latent cluster assignments $Z_i \in \{1, \ldots, K\}$ such that the latent location for observation $i$ is $\theta_{Z_i}^* - \mu_{S_i}$, the full hierarchical model is:
 \begin{align}
@@ -137,7 +137,7 @@ R_i^{(m_0)} &= Y_i - A_i \tau(X_i) - A_i(1-S_i) c(X_i) - (\theta_{Z_i}^* - \mu_{
 R_i^{(\tau)} &= Y_i - m_0(X_i, S_i) - (1-S_i) c(X_i) - (\theta_{Z_i}^* - \mu_{S_i}), && i \text{ with } A_i = 1, \\
 R_i^{(c)} &= Y_i - m_0(X_i, 0) - \tau(X_i) - (\theta_{Z_i}^* - \mu_0), && i \text{ with } A_i = 1, S_i = 0.
 \end{align}
-Each working response is treated as Gaussian with mean equal to the relevant forest and variance $\sigma^2$. Control observations carry no information about $\tau$; RCT observations and untreated OS observations carry no information about $c$. After the BART updates, recompute $R_i$ from~\eqref{eq:app-Ri}.
+Each working response is treated as Gaussian with mean equal to the relevant forest and variance $\sigma^2$. Control observations carry no information about $\tau$; RCT observations and untreated RWD observations carry no information about $c$. After the BART updates, recompute $R_i$ from~\eqref{eq:app-Ri}.
 
 \paragraph{Step 3 (cluster assignments).} For each $i$,
 \begin{equation}

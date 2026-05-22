@@ -42,7 +42,7 @@
 #' @param time Numeric scalar (positive).  Required for \code{"SD"} and
 #'   \code{"RMST"}; ignored for \code{"AF"}.  Interpreted on the
 #'   \emph{time} (not log-time) scale.
-#' @param target_source Character, \code{"os"} (default) or \code{"rct"}.
+#' @param target_source Character, \code{"rwd"} (default) or \code{"rct"}.
 #'   Selects the target population \eqn{s_t} appearing in the survival
 #'   formula (eqs.\ 2.6--2.8 of \code{estimands.tex}).  Ignored for
 #'   \code{"AF"} since the causal AF is shared across sources.
@@ -79,7 +79,7 @@ fusion_estimand <- function(
   fit,
   estimand           = c("SD", "RMST", "AF"),
   time               = NULL,
-  target_source      = c("os", "rct"),
+  target_source      = c("rwd", "rct"),
   population_average = FALSE,
   bayesian_bootstrap = TRUE,
   seed               = NULL
@@ -104,7 +104,7 @@ fusion_estimand <- function(
   ## Recover per-iteration test predictions on the user log-time scale
   ## -----------------------------------------------------------------
 
-  comp <- .log_scale_components(fit, meta)        # list(mu, tau, c, g) of R*n
+  comp <- .log_scale_components(fit, meta, which = "test")  # list(mu, tau, c, g) of R*n
   R    <- nrow(comp$mu)
   n_ev <- ncol(comp$mu)
 
@@ -170,12 +170,13 @@ fusion_estimand <- function(
 # "time" the back-transform applied exp(.), so we take log() to recover
 # the log-time scale predictions used in the eta_a formula.  For "log"
 # and continuous outcomes the predictions are already on the right scale.
-# g(X) is NULL in three-forest mode.
-.log_scale_components <- function(fit, meta) {
+# g(X) is NULL in three-forest mode.  `which` selects test or train rows.
+.log_scale_components <- function(fit, meta, which = c("test", "train")) {
 
-  need <- c("test_predictions_sample_control",
-            "test_predictions_sample_treat",
-            "test_predictions_sample_deconf")
+  which <- match.arg(which)
+  prefix <- paste0(which, "_predictions_sample_")
+
+  need <- paste0(prefix, c("control", "treat", "deconf"))
   for (nm in need) {
     if (is.null(fit[[nm]]))
       stop("fit$", nm, " is missing.  Refit with store_posterior_sample = TRUE.")
@@ -185,11 +186,11 @@ fusion_estimand <- function(
   unlog  <- function(x) if (to_log) log(x) else x
 
   list(
-    mu  = unlog(fit$test_predictions_sample_control),
-    tau = unlog(fit$test_predictions_sample_treat),
-    c   = unlog(fit$test_predictions_sample_deconf),
+    mu  = unlog(fit[[paste0(prefix, "control")]]),
+    tau = unlog(fit[[paste0(prefix, "treat")]]),
+    c   = unlog(fit[[paste0(prefix, "deconf")]]),
     g   = if (meta$decomposition == "four-forest")
-            unlog(fit$test_predictions_sample_deviation) else NULL
+            unlog(fit[[paste0(prefix, "deviation")]]) else NULL
   )
 }
 
@@ -213,7 +214,7 @@ fusion_estimand <- function(
 
   # dp_locations is rescaled to response scale in the wrapper; dp_mix_prop
   # is scale-free.  For shared_dp there is a single group (index 1) used
-  # for both sources; otherwise group 1 = OS (s = 0), group 2 = RCT
+  # for both sources; otherwise group 1 = RWD (s = 0), group 2 = RCT
   # (s = 1).
   g_idx <- if (err == "shared_dp") 1L else (s_t + 1L)
 

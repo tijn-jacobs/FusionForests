@@ -1,7 +1,7 @@
-## OS_exploration.R
+## RWD_exploration.R
 ##
 ## First-pass screen of three candidate observational HIV cohorts as
-## potential OS arms for fusing with the ACTG175 RCT (FusionForest).
+## potential RWD arms for fusing with the ACTG175 RCT (FusionForest).
 ##
 ##   MACS  PDS  -- men-only, baseline visits 1991-1995  (primary)
 ##   WIHS  PDS  -- women-only, baseline 1994-1995       (sensitivity)
@@ -14,7 +14,7 @@
 ## user to confirm before proceeding.
 ##
 ## Run from project root:
-##   Rscript data/analysis/OS_exploration.R
+##   Rscript data/analysis 0/RWD_exploration.R
 
 setwd("~/Library/CloudStorage/OneDrive-VrijeUniversiteitAmsterdam/Documents/GitHub/FusionForests/")
 
@@ -445,7 +445,7 @@ if (nrow(cohort) >= 50) {
 banner("6. Open design questions for the user")
 
 cat("
-The following choices need confirmation before building the OS frame
+The following choices need confirmation before building the RWD frame
 and calling FusionForest:
 
   (a) OUTCOME definition.
@@ -470,7 +470,7 @@ and calling FusionForest:
   (d) WHETHER TO INCLUDE WIHS.
       Gender mismatch (women vs ACTG175's mostly-men) makes effect
       transfer fragile. Could be (i) excluded, (ii) used as a
-      gender-restricted sensitivity arm, (iii) included as OS with
+      gender-restricted sensitivity arm, (iii) included as RWD with
       gender added as a covariate and source-effect absorbing the gap.
 
   (e) HANDLING TREATMENT SWITCHERS.

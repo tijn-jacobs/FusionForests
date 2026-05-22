@@ -2,16 +2,16 @@
 # Simulation study: extrapolation under shorter RCT follow-up.
 #
 # Same DGP family as examples/NP_error_simulation.R, but here we
-#   - fix a single OS residual scenario (configurable; default = gumbel),
+#   - fix a single RWD residual scenario (configurable; default = gumbel),
 #   - compare only two methods: error_dist = gaussian vs source_hdp,
 #   - administratively right-censor the RCT at 70% of the largest
-#     non-censored event time in the OS (per replicate).
+#     non-censored event time in the RWD (per replicate).
 #
 # Motivation
-#   The OS has longer follow-up than the RCT.  Under AFT, the treatment
+#   The RWD has longer follow-up than the RCT.  Under AFT, the treatment
 #   effect tau(X) is a log-time shift; the question is whether a heavily
 #   admin-censored RCT can still anchor tau (and disentangle it from c)
-#   when the OS error tail is misspecified by the gaussian working model
+#   when the RWD error tail is misspecified by the gaussian working model
 #   but absorbed by the HDP working model.
 #
 # Outputs
@@ -32,13 +32,13 @@ nRep   <- 25L
 nCores <- 5L
 
 n_rct  <- 100L
-n_os   <- 200L
+n_rwd   <- 200L
 p      <- 5L
 q      <- 2L
 N_post <- 2500L
 N_burn <- 1500L
 
-cens_frac        <- 0.70                          # RCT admin cutoff: 70% of max OS event
+cens_frac        <- 0.70                          # RCT admin cutoff: 70% of max RWD event
 random_cens_rate <- 0.25                          # per-source random censoring rate
 
 outFile <- "examples/NP_error_extrapolation_results.rds"
@@ -61,45 +61,45 @@ random_censor <- function(y_event, rate) {
 # ---- Data-generating process ----------------------------------------
 gen_data <- function(scenario) {
   X_rct <- matrix(runif(n_rct * p), n_rct, p)
-  X_os  <- matrix(runif(n_os  * p), n_os,  p)
-  U_os  <- matrix(rnorm(n_os * q), n_os, q)
+  X_rwd  <- matrix(runif(n_rwd  * p), n_rwd,  p)
+  U_rwd  <- matrix(rnorm(n_rwd * q), n_rwd, q)
 
   m0   <- function(X) 2*X[,1] - X[,2] + 0.5*X[,3]
   tau  <- function(X) X[,1] + 0.5 * X[,2]^2
   conf <- function(U) -0.5*U[,1] + 0.25*U[,2]
 
   A_rct <- rbinom(n_rct, 1, 0.5)
-  A_os  <- rbinom(n_os,  1, plogis(X_os[,1] + U_os[,1] + U_os[,2]))
+  A_rwd  <- rbinom(n_rwd,  1, plogis(X_rwd[,1] + U_rwd[,1] + U_rwd[,2]))
 
   eps_rct <- rnorm(n_rct, 0, 0.5)
 
-  eps_os <- switch(scenario,
+  eps_rwd <- switch(scenario,
     bimodal = {
-      m <- rbinom(n_os, 1, 0.5)
-      ifelse(m == 1, rnorm(n_os,  1, 0.2),
-                     rnorm(n_os, -1, 0.2))
+      m <- rbinom(n_rwd, 1, 0.5)
+      ifelse(m == 1, rnorm(n_rwd,  1, 0.2),
+                     rnorm(n_rwd, -1, 0.2))
     },
     gumbel = {
-      g       <- -log(-log(runif(n_os)))
+      g       <- -log(-log(runif(n_rwd)))
       gamma_E <- 0.5772156649015329
       sd_g    <- pi / sqrt(6)
       (g - gamma_E) * (1.0 / sd_g)
     },
     logistic = {
-      qlogis(runif(n_os)) * (1.0 / (pi / sqrt(3)))
+      qlogis(runif(n_rwd)) * (1.0 / (pi / sqrt(3)))
     },
     stop("unknown scenario: ", scenario)
   )
 
   y_rct_event <- m0(X_rct) + A_rct * tau(X_rct) + eps_rct
-  y_os_event  <- m0(X_os)  + A_os  * tau(X_os) + A_os * conf(U_os) + eps_os
+  y_rwd_event  <- m0(X_rwd)  + A_rwd  * tau(X_rwd) + A_rwd * conf(U_rwd) + eps_rwd
 
   # Random censoring per source (independent of event time).
-  os_rc  <- random_censor(y_os_event,  random_cens_rate)
+  rwd_rc  <- random_censor(y_rwd_event,  random_cens_rate)
   rct_rc <- random_censor(y_rct_event, random_cens_rate)
 
-  # Admin censoring threshold: cens_frac * max non-censored OS event.
-  t_cut <- cens_frac * max(os_rc$y_obs[os_rc$status == 1L])
+  # Admin censoring threshold: cens_frac * max non-censored RWD event.
+  t_cut <- cens_frac * max(rwd_rc$y_obs[rwd_rc$status == 1L])
 
   # Admin censoring of the RCT, applied on top of the random censoring:
   # any obs (event or random-censored) sitting above t_cut is replaced
@@ -109,17 +109,17 @@ gen_data <- function(scenario) {
   status_rct <- ifelse(admin_cens, 0L,    rct_rc$status)
 
   list(
-    X_train          = rbind(X_rct, X_os),
-    A_train          = c(A_rct, A_os),
-    S_train          = c(rep(1L, n_rct), rep(0L, n_os)),
-    y_train          = c(y_rct, os_rc$y_obs),
-    status_train     = c(status_rct, os_rc$status),
+    X_train          = rbind(X_rct, X_rwd),
+    A_train          = c(A_rct, A_rwd),
+    S_train          = c(rep(1L, n_rct), rep(0L, n_rwd)),
+    y_train          = c(y_rct, rwd_rc$y_obs),
+    status_train     = c(status_rct, rwd_rc$status),
     true_cate_rct    = tau(X_rct),
-    true_cate_os     = tau(X_os),
+    true_cate_rwd     = tau(X_rwd),
     t_cut            = t_cut,
     rct_cens_rate    = mean(status_rct == 0L),
     rct_admin_rate   = mean(admin_cens),
-    os_cens_rate     = mean(os_rc$status == 0L)
+    rwd_cens_rate     = mean(rwd_rc$status == 0L)
   )
 }
 
@@ -148,8 +148,8 @@ fit_one <- function(dat, error_dist) {
 
   cate_hat  <- fit$train_predictions_treat
   idx_rct   <- seq_len(n_rct)
-  idx_os    <- (n_rct + 1L):(n_rct + n_os)
-  truth_all <- c(dat$true_cate_rct, dat$true_cate_os)
+  idx_rwd    <- (n_rct + 1L):(n_rct + n_rwd)
+  truth_all <- c(dat$true_cate_rct, dat$true_cate_rwd)
 
   data.frame(
     error_dist     = error_dist,
@@ -158,9 +158,9 @@ fit_one <- function(dat, error_dist) {
     t_cut          = dat$t_cut,
     rct_cens_rate  = dat$rct_cens_rate,
     rct_admin_rate = dat$rct_admin_rate,
-    os_cens_rate   = dat$os_cens_rate,
+    rwd_cens_rate   = dat$rwd_cens_rate,
     rmse_rct       = sqrt(mean((cate_hat[idx_rct] - dat$true_cate_rct)^2)),
-    rmse_rwd       = sqrt(mean((cate_hat[idx_os]  - dat$true_cate_os )^2)),
+    rmse_rwd       = sqrt(mean((cate_hat[idx_rwd]  - dat$true_cate_rwd )^2)),
     rmse_all       = sqrt(mean((cate_hat          - truth_all       )^2)),
     stringsAsFactors = FALSE
   )
@@ -224,7 +224,7 @@ cat(sprintf("Raw per-fit results written to %s\n", outFile))
 # ---- Aggregate -------------------------------------------------------
 agg <- aggregate(
   cbind(runtime_s, sigma_mean, t_cut,
-        rct_cens_rate, rct_admin_rate, os_cens_rate,
+        rct_cens_rate, rct_admin_rate, rwd_cens_rate,
         rmse_rct, rmse_rwd, rmse_all) ~ error_dist,
   data = results,
   FUN  = function(x) c(mean = mean(x), sd = sd(x))
@@ -238,7 +238,7 @@ summary_tab <- with(agg, data.frame(
   t_cut          = fmt_msd(t_cut[, "mean"], t_cut[, "sd"]),
   rct_cens_rate  = fmt_msd(rct_cens_rate[, "mean"], rct_cens_rate[, "sd"]),
   rct_admin_rate = fmt_msd(rct_admin_rate[, "mean"], rct_admin_rate[, "sd"]),
-  os_cens_rate   = fmt_msd(os_cens_rate[, "mean"], os_cens_rate[, "sd"]),
+  rwd_cens_rate   = fmt_msd(rwd_cens_rate[, "mean"], rwd_cens_rate[, "sd"]),
   RMSE_RCT       = fmt_msd(rmse_rct[, "mean"], rmse_rct[, "sd"]),
   RMSE_RWD       = fmt_msd(rmse_rwd[, "mean"], rmse_rwd[, "sd"]),
   RMSE_All       = fmt_msd(rmse_all[, "mean"], rmse_all[, "sd"]),

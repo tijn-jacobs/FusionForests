@@ -23,7 +23,7 @@
 //
 // Per-source state is held in std::vector-of-vector containers indexed by
 // group g in [0, num_groups_).  SHARED_DP uses num_groups_ = 1; SOURCE_DP* /
-// SOURCE_HDP use num_groups_ = 2 with group 0 = observational study (S=0) and
+// SOURCE_HDP use num_groups_ = 2 with group 0 = real-world data (S=0) and
 // group 1 = randomised trial (S=1).
 class MixtureDP {
 public:

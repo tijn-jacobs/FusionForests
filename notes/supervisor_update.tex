@@ -1,0 +1,150 @@
+% Project status update for supervisor.
+% Compile with: xelatex supervisor_update.tex  (Metropolis prefers Xe/LuaLaTeX;
+% pdflatex also works but the typography is less crisp). Requires the
+% `metropolis` beamer theme.
+
+\documentclass[10pt,aspectratio=169]{beamer}
+\usetheme{metropolis}
+
+\usepackage{amsmath, amssymb}
+\usepackage{hyperref}
+
+\metroset{progressbar=frametitle, block=fill}
+
+% Math shortcuts
+\newcommand{\X}{X}
+\newcommand{\A}{A}
+\newcommand{\Sx}{S}
+\newcommand{\CATE}{\tau}
+\newcommand{\cf}{c}
+\newcommand{\mzero}{m_{0}}
+\newcommand{\SD}{\mathrm{SD}}
+\newcommand{\RMST}{\mathrm{RMST}}
+
+\title{FusionForests}
+\subtitle{Data fusion for causal survival inference\,---\,project update}
+\author{Tijn Jacobs \\ \small Vrije Universiteit Amsterdam}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+%======================================================================
+\begin{frame}{Project and goals}
+
+\textbf{What.}\ A Bayesian nonparametric framework for fusing a
+randomised trial (RCT) with real-world data (RWD) under
+unmeasured confounding in the RWD. Implemented in the
+\texttt{FusionForests} R package.
+
+\medskip
+\textbf{Two explicit goals}
+\begin{itemize}
+  \item[\textbf{(G1)}] \textbf{Efficiency gain} for heterogeneous
+        treatment-effect estimation, by borrowing from the RWD.
+  \item[\textbf{(G2)}] \textbf{Identifiable extrapolation} of causal
+        survival contrasts beyond the RCT follow-up horizon, using
+        the longer follow-up of the RWD.
+\end{itemize}
+
+\medskip
+\textbf{Niche.}\ Existing methods address confounding correction
+\emph{or} long-term extrapolation, rarely both, and almost none with a
+flexible nonparametric error. The aim is all three at once.
+
+\end{frame}
+
+%======================================================================
+\begin{frame}{Model and causal estimands}
+
+\textbf{AFT decomposition} ($Y_i = \log T_i$):
+\[
+  Y_i \;=\; \mzero(\X_i, \Sx_i)
+         \;+\; \A_i\,\CATE(\X_i)
+         \;+\; (1-\Sx_i)\,\A_i\,\cf(\X_i)
+         \;+\; \sigma\,\varepsilon_i,
+\]
+with $\mzero, \CATE, \cf$ each modelled by BART forests and
+$\varepsilon \sim P$ under a hierarchical-DP prior. $\CATE$ is
+identified from the RCT; $\cf$ is identified from the RWD once $\CATE$
+is anchored.
+
+\bigskip
+\textbf{Three causal contrasts on the survival scale}
+\begin{itemize}
+  \item $\Delta_{\SD}(t, x)$ --- survival-probability gain at a fixed
+        horizon $t$.
+  \item $\Delta_{\RMST}(t^{*}, x)$ --- expected life-time gain on
+        $[0, t^{*}]$; the headline summary under (G2).
+  \item \alert{$\mathrm{AF}(x) = \exp\{\CATE(x)\}$} --- acceleration
+        factor: horizon-free, HDP-independent, causally interpretable
+        under frailty and effect heterogeneity
+        (Brathovde et al.\ 2024).
+\end{itemize}
+
+\end{frame}
+
+%======================================================================
+\begin{frame}{Progress in the past year}
+
+\textbf{Methodology}
+\begin{itemize}
+  \item \textbf{HDP nonparametric error}\,---\,five modes from Gaussian
+        through to the full hierarchical-DP with per-source recentring.
+        The HDP fixes a centring pathology that destabilised the pooled
+        DP under bimodal RWD noise.
+  \item \textbf{Causal estimands}\,---\,closed forms for
+        $\Delta_{\SD}$ and $\Delta_{\RMST}$ under the HDP; full
+        argument for the acceleration factor as the principal causal
+        target.
+  \item \textbf{Posterior projection summaries}
+        (Woody--Carvalho--Murray)\,---\,BART posterior of $\CATE$ or
+        the AF projected onto a small interpretable basis; uncertainty
+        inherited exactly.
+  \item \textbf{Framework writeup}\,---\,identification,
+        transportability, structural decomposition of the confounding
+        function.
+\end{itemize}
+
+\textbf{Application}
+\begin{itemize}
+  \item ACTG175 (RCT) $+$ MACS (RWD): first end-to-end HIV survival
+        analysis underway.
+\end{itemize}
+
+\textbf{Prior milestone.}\ Horseshoe Forests paper,
+\href{https://arxiv.org/abs/2507.22004}{arXiv:2507.22004}.
+
+\end{frame}
+
+%======================================================================
+\begin{frame}{Remaining challenges and next steps}
+
+\textbf{Methodological}
+\begin{itemize}
+  \item \emph{Constancy of $\CATE$ over time}: waning or late-emerging
+        effects break extrapolation.
+  \item \emph{RCT does double duty}: anchors $\CATE$ \emph{and}
+        disambiguates $\CATE$ from $\cf$\,---\,fragile when
+        $n_{\mathrm{RCT}}$ is small.
+  \item Calendar-time effects in long RWD; informative RWD censoring;
+        covariate overlap at long $t$.
+\end{itemize}
+
+\textbf{Implementation.}\ HDP combined with per-source scale; adaptive
+truncation; DP-aware censored augmentation; cure-fraction;
+time-varying $\CATE(x, t)$.
+
+\textbf{Next}
+\begin{itemize}
+  \item Finish the HIV case study; simulations over
+        $n_{\mathrm{RCT}}/n_{\mathrm{RWD}}$ and extrapolation horizons.
+  \item Paper draft at \emph{causal fusion} $\cap$
+        \emph{long-term extrapolation} $\cap$ \emph{nonparametric
+        error}.
+\end{itemize}
+
+\end{frame}
+
+\end{document}

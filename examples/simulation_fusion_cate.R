@@ -2,9 +2,9 @@
 ##
 ## Replicates fusion_vs_rct_hte.R over n_rep runs, comparing:
 ##   1. Two-forest BCF (RCT only)
-##   2. Two-forest BCF (OS only, naive)
-##   3. Three-forest FusionForest (RCT + OS)
-##   4. Four-forest FusionForest  (RCT + OS)
+##   2. Two-forest BCF (RWD only, naive)
+##   3. Three-forest FusionForest (RCT + RWD)
+##   4. Four-forest FusionForest  (RCT + RWD)
 ##
 ## Metrics (training sample): RMSE of CATE, 95% CI coverage, CI width
 ## Parallelised with foreach + doParallel over 6 cores.
@@ -113,7 +113,7 @@ run_one_rep <- function(rep_id) {
   m1 <- eval_cate(fit$train_predictions_treat,
                   fit$train_predictions_sample_treat, truth_rct)
 
-  # --- Model 2: Two-forest BCF (OS only, naive) -------------------------
+  # --- Model 2: Two-forest BCF (RWD only, naive) ------------------------
   src <- rep(1L, n_rwd); src[n_rwd] <- 0L
   fit <- FusionForest(
     y                         = y_rwd,
@@ -136,7 +136,7 @@ run_one_rep <- function(rep_id) {
   m2 <- eval_cate(fit$train_predictions_treat,
                   fit$train_predictions_sample_treat, truth_rwd)
 
-  # --- Model 3: Three-forest FusionForest (RCT + OS) --------------------
+  # --- Model 3: Three-forest FusionForest (RCT + RWD) -------------------
   fit <- FusionForest(
     y                         = y_all,
     X_train_control           = X_all,
@@ -158,7 +158,7 @@ run_one_rep <- function(rep_id) {
   m3 <- eval_cate(fit$train_predictions_treat,
                   fit$train_predictions_sample_treat, truth_all)
 
-  # --- Model 4: Four-forest FusionForest (RCT + OS) ---------------------
+  # --- Model 4: Four-forest FusionForest (RCT + RWD) --------------------
   fit <- FusionForest(
     y                         = y_all,
     X_train_control           = X_all,
@@ -182,7 +182,7 @@ run_one_rep <- function(rep_id) {
   m4 <- eval_cate(fit$train_predictions_treat,
                   fit$train_predictions_sample_treat, truth_all)
 
-  c(rct = m1, os = m2, three = m3, four = m4)
+  c(rct = m1, rwd = m2, three = m3, four = m4)
 }
 
 # -------------------------------------------------------------------------
@@ -212,8 +212,8 @@ res <- do.call(rbind, res_list)   # n_rep x 16
 # -------------------------------------------------------------------------
 # 4. SUMMARY TABLE
 # -------------------------------------------------------------------------
-models   <- c("RCT only", "OS only", "Three-forest", "Four-forest")
-prefixes <- c("rct", "os", "three", "four")
+models   <- c("RCT only", "RWD only", "Three-forest", "Four-forest")
+prefixes <- c("rct", "rwd", "three", "four")
 met_keys <- c("rmse", "bias", "coverage", "width")
 met_labs <- c("RMSE", "Bias", "Coverage", "CI Width")
 

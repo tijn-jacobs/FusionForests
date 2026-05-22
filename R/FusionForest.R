@@ -95,7 +95,7 @@
 #'       Henderson et al., 2020).  Atoms are recentred to weighted mean zero
 #'       to identify the structural mean components.}
 #'     \item{\code{"source_dp"}}{Independent centred Dirichlet-process
-#'       mixtures per source (Stage A of the HDP-CDP plan).  RCT and OS get
+#'       mixtures per source (Stage A of the HDP-CDP plan).  RCT and RWD get
 #'       their own atoms, weights, and concentration; \eqn{\sigma} is shared.}
 #'     \item{\code{"source_dp_scale"}}{Same as \code{"source_dp"} but with
 #'       per-source error scales \eqn{\sigma_s}.  Each source gets its own
@@ -136,9 +136,9 @@
 #'   \item{train_predictions_treat, test_predictions_treat}{Posterior mean of
 #'     the CATE \eqn{\tau(X)}.}
 #'   \item{train_predictions_deconf, test_predictions_deconf}{Posterior mean of
-#'     the confounding function \eqn{c(X)} (OS rows only for training).}
+#'     the confounding function \eqn{c(X)} (RWD rows only for training).}
 #'   \item{train_predictions_deviation, test_predictions_deviation}{Posterior
-#'     mean of the RWD deviation \eqn{g(X)} (four-forest only; OS rows only
+#'     mean of the RWD deviation \eqn{g(X)} (four-forest only; RWD rows only
 #'     for training).}
 #'   \item{sigma}{Posterior sample of \eqn{\sigma} (or the fixed value if
 #'     \code{sigma} was supplied).}
@@ -255,7 +255,7 @@ FusionForest <- function(
 
   treatment_indicator_train <- as.integer(treatment_indicator_train)
   if (!all(source_indicator_train %in% c(0L, 1L)))
-    stop("source_indicator_train must be 0 (OS) or 1 (RCT).")
+    stop("source_indicator_train must be 0 (RWD) or 1 (RCT).")
   source_indicator_train <- as.integer(source_indicator_train)
 
   if (treatment_coding == "adaptive") {
@@ -270,13 +270,13 @@ FusionForest <- function(
     propensity_train <- numeric(0)
   }
 
-  # OS subset for the deconfounding forest
+  # RWD subset for the deconfounding forest
   n_deconf <- sum(source_indicator_train == 0L)
-  if (n_deconf <= 0L) stop("At least one observational-study (source = 0) row is required.")
+  if (n_deconf <= 0L) stop("At least one real-world-data (source = 0) row is required.")
   X_train_deconf <- X_train_control[source_indicator_train == 0L, , drop = FALSE]
   p_deconf       <- ncol(X_train_deconf)
 
-  # OS subset for the deviation (g) forest (same rows as deconf)
+  # RWD subset for the deviation (g) forest (same rows as deconf)
   use_four_forest <- (decomposition == "four-forest")
   n_deviation     <- n_deconf
   X_train_deviation <- X_train_deconf  # same subset, same covariates
@@ -307,7 +307,7 @@ FusionForest <- function(
     } else {
       s <- as.integer(source_indicator_test)
       if (length(s) != n_test) stop("source_indicator_test length must match number of test rows.")
-      if (!all(s %in% c(0L, 1L))) stop("source_indicator_test must be 0 (OS) or 1 (RCT).")
+      if (!all(s %in% c(0L, 1L))) stop("source_indicator_test must be 0 (RWD) or 1 (RCT).")
       s
     }
 

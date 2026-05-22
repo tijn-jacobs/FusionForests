@@ -58,7 +58,7 @@ test_that("fusion_estimand AF returns R x n_test matrix on time scale", {
 test_that("fusion_estimand SD returns matrix in (-1, 1)", {
   fit <- fit_gaussian_test()
   t_eval <- exp(median(y_cnt))
-  for (src in c("os", "rct")) {
+  for (src in c("rwd", "rct")) {
     sd <- fusion_estimand(fit, estimand = "SD", time = t_eval,
                           target_source = src)
     expect_equal(dim(sd), c(N_post, n_test))
@@ -70,7 +70,7 @@ test_that("fusion_estimand SD returns matrix in (-1, 1)", {
 test_that("fusion_estimand RMST is non-negative and bounded by t*", {
   fit    <- fit_gaussian_test()
   t_star <- exp(quantile(y_cnt, 0.95))
-  for (src in c("os", "rct")) {
+  for (src in c("rwd", "rct")) {
     rmst <- fusion_estimand(fit, estimand = "RMST", time = t_star,
                             target_source = src)
     expect_equal(dim(rmst), c(N_post, n_test))
@@ -132,7 +132,7 @@ test_that("fusion_estimand RMST works under source_hdp error", {
   )
   rmst <- fusion_estimand(fit, estimand = "RMST",
                           time = exp(quantile(y_cnt, 0.9)),
-                          target_source = "os")
+                          target_source = "rwd")
   expect_equal(dim(rmst), c(N_post, n_test))
   expect_true(all(is.finite(rmst)))
 })

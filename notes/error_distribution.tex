@@ -25,12 +25,12 @@
 \maketitle
 
 \begin{abstract}
-We extend the Bayesian nonparametric framework for combining randomized and observational data under unmeasured confounding by allowing the residual distribution in the accelerated failure time outcome model to differ across data sources. Building on the centered Dirichlet process (CDP) construction of \citet{yang2010semiparametric}, used in a single-source AFT--BART setting by \citet{henderson2020individualized}, we place a hierarchical Dirichlet process (HDP) prior \citep{teh2006hierarchical} on the source-specific mixing measures, with shared atoms but source-specific weights. The mean-zero constraint required for identifiability of the regression components is enforced separately within each source by recentering. We derive a blocked Gibbs sampler that preserves conjugacy with the BART updates of the prognostic, treatment-effect, and confounding-function components.
+We extend the Bayesian nonparametric framework for combining randomized and real-world data under unmeasured confounding by allowing the residual distribution in the accelerated failure time outcome model to differ across data sources. Building on the centered Dirichlet process (CDP) construction of \citet{yang2010semiparametric}, used in a single-source AFT--BART setting by \citet{henderson2020individualized}, we place a hierarchical Dirichlet process (HDP) prior \citep{teh2006hierarchical} on the source-specific mixing measures, with shared atoms but source-specific weights. The mean-zero constraint required for identifiability of the regression components is enforced separately within each source by recentering. We derive a blocked Gibbs sampler that preserves conjugacy with the BART updates of the prognostic, treatment-effect, and confounding-function components.
 \end{abstract}
 
 \section{Motivation}
 
-In our framework for combining randomized and observational data under unmeasured confounding \citep{jacobs2026framework}, the conditional expectation of the observed log-survival outcome admits the decomposition
+In our framework for combining randomized and real-world data under unmeasured confounding \citep{jacobs2026framework}, the conditional expectation of the observed log-survival outcome admits the decomposition
 \begin{equation}
 \E[Y \given A, X, S] \;=\; m_0(X, S) + \tau(X)\, A + (1 - S) A\, c(X),
 \label{eq:cmean}
@@ -40,7 +40,7 @@ under SUTVA, randomization in the RCT, and transportability of potential outcome
 Y_i \;=\; m_0(X_i, S_i) + A_i\, \tau(X_i) + A_i(1 - S_i)\, c(X_i) + W_i, \qquad W_i \sim F_{S_i},
 \label{eq:outcome}
 \end{equation}
-where $F_s$ is the error distribution within data source $s \in \{0, 1\}$ ($s=1$ for the RCT, $s=0$ for the observational study). For $m_0$, $\tau$, and $c$ to be identified as the conditional-mean components defined in our framework, each $F_s$ must have mean zero.
+where $F_s$ is the error distribution within data source $s \in \{0, 1\}$ ($s=1$ for the RCT, $s=0$ for the real-world data). For $m_0$, $\tau$, and $c$ to be identified as the conditional-mean components defined in our framework, each $F_s$ must have mean zero.
 
 \citet{henderson2020individualized} model the residual distribution in a single-source AFT model as a location mixture of normals with a centered Dirichlet process prior on the mixing measure, leveraging the construction of \citet{yang2010semiparametric}. In their setting, a single CDP is sufficient because there is only one source. In ours, the natural question is whether $F_0$ and $F_1$ should be assumed equal. We argue they should not: real-world data and randomized trials typically differ in measurement quality, follow-up protocols, and the prevalence of extreme outcomes, and these differences plausibly enter the error distribution rather than the structural mean. At the same time, the two error distributions are unlikely to be entirely unrelated, and pooling information across them through a shared base measure is desirable.
 
@@ -181,7 +181,7 @@ R_i^{(\tau)} \;=\; Y_i - m_0(X_i, S_i) - (1 - S_i)\, c(X_i) - \big(\theta_{Z_i}^
 \end{equation}
 Treat $R_i^{(\tau)} \sim N(\tau(X_i), \sigma^2)$ and update the BART for $\tau$ on this subset. Control observations carry no information about $\tau$.
 
-\paragraph{Update $c$.} Active only for treated observations in the OS ($A_i = 1, S_i = 0$). Working response:
+\paragraph{Update $c$.} Active only for treated observations in the RWD ($A_i = 1, S_i = 0$). Working response:
 \begin{equation}
 R_i^{(c)} \;=\; Y_i - m_0(X_i, 0) - \tau(X_i) - \big(\theta_{Z_i}^* - \mu_0\big), \qquad i \text{ with } A_i = 1, S_i = 0.
 \end{equation}
@@ -332,7 +332,7 @@ $\nu, \lambda$ on $\sigma^2$ (and $\sigma_s^2$) & inherited from the existing \t
 \label{tab:hyperparams}
 \end{table}
 
-\paragraph{Truncation $K$.} Default $50$. \citet{henderson2020individualized} uses $50$ in their two-arm variant and $200$ in their single-arm variant; the difference does not affect their posterior summaries, suggesting $50$ is comfortable for moderate $n$. In our simulations under $n_\mathrm{RCT} = 100$, $n_\mathrm{OS} = 200$ the number of occupied components rarely exceeds $20$, with the RCT-only DP under \texttt{source\_dp} occupying roughly $18/50$ on average. \emph{For the paper:} report posterior-mean occupancy by group and verify it stays well below $K$.
+\paragraph{Truncation $K$.} Default $50$. \citet{henderson2020individualized} uses $50$ in their two-arm variant and $200$ in their single-arm variant; the difference does not affect their posterior summaries, suggesting $50$ is comfortable for moderate $n$. In our simulations under $n_\mathrm{RCT} = 100$, $n_\mathrm{RWD} = 200$ the number of occupied components rarely exceeds $20$, with the RCT-only DP under \texttt{source\_dp} occupying roughly $18/50$ on average. \emph{For the paper:} report posterior-mean occupancy by group and verify it stays well below $K$.
 
 \paragraph{Atom prior scale $\sigma_\theta$.} The atoms have prior $\theta_k \sim N(0, \sigma_\theta^2)$. The default $\sigma_\theta = 0.5$ on the standardised scale lets atoms reach roughly $\pm 1$ standard residual unit with prior probability $\approx 0.95$. \citet{henderson2020individualized} calibrate this from a preliminary parametric fit via their \texttt{FindKappa} helper, which after standardisation gives $\sigma_\theta^2 \approx \sigma_\theta^2/Q$ with $Q$ a chi-square-derived quantile -- numerically similar to our flat default. \emph{For the paper:} either match Henderson's calibration (port \texttt{FindKappa}) or document that the standardised-scale default is robust and report posterior atom locations to justify it. If atoms cluster against the prior support boundary, the prior is too tight.
 
@@ -340,7 +340,7 @@ $\nu, \lambda$ on $\sigma^2$ (and $\sigma_s^2$) & inherited from the existing \t
 
 \paragraph{Mass initialisation.} The R argument \texttt{error\_mass\_init} sets $\alpha^{(0)} = 1$ by default; AFTrees uses $10$. The conjugate update converges within a few sweeps regardless, and we have not observed sensitivity to this choice. Drop from the paper.
 
-\paragraph{$\nu, \lambda$ for $\sigma_s^2$.} In \texttt{source\_dp\_scale} the per-source scale update is $\sigma_s^2 \mid \cdot \sim \mathrm{IG}((\nu + n_s)/2,\; (\nu\lambda + SS_s)/2)$ where $SS_s = \sum_{i: S_i = s}(\varepsilon_i - \theta_{Z_i})^2$. The hyperparameters $(\nu, \lambda)$ are inherited from the outer Gibbs sampler ($\nu = 3$ by default, $\lambda$ derived from $\hat\sigma^2 \cdot \chi^2_{\nu, 1-q}/\nu$ with $q = 0.9$), \emph{shared} across sources. \emph{For the paper:} consider allowing source-specific $(\nu_s, \lambda_s)$, calibrated independently from the RCT and OS residuals of a preliminary parametric fit. Sharing is principled when RCT and OS are believed to have similar prognostic noise, but the implementation cost of stratifying is one line.
+\paragraph{$\nu, \lambda$ for $\sigma_s^2$.} In \texttt{source\_dp\_scale} the per-source scale update is $\sigma_s^2 \mid \cdot \sim \mathrm{IG}((\nu + n_s)/2,\; (\nu\lambda + SS_s)/2)$ where $SS_s = \sum_{i: S_i = s}(\varepsilon_i - \theta_{Z_i})^2$. The hyperparameters $(\nu, \lambda)$ are inherited from the outer Gibbs sampler ($\nu = 3$ by default, $\lambda$ derived from $\hat\sigma^2 \cdot \chi^2_{\nu, 1-q}/\nu$ with $q = 0.9$), \emph{shared} across sources. \emph{For the paper:} consider allowing source-specific $(\nu_s, \lambda_s)$, calibrated independently from the RCT and RWD residuals of a preliminary parametric fit. Sharing is principled when RCT and RWD are believed to have similar prognostic noise, but the implementation cost of stratifying is one line.
 
 \paragraph{Numerical caps.} Both the global $\sigma$ and the per-source $\sigma_s$ updates cap the draw at $10$ (on the standardised scale) to guard against pathological early-burn-in draws. This mirrors the existing \texttt{UpdateSigma}. \emph{For the paper:} this is a numerical detail and need not be mentioned, but the cap can mask divergence -- the diagnostic is to inspect posterior $\sigma$ traces.
 
@@ -354,7 +354,7 @@ where $w_i^{(0)}$ is the existing weight (either $b_i^2$ for the $\tau$ and $c$ 
 
 \subsection{Centring is post-hoc renormalisation}\label{sec:impl-centring}
 
-The mean-zero constraint $\sum_k \pi_{sk} \theta_{sk} = 0$ is enforced as a \emph{deterministic} recentre after each atom block, exactly as in \citet{yang2010semiparametric} and AFTrees: atoms are sampled from the unconstrained posterior, then shifted by $-\mu_s = -\sum_k \pi_{sk}\theta_k^*$. This is a parameter-expansion in the sense of \citet{liu1999parameter}: the implied prior on the centred atoms is the marginal of the unconstrained prior conditional on the centring constraint, which is preserved by the deterministic transformation. For \texttt{source\_dp}, \texttt{source\_dp\_scale}, and \texttt{source\_hdp}, the recentre is \emph{per source}; for \texttt{shared\_dp}, it is global, which couples the RCT and OS likelihoods through the shared $\mu$.
+The mean-zero constraint $\sum_k \pi_{sk} \theta_{sk} = 0$ is enforced as a \emph{deterministic} recentre after each atom block, exactly as in \citet{yang2010semiparametric} and AFTrees: atoms are sampled from the unconstrained posterior, then shifted by $-\mu_s = -\sum_k \pi_{sk}\theta_k^*$. This is a parameter-expansion in the sense of \citet{liu1999parameter}: the implied prior on the centred atoms is the marginal of the unconstrained prior conditional on the centring constraint, which is preserved by the deterministic transformation. For \texttt{source\_dp}, \texttt{source\_dp\_scale}, and \texttt{source\_hdp}, the recentre is \emph{per source}; for \texttt{shared\_dp}, it is global, which couples the RCT and RWD likelihoods through the shared $\mu$.
 
 \subsection{Full HDP-CDP implementation (\texttt{source\_hdp})}\label{sec:impl-hdp}
 
@@ -393,7 +393,7 @@ One Gibbs sweep in \texttt{source\_hdp} runs these steps in order:
 
 \subsection{Empirical pathology of \texttt{shared\_dp}}
 
-In our 25-replicate simulation under bimodal OS noise (results in \texttt{examples/NP\_error\_simulation\_report.md}), \texttt{shared\_dp} produced unstable CATE RMSE with coefficient of variation $\approx 0.85$ across replicates: most replicates were fine, a few were catastrophic. The mechanism is the global centring: the shared mixture must accommodate the RCT mode near $0$ and the OS modes near $\pm 1$ simultaneously, so the centring shift $\mu$ has to balance them; with $n_\mathrm{RCT} = 100$ the sampler occasionally lands in a label configuration that mis-attributes RCT observations to the wide OS modes, biasing both the cluster shifts and the structural mean estimates. The Stage~A modes (\texttt{source\_dp}, \texttt{source\_dp\_scale}) avoid the issue by decoupling the centring entirely; \texttt{source\_hdp} avoids it by recentring \emph{per source} while still sharing the atom \emph{positions} through the top-level $G^*$. \emph{For the paper:} this is the central empirical motivation for the modelling trajectory pooled $\Rightarrow$ per-source $\Rightarrow$ HDP-CDP: each step is needed to fix a specific failure mode of the previous one.
+In our 25-replicate simulation under bimodal RWD noise (results in \texttt{examples/NP\_error\_simulation\_report.md}), \texttt{shared\_dp} produced unstable CATE RMSE with coefficient of variation $\approx 0.85$ across replicates: most replicates were fine, a few were catastrophic. The mechanism is the global centring: the shared mixture must accommodate the RCT mode near $0$ and the RWD modes near $\pm 1$ simultaneously, so the centring shift $\mu$ has to balance them; with $n_\mathrm{RCT} = 100$ the sampler occasionally lands in a label configuration that mis-attributes RCT observations to the wide RWD modes, biasing both the cluster shifts and the structural mean estimates. The Stage~A modes (\texttt{source\_dp}, \texttt{source\_dp\_scale}) avoid the issue by decoupling the centring entirely; \texttt{source\_hdp} avoids it by recentring \emph{per source} while still sharing the atom \emph{positions} through the top-level $G^*$. \emph{For the paper:} this is the central empirical motivation for the modelling trajectory pooled $\Rightarrow$ per-source $\Rightarrow$ HDP-CDP: each step is needed to fix a specific failure mode of the previous one.
 
 \subsection{Posterior outputs}
 
@@ -441,11 +441,11 @@ Several extensions follow naturally from this construction.
 
 \paragraph{Source-specific scales.} Replacing $\sigma$ by $\sigma_s$ requires only stratifying Steps~3 and~8 by source. This is appropriate when RWD has notably different noise magnitude than the RCT.
 
-\paragraph{Nested rather than hierarchical Dirichlet process.} A nested Dirichlet process \citep{rodriguez2008nested} on $(G_0^*, G_1^*)$ would cluster the residual \emph{distributions themselves}, identifying subpopulations within the OS whose residual structure matches the RCT and subpopulations whose does not. This is thematically aligned with the confounding-function decomposition: the bias function $c(X)$ absorbs the conditional-mean shift, and the nested DP would absorb the residual-shape shift.
+\paragraph{Nested rather than hierarchical Dirichlet process.} A nested Dirichlet process \citep{rodriguez2008nested} on $(G_0^*, G_1^*)$ would cluster the residual \emph{distributions themselves}, identifying subpopulations within the RWD whose residual structure matches the RCT and subpopulations whose does not. This is thematically aligned with the confounding-function decomposition: the bias function $c(X)$ absorbs the conditional-mean shift, and the nested DP would absorb the residual-shape shift.
 
 \paragraph{Covariate-dependent error distribution.} A dependent Dirichlet process \citep{maceachern1999dependent} with covariate-dependent weights would extend the construction to fully heteroscedastic errors. Combining with the heteroskedastic AFT-BART approach of \citet{sparapani2023nonparametric}, in which a second BART models $\log \sigma(X)$, yields an even more flexible alternative.
 
-\paragraph{Connection to Bayesian borrowing diagnostics.} Source-specific concentration parameters $M_s$, jointly with the source-specific table counts $t_{s\cdot}$ produced as a by-product of the sampler, function as effective-sample-size-style summaries of how much the OS-specific residual distribution borrows from the shared base measure $G^*$. This connects the construction to the broader Bayesian-borrowing literature on dynamic information-sharing diagnostics \citep{hupf2021bayesian}.
+\paragraph{Connection to Bayesian borrowing diagnostics.} Source-specific concentration parameters $M_s$, jointly with the source-specific table counts $t_{s\cdot}$ produced as a by-product of the sampler, function as effective-sample-size-style summaries of how much the RWD-specific residual distribution borrows from the shared base measure $G^*$. This connects the construction to the broader Bayesian-borrowing literature on dynamic information-sharing diagnostics \citep{hupf2021bayesian}.
 
 \bibliographystyle{apalike}
 \bibliography{references}

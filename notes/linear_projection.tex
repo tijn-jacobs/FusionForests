@@ -29,7 +29,7 @@
 \newcommand{\mzero}{m_{0}}
 \newcommand{\Spot}{S}
 \newcommand{\RCT}{\mathrm{RCT}}
-\newcommand{\OS}{\mathrm{OS}}
+\newcommand{\RWD}{\mathrm{RWD}}
 \newcommand{\RMST}{\mathrm{RMST}}
 \newcommand{\RD}{\mathrm{RD}}
 
@@ -118,20 +118,20 @@ into the extrapolation regime.
 \paragraph{(P3) The confounding function: $\cf(\X)$.}
 A diagnostic projection rather than a clinical summary. The projection of
 $\cf(\X)$ describes which covariates carry the residual bias signal in the
-OS. If $\cf$ admits a clean low-dimensional projection, the bias structure
-is interpretable; if it does not, the OS contribution is intrinsically
+RWD. If $\cf$ admits a clean low-dimensional projection, the bias structure
+is interpretable; if it does not, the RWD contribution is intrinsically
 complex and the reader should be warned.
 
 \subsection{The headline use: RCT-only vs.\ fusion contrast}
 
 The single most informative deployment of the projection in this paper is
 to fit the model under two data configurations --- RCT-only and full
-RCT$+$OS fusion --- and to project both posteriors onto the \emph{same}
+RCT$+$RWD fusion --- and to project both posteriors onto the \emph{same}
 basis $\phi$ at the \emph{same} evaluation points. The marginal posteriors
 of each $\gamma_{k}$ can then be plotted side by side, giving a direct,
 scale-matched answer to the question ``how did borrowing change the
 heterogeneity story?''. The same construction with the model fit once and
-the evaluation points changed (RCT-population vs.\ OS-population
+the evaluation points changed (RCT-population vs.\ RWD-population
 empirical distribution) decomposes ``model effect'' from
 ``population effect'' in the apparent change of heterogeneity.
 
@@ -225,8 +225,8 @@ matters more once relative magnitudes of $\gamma_{k}$ are interpreted
 visually.
 
 \paragraph{Evaluation set.} The choice of evaluation set determines the
-implicit target population of the summary. Pooled RCT$+$OS rows describe
-the combined sample; OS rows alone describe the target observational
+implicit target population of the summary. Pooled RCT$+$RWD rows describe
+the combined sample; RWD rows alone describe the target observational
 population (the natural choice under (G1)); RCT rows describe the trial
 population (typically the natural choice for HTA-style extrapolation under
 (G2)). Always state explicitly which set is used.
@@ -245,7 +245,7 @@ itself is the object of interest.
 \paragraph{Choice of $t^{*}$ for the RMST projection.} If $t^{*} \leq
 t_{\RCT}$ the projection summary reflects RCT-anchored information; if
 $t^{*} > t_{\RCT}$ the summary is computed from the extrapolated posterior
-and depends on the HDP and the OS. Reporting projections at both an
+and depends on the HDP and the RWD. Reporting projections at both an
 in-window and an out-of-window $t^{*}$ traces how the heterogeneity story
 evolves into the extrapolation regime, complementing the
 coverage-vs-horizon diagnostic from the simulation.
@@ -314,9 +314,9 @@ when they are not.
 \texttt{survextrap} does not address unmeasured confounding in the external
 data; the external sources it accommodates are general-population mortality,
 registry conditional survival, and elicited beliefs --- not a confounded
-observational study of the \emph{same} treatment. The proposed framework
+real-world data of the \emph{same} treatment. The proposed framework
 adds an explicit confounding-function correction $\cf(\X)$, allowing the
-external data to be a contemporaneous OS subject to non-randomised
+external data to be a contemporaneous RWD subject to non-randomised
 treatment assignment, not merely a background hazard reference. The
 modelling style also differs: M-spline hazards versus BART forests on
 AFT components, and a flexible parametric error versus an HDP nonparametric
@@ -324,13 +324,13 @@ error.
 
 \subsection{Causal data fusion under unmeasured confounding}
 
-The methodological core --- a confounding function $\cf(\X)$ correcting OS
+The methodological core --- a confounding function $\cf(\X)$ correcting RWD
 contrasts that do not hold unconfoundedness --- is established in
 \citet{YangLiuZengWang2025}, who derive semiparametric efficiency bounds for
 joint estimation of $\tauf$ and $\cf$. \citet{Kallus2018} propose the
 ``experimental grounding'' framework, in which an RCT supplies a bias
 function correcting an observational HTE estimator. \citet{Yao2024} extend
-data fusion to partial OS treatment information. \citet{vanderLaan2024}
+data fusion to partial RWD treatment information. \citet{vanderLaan2024}
 develop adaptive TMLE for RCT--RWD fusion that adapts borrowing to detected
 bias.
 

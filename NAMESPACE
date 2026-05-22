@@ -2,9 +2,12 @@
 
 export(FusionForest)
 export(fusion_estimand)
+export(fusion_projection)
 importFrom(Rcpp,evalCpp)
 importFrom(stats,dnorm)
+importFrom(stats,lm.wfit)
 importFrom(stats,median)
+importFrom(stats,model.matrix)
 importFrom(stats,pnorm)
 importFrom(stats,qchisq)
 importFrom(stats,qnorm)

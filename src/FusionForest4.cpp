@@ -555,21 +555,21 @@ Rcpp::List FusionForest4_cpp(
 
     // SCALE mode: refresh per-obs precision weights and pooled sigma.
     if (dp_scale_mode) {
-      const double sg_os    = mixture.sigma_g(0);
+      const double sg_rwd    = mixture.sigma_g(0);
       const double sg_rct   = mixture.sigma_g(1);
       const double sigma_ref = mixture.sigma_pooled();
       const double sigma_ref_sq = sigma_ref * sigma_ref;
-      const double factor_os  = sigma_ref_sq / (sg_os  * sg_os );
+      const double factor_rwd  = sigma_ref_sq / (sg_rwd  * sg_rwd );
       const double factor_rct = sigma_ref_sq / (sg_rct * sg_rct);
       for (size_t k = 0; k < n; ++k) {
-        const double fac = (source_indicator[k] == 1) ? factor_rct : factor_os;
+        const double fac = (source_indicator[k] == 1) ? factor_rct : factor_rwd;
         weight_treat_dyn  [k] = weights_treat[k] * fac;
         weight_control_dyn[k] = fac;
       }
       for (size_t j = 0; j < n_deconf; ++j)
-        weight_deconf_dyn[j] = weights_deconf[j] * factor_os;
+        weight_deconf_dyn[j] = weights_deconf[j] * factor_rwd;
       for (size_t j = 0; j < n_deviation; ++j)
-        weight_deviation_dyn[j] = factor_os;          // g is OS-only
+        weight_deviation_dyn[j] = factor_rwd;          // g is RWD-only
       sigma = sigma_ref;
       if (!sigma_known) store_sigma[i] = sigma;
     }
@@ -593,7 +593,7 @@ Rcpp::List FusionForest4_cpp(
     // -- Post-burn-in storage --
     if (i >= N_burn) {
 
-      size_t j_os = 0;
+      size_t j_rwd = 0;
       for (size_t k = 0; k < n; ++k) {
         const double b = b_train[k];
         const double mu_k  = forest_mu.GetPrediction(k);
@@ -601,11 +601,11 @@ Rcpp::List FusionForest4_cpp(
         double g_k = 0.0, c_k = 0.0, s = 1.0;
         if (source_indicator[k] == 0) {
           s   = 0.0;
-          g_k = forest_g.GetPrediction(j_os);
-          c_k = forest_c.GetPrediction(j_os);
-          train_predictions_mean_deviation[j_os] += g_k;
-          train_predictions_mean_deconf[j_os]    += c_k;
-          ++j_os;
+          g_k = forest_g.GetPrediction(j_rwd);
+          c_k = forest_c.GetPrediction(j_rwd);
+          train_predictions_mean_deviation[j_rwd] += g_k;
+          train_predictions_mean_deconf[j_rwd]    += c_k;
+          ++j_rwd;
         }
         train_predictions_mean[k] +=
           mu_k + (1.0 - s) * g_k
@@ -621,14 +621,14 @@ Rcpp::List FusionForest4_cpp(
           train_predictions_sample_treat(i - N_burn, k) =
             forest_tau.GetPrediction(k);
         }
-        size_t j_os2 = 0;
+        size_t j_rwd2 = 0;
         for (size_t k = 0; k < n; ++k) {
           if (source_indicator[k] == 0) {
-            train_predictions_sample_deconf(i - N_burn, j_os2) =
-              forest_c.GetPrediction(j_os2);
-            train_predictions_sample_deviation(i - N_burn, j_os2) =
-              forest_g.GetPrediction(j_os2);
-            ++j_os2;
+            train_predictions_sample_deconf(i - N_burn, j_rwd2) =
+              forest_c.GetPrediction(j_rwd2);
+            train_predictions_sample_deviation(i - N_burn, j_rwd2) =
+              forest_g.GetPrediction(j_rwd2);
+            ++j_rwd2;
           }
         }
       }

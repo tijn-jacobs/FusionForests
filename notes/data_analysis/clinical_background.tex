@@ -1,0 +1,245 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{natbib}
+\usepackage{hyperref}
+
+\title{Clinical background}
+\author{Tijn Jacobs}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\subsection{Clinical background and data sources}
+
+Our analysis combines two data sources on the treatment of HIV-1 infection.
+The randomized component is the AIDS Clinical Trials Group Study~175
+(ACTG~175), a double-blind trial that enrolled $2{,}139$ HIV-1--infected
+adults with CD4 cell counts between $200$ and $500$ cells/mm$^3$ and
+randomized them to one of four nucleoside reverse-transcriptase inhibitor
+regimens: zidovudine (ZDV) monotherapy, didanosine (ddI) monotherapy, ZDV
+combined with ddI, or ZDV combined with zalcitabine (ddC)
+\citep{hammer1996}. The observational component is drawn from the
+Multicenter AIDS Cohort Study (MACS), a long-running prospective cohort of
+men who have sex with men that has documented the natural and treated
+history of HIV-1 infection since 1984 \citep{kaslow1987}. We restrict both
+sources to a comparable pre-HAART calendar window and to participants
+meeting the trial's eligibility criteria, and we define a binary treatment
+contrast: ZDV monotherapy versus the pooled alternative of ddI monotherapy,
+ZDV+ddI, or ZDV+ddC. The outcome is event-free survival, defined as the
+time to the first of a $\geq 50\%$ decline in CD4 count, an AIDS-defining
+event, or death.
+
+The clinical evidence on this treatment contrast is well established.
+ACTG~175 found that ZDV monotherapy was inferior to each of the other three
+regimens, which were in turn comparable to one another: ddI monotherapy,
+ZDV+ddI, and ZDV+ddC each delayed disease progression and prolonged
+survival relative to ZDV alone \citep{hammer1996}. The Delta trial reached
+the same conclusion, showing that combinations of ZDV with ddI or ddC were
+superior to ZDV monotherapy \citep{delta1996}. The pharmacological
+explanation is the rapid emergence of resistance under ZDV monotherapy:
+HIV-1 reliably accumulates thymidine-analogue mutations in reverse
+transcriptase within months of treatment, eroding any initial benefit
+\citep{larder1989}. While zidovudine had earlier been shown to confer a
+short-lived advantage over deferred treatment in symptom-free individuals
+\citep{concorde1994}, this transient benefit reflects a comparison against
+no treatment and does not extend to a comparison against ddI- or
+combination-based regimens. Pooling the three superior arms into a single
+comparator is therefore both clinically and statistically justified.
+
+This contrast is well suited to studying the integration of randomized and
+observational evidence precisely because the two sources are expected to
+disagree. In observational practice, the choice of regimen was driven by
+disease severity, immunologic trajectory, and prior treatment experience,
+so that patients with poorer prognosis were preferentially escalated to
+ddI-containing or combination therapy. This channeling induces confounding
+by indication that operates opposite to the true treatment effect, and can
+produce a spurious early survival advantage for ZDV monotherapy in the
+observational cohort---together with an apparent attenuation of that
+advantage over follow-up, as the mis-sorted high-risk patients experience
+events and the susceptible pool is depleted \citep{hernan2010}. Neither
+feature is present under randomization. The discrepancy between the
+unconfounded trial estimate and the confounded observational estimate is
+precisely the quantity that the confounding function in our framework is
+designed to capture.
+
+\begin{itemize}
+  \item ACTG~175 was a double-blind randomized trial of $2{,}139$ HIV-1--infected
+        adults with CD4 counts of $200$--$500$ cells/mm$^3$, randomized to ZDV
+        monotherapy, ddI monotherapy, ZDV+ddI, or ZDV+ddC; the primary endpoint was
+        event-free survival, i.e.\ time to a $\geq 50\%$ CD4 decline, an
+        AIDS-defining event, or death \citep{hammer1996}.
+
+  \item The trial's principal finding was that ZDV monotherapy was inferior to each
+        of the other three regimens, which were statistically comparable to one
+        another --- providing the clinical justification for collapsing them into a
+        single comparator arm \citep{hammer1996}.
+
+  \item The Delta trial independently corroborated this result, showing ZDV+ddI and
+        ZDV+ddC superior to ZDV monotherapy \citep{delta1996}.
+
+  \item The inferiority of ZDV monotherapy is mechanistically explained by the rapid
+        emergence of thymidine-analogue resistance mutations in HIV-1 reverse
+        transcriptase, which erode the initial treatment response within months of
+        starting therapy \citep{larder1989}.
+
+  \item The early, short-lived benefit of ZDV documented in Concorde was a comparison
+        against \emph{deferred or no} treatment in symptom-free individuals; it does
+        not imply any advantage of ZDV monotherapy over ddI- or combination-based
+        regimens, and so does not apply to the present treatment contrast
+        \citep{concorde1994}.
+
+  \item MACS is a prospective observational cohort of men who have sex with men that
+        has followed the natural and treated history of HIV-1 infection since 1984;
+        regimen choice was made in routine clinical care rather than randomized
+        \citep{kaslow1987}.
+
+  \item In observational practice, regimen choice tracked disease severity, CD4
+        trajectory, and prior treatment experience, so that poorer-prognosis patients
+        were preferentially escalated to ddI-containing or combination therapy
+        (confounding by indication).
+
+  \item This channeling sorts high-risk patients into the comparator arm and can make
+        ZDV monotherapy appear spuriously favorable in the observational data ---
+        opposite in direction to the randomized result --- with an apparent
+        attenuation of that advantage over follow-up as susceptible patients are
+        depleted \citep{hernan2010}.
+
+  \item The introduction of protease inhibitors and HAART in 1996 redefined standard
+        of care; both data sources must be restricted to a comparable pre-HAART
+        calendar window for the treatment definitions to remain meaningful and
+        exchangeable.
+
+  \item ACTG~175 was stratified by prior antiretroviral use; ZDV-experienced patients
+        are more likely to harbor pre-existing resistance, making prior ARV exposure
+        a clinically motivated candidate effect modifier for the treatment effect.
+
+  \item In the observational cohort, regimens were switched as disease progressed; a
+        baseline-fixed treatment definition therefore leaves later follow-up subject
+        to switching-induced selection.
+
+  \item Regimen toxicity profiles differ (ZDV: bone-marrow suppression; ddI:
+        pancreatitis and peripheral neuropathy; ddC: peripheral neuropathy), which
+        can contribute to early, regimen-specific attrition.
+\end{itemize}
+
+
+
+\subsection{The error distribution}
+
+Two features of the application dictate the form of the error distribution: it
+must be nonparametric, and it must be specific to the data source.
+
+\paragraph{Why nonparametric.} The event-free survival endpoint is a composite,
+defined as the first occurrence of a $\geq 50\%$ decline in CD4 count, an
+AIDS-defining event, or death \citep{hammer1996}. The time to the first of
+several biologically distinct events does not follow any standard parametric
+family, and the log-normal, Weibull, and log-logistic errors implied by the
+usual parametric accelerated failure time models cannot be expected to capture
+its shape. Crucially, in this setting error misspecification is not innocuous. A
+parametric accelerated failure time model fully specifies the likelihood, so an
+incorrect error shape is accommodated by distorting the location parameters---the
+baseline function $m_0$, the treatment effect $\tau$, and the confounding
+function $c$. Because these location parameters are precisely the causal
+estimands of interest, a nonparametric error is required to protect them from
+shape misspecification, rather than merely to improve the fit of the survival
+curve.
+
+\paragraph{Why source-specific.} A single nonparametric error, shared between the
+trial and the cohort, still imposes the assumption that the two samples have an
+identical residual distribution. This homogeneity assumption is difficult to
+defend here. First, the decomposition is a working model marginal over the
+unmeasured confounders $U$; because treatment is selected on $U$ in the
+observational study but randomized in the trial, the residual distribution of
+the treated observational arm is reshaped relative to the trial, and this
+reshaping affects higher moments that the confounding function $c(X)$, capturing
+only the location, does not absorb. Second, the endpoint is ascertained
+differently---on a protocol schedule with adjudication in the trial, and by
+reconstruction from approximately six-monthly cohort visits in the observational
+study, which coarsens event times. Third, the censoring and follow-up regimes
+differ, the cohort being additionally subject to loss to follow-up and to
+truncation at the onset of the HAART era. Fourth, the observational population
+is broader and less selected for adherence than the trial population. These
+mechanisms predict differences in the \emph{shape} of the residual
+distribution---its skewness, tails, and modality---and not merely its scale, so
+that a shared error with a source-specific variance would also be inadequate. At
+the same time, the two samples concern the same disease, endpoint, and time
+scale, so their error distributions are related rather than arbitrary. The
+hierarchical Dirichlet process is the appropriate model for this situation: it
+equips each source with its own error distribution while sharing a common pool
+of mixture components, and it reduces to a single shared distribution when the
+two samples are in fact homogeneous. The hierarchical specification therefore
+relaxes the homogeneity assumption without requiring that the sources be shown
+to differ in advance.
+
+
+\textbf{The error distribution: the argument.}
+
+\medskip
+\noindent\emph{Part A --- the error must be nonparametric.}
+\begin{itemize}
+  \item \textbf{R1.} The endpoint is a composite---the first of a $\geq 50\%$
+        CD4 decline, an AIDS-defining event, or death---and the time to the
+        first of such heterogeneous events has no standard parametric form.
+  \item \textbf{R2.} In an AFT model the likelihood is fully specified, so a
+        misspecified error is absorbed by the location parameters
+        $m_0,\tau,c$. Since these are the causal estimands, parametric
+        misspecification biases the targets of inference.
+\end{itemize}
+
+\noindent\emph{Part B --- the error must be source-specific (HDP, not a single DP).}
+A single DP assumes the trial and the cohort share one error distribution; this
+homogeneity assumption fails for four reasons.
+\begin{itemize}
+  \item \textbf{R3 (structural).} The model is marginal over the unmeasured $U$;
+        treatment is selected on $U$ in the cohort but randomized in the trial,
+        reshaping the cohort's residual distribution. $c(X)$ corrects the
+        location of this distortion, not its shape.
+  \item \textbf{R4 (measurement).} The endpoint is adjudicated on a protocol
+        schedule in the trial but reconstructed from six-monthly visits in the
+        cohort, coarsening event times.
+  \item \textbf{R5 (design).} Censoring differs: administrative in the trial;
+        loss to follow-up and HAART-era truncation in the cohort.
+  \item \textbf{R6 (population).} The cohort is broader and less
+        adherence-selected than the trial.
+\end{itemize}
+Two further steps complete the argument.
+\begin{itemize}
+  \item \textbf{R7.} R3--R6 alter the \emph{shape} of the error---skew, tails,
+        modality---not merely its scale; a shared DP with a source-specific
+        variance is therefore also insufficient.
+  \item \textbf{R8.} The two sources share disease, endpoint, and time scale, so
+        independent DPs would discard common structure.
+\end{itemize}
+
+\noindent\textbf{Conclusion.} R1--R2 require a nonparametric error; R3--R8
+require it to be source-specific with partial pooling. The hierarchical
+Dirichlet process is the implied model---source-specific error distributions
+over a shared atom pool---and it reduces to a single DP when homogeneity holds.
+
+
+
+
+\vspace{1cm}
+
+\noindent\textbf{Important questions.}
+\begin{itemize}
+  \item From when do we start counting time? For the RCT since
+    randomisation; how about the RWD?
+  \item Go into the selection of the RCT---restrict the RWD to a
+    similar cohort?
+  \item How can we use the WIHS data? Merge it with the MACS, treat it
+    as a separate source, or use it as a validation set?
+  \item Interval censored: currently the left interval point is
+    registered as the event time.
+\end{itemize}
+
+\newpage
+
+
+\bibliographystyle{apalike}
+\bibliography{../references}
+
+\end{document}

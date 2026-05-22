@@ -5,18 +5,18 @@ First release of **FusionForests**.
 ## New model: `FusionForest`
 
 Added `FusionForest()`, a 3-forest Bayesian tree ensemble for combining
-data from a randomised controlled trial (RCT) and an observational study (OS).
+data from a randomised controlled trial (RCT) and real-world data (RWD).
 
 The model decomposes the outcome as:
 
   ŷᵢ = m(xᵢ) + bᵢ · τ₀(xᵢ) + bᵢ · (1 − sᵢ) · τ₁(xᵢ)
 
 where `m(x)` is the control forest, `τ₀(x)` is the RCT treatment forest,
-and `τ₁(x)` is the OS deconfounding forest. The binary variable `sᵢ` indicates
-whether observation `i` comes from the RCT (1) or the OS (0).
+and `τ₁(x)` is the RWD deconfounding forest. The binary variable `sᵢ` indicates
+whether observation `i` comes from the RCT (1) or the RWD (0).
 
 A **commensurate prior** with spike-and-slab structure controls borrowing
-strength from the observational data. The `eta_commensurate` argument
+strength from the real-world data. The `eta_commensurate` argument
 configures this prior.
 
 All three forests default to standard BART with leaf hyperparameters

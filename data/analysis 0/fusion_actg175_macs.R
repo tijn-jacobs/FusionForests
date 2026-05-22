@@ -2,16 +2,33 @@
 ##
 ## Side-by-side comparison of two FusionForest survival fits:
 ##   M1 -- ACTG175 (RCT) only
-##   M2 -- ACTG175 (RCT) + MACS (OS) fusion
+##   M2 -- ACTG175 (RCT) + MACS (RWD) fusion
 ##
 ## Outputs a single multi-panel PDF
-## (data/analysis/fusion_actg175_macs.pdf) with five rows of paired
+## (data/analysis 0/fusion_actg175_macs.pdf) with five rows of paired
 ## diagnostics:
 ##   row 1  KM by treatment, ACTG175 vs MACS (data only)
 ##   row 2  sigma traceplots                  (M1 vs M2)
 ##   row 3  subject-level CATE caterpillars  (M1 vs M2)
 ##   row 4  ATE posterior densities          (M1 vs M2)
 ##   row 5  empirical KM with model-implied per-arm survival overlay
+##
+## Endpoint: event-free survival (EFS-cd4-fix; variant v3 in
+## data/analysis 0/endpoint_comparison.R). ACTG175 contributes its
+## published composite `cens` = >=50% CD4 decline from baseline OR
+## AIDS-defining event OR all-cause death. MACS is reconstructed to
+## match this composite:
+##   (i)   AIDS:        AIDSCASE in {2,3}, time = DATE1yy
+##   (ii)  CD4 decline: first lab in lab_rslt where LEU3N drops to
+##                      <=50% of the subject's earliest 1991-95 LEU3N
+##                      (relative rule, matching ACTG175 -- NOT the
+##                      absolute <200/<14% rule used previously)
+##   (iii) Death:       all-cause, DEATH in {1,2,3,4}. The death DATE
+##                      is redacted in the MACS public release, so
+##                      death-event times fall back to the subject's
+##                      last lab-visit year (known bias).
+## See endpoint_comparison.R for the rule comparison and concordance
+## with the previous coding.
 ##
 ## Treatment contrast (matches ACTG175$treat):
 ##   0 = ZDV monotherapy
@@ -32,7 +49,16 @@ suppressPackageStartupMessages({
 proj        <- "."
 macsDir    <- file.path(proj, "data", "MACS PDS")
 actgEra    <- 1991:1995
-harmCovars <- c("age", "wtkg", "cd4", "cd8")
+# Tier 1 harmonised covariates (age, wtkg, cd4, cd8) are augmented with:
+#   anchor_year      -- calendar year of anchor visit (constant 1992 in RCT)
+#   race             -- binary, 0 = White non-Hispanic, 1 = other
+#   prior_art_years  -- years of prior antiretroviral exposure before anchor
+# Symptomatic HIV at baseline is also clinically relevant but its MACS
+# analogue requires reading section1.dat (symptom form) whose layout is
+# not visible here; left as a follow-up.
+harmCovars <- c("age", "wtkg", "cd4", "cd8",
+                "anchor_year", "race", "prior_art_years")
+artCodes  <- c(92, 94, 147, 180, 185, 186, 187)
 lbToKg    <- 0.453592
 
 # ---------------------------------------------------------------------
@@ -98,7 +124,7 @@ read_macs_subset <- function(dat_path, layout, vars) {
 }
 
 classify_treat <- function(drg_set) {
-  art <- intersect(drg_set, c(92, 94, 147, 180, 185, 186, 187))
+  art <- intersect(drg_set, artCodes)
   if (length(art) == 0)             return(NA_integer_)
   if (any(art %in% c(186, 187)))    return(NA_integer_)
   if (identical(sort(art), 94))     return(NA_integer_)   # ddC mono
@@ -113,22 +139,30 @@ classify_treat <- function(drg_set) {
 build_rct <- function() {
   data(ACTG175)
   d <- ACTG175
+  # anchor_year: ACTG175 enrolled Dec 1991 - Oct 1992; the public release
+  # carries no per-subject date, so we set a constant 1992.
+  # race: ACTG175 codes 0 = White, 1 = non-White; pass through unchanged.
+  # prior_art_years: convert preanti (days of previously received ART)
+  # to years so the scale matches the MACS derivation below.
   data.frame(
-    id       = as.character(d$pidnum),
-    source   = "RCT",
-    treat    = as.integer(d$treat),
-    log_time = log(d$days / 365.25),
-    status   = as.integer(d$cens),
-    age      = d$age,
-    wtkg     = d$wtkg,
-    cd4      = d$cd40,
-    cd8      = d$cd80,
+    id              = as.character(d$pidnum),
+    source          = "RCT",
+    treat           = as.integer(d$treat),
+    log_time        = log(d$days / 365.25),
+    status          = as.integer(d$cens),
+    age             = d$age,
+    wtkg            = d$wtkg,
+    cd4             = d$cd40,
+    cd8             = d$cd80,
+    anchor_year     = 1992L,
+    race            = as.integer(d$race),
+    prior_art_years = d$preanti / 365.25,
     stringsAsFactors = FALSE
   )
 }
 
 build_macs <- function() {
-  cat("Building MACS-OS frame ...\n")
+  cat("Building MACS-RWD frame ...\n")
   inp <- function(f) file.path(macsDir, "sasinp", f)
   dat <- function(f) file.path(macsDir, "data",   f)
 
@@ -144,7 +178,7 @@ build_macs <- function() {
   macsid   <- read_macs_subset(dat("macsid.dat"), lay_macsid,
     c("CASEID", "STATUS02", "STATUS10"))
   section2 <- read_macs_subset(dat("section2.dat"), lay_section2,
-    c("CASEID", "VISIT", "BORNY"))
+    c("CASEID", "VISIT", "BORNY", "RACE"))
   drugf1   <- read_macs_subset(dat("drugf1.dat"), lay_drugf1,
     c("CASEID", "VISIT", "AVQY", "DRGAV", "AVNW"))
   lab      <- read_macs_subset(dat("lab_rslt.dat"), lay_lab,
@@ -173,28 +207,63 @@ build_macs <- function() {
                      stringsAsFactors = FALSE)
   base <- base[!is.na(base$treat), ]
 
+  # ----- MACS endpoint = EFS-cd4-fix (v3 in endpoint_comparison.R) ----
+  # Composite matched to ACTG175$cens:
+  #   (i)   AIDS dx:         AIDSCASE in {2, 3}, time = DATE1yy
+  #   (ii)  CD4 >=50% decl:  reconstructed from lab_rslt -- baseline =
+  #                          earliest 1991-95 LEU3N, event = first lab
+  #                          where LEU3N <= 0.5 * baseline
+  #   (iii) all-cause death: DEATH in {1, 2, 3, 4}; death DATE is
+  #                          redacted, so death-event time falls back
+  #                          to the subject's last lab-visit year
+  # Previous versions used SELFCD4Dyy (absolute <200/<14% rule) and
+  # DEATH %in% c(1, 2) (AIDS-related only). Both diverged from
+  # ACTG175's composite; see endpoint_comparison.R for the analysis.
+
+  lab_cd4 <- lab[!is.na(lab$LEU3N) & lab$LEU3N > 0 &
+                 !is.na(lab$LDATY) & lab$LDATY > 0, ]
+  lab_cd4 <- lab_cd4[order(lab_cd4$CASEID, lab_cd4$LDATY), ]
+  base_cd4 <- aggregate(LEU3N ~ CASEID,
+                        data = lab_cd4[lab_cd4$LDATY %in% actgEra, ],
+                        FUN = function(x) x[1])
+  names(base_cd4)[2] <- "cd4_base"
+  lab_cd4 <- merge(lab_cd4, base_cd4, by = "CASEID")
+  decl_rows <- lab_cd4[lab_cd4$LEU3N <= 0.5 * lab_cd4$cd4_base, ]
+  cd4_rel <- aggregate(LDATY ~ CASEID, data = decl_rows, FUN = min)
+  names(cd4_rel)[2] <- "cd4_rel_yr"
+
   oc <- outcome
-  oc$aids_yr   <- ifelse(oc$AIDSCASE %in% c(2, 3) & oc$DATE1yy > 0,
-                         oc$DATE1yy, NA)
-  oc$cd4dec_yr <- ifelse(oc$SELFCD4Dyy > 0, oc$SELFCD4Dyy, NA)
-  oc$is_dead   <- oc$DEATH %in% c(1, 2)
-  oc$ev_yr     <- pmin(oc$aids_yr, oc$cd4dec_yr, na.rm = TRUE)
-  oc$has_event <- !is.na(oc$ev_yr) | oc$is_dead
+  oc$aids_yr <- ifelse(oc$AIDSCASE %in% c(2, 3) & oc$DATE1yy > 0,
+                       oc$DATE1yy, NA_real_)
+  oc$is_dead <- !is.na(oc$DEATH) & oc$DEATH %in% c(1, 2, 3, 4)
 
   last_lab <- aggregate(LDATY ~ CASEID, data = lab,
                         FUN = function(x) max(x, na.rm = TRUE))
   names(last_lab)[2] <- "last_year"
-  base <- merge(base, oc[, c("CASEID", "ev_yr", "has_event")],
+
+  base <- merge(base, oc[, c("CASEID", "aids_yr", "is_dead")],
+                by.x = "id", by.y = "CASEID", all.x = TRUE)
+  base <- merge(base, cd4_rel,
                 by.x = "id", by.y = "CASEID", all.x = TRUE)
   base <- merge(base, last_lab,
                 by.x = "id", by.y = "CASEID", all.x = TRUE)
-  base$has_event[is.na(base$has_event)] <- FALSE
-  base$end_year <- ifelse(!is.na(base$ev_yr), base$ev_yr, base$last_year)
+  base$is_dead[is.na(base$is_dead)] <- FALSE
 
-  prior_aids <- !is.na(base$ev_yr) & base$ev_yr < base$anchor_year
+  prior_aids <- !is.na(base$aids_yr) & base$aids_yr < base$anchor_year
   base <- base[!prior_aids, ]
-  base$log_time <- log(pmax(base$end_year - base$anchor_year, 0.5))
-  base$status   <- as.integer(base$has_event)
+
+  # Composite event time: earliest of {aids, cd4_rel, death-imputed}.
+  # NA stays NA in pmin if we go through Inf instead of na.rm = TRUE
+  # (which behaves inconsistently across R versions for all-NA rows).
+  death_yr <- ifelse(base$is_dead, base$last_year, NA_real_)
+  comp <- cbind(base$aids_yr, base$cd4_rel_yr, death_yr)
+  comp[is.na(comp)] <- Inf
+  ev_yr <- pmin(comp[, 1], comp[, 2], comp[, 3])
+  ev_yr[is.infinite(ev_yr)] <- NA_real_
+  base$has_event <- !is.na(ev_yr)
+  base$end_year  <- ifelse(base$has_event, ev_yr, base$last_year)
+  base$log_time  <- log(pmax(base$end_year - base$anchor_year, 0.5))
+  base$status    <- as.integer(base$has_event)
 
   byr <- aggregate(BORNY ~ CASEID, data = section2,
                    FUN = function(x) max(x, na.rm = TRUE))
@@ -215,10 +284,34 @@ build_macs <- function() {
   base$cd4 <- cd4_med$LEU3N[match(base$id, cd4_med$CASEID)]
   base$cd8 <- cd8_med$LEU2N[match(base$id, cd8_med$CASEID)]
 
+  # Race: MACS RACE 1 = White non-Hispanic, everything else (incl. White
+  # Hispanic) collapses to 1 so the binary matches ACTG175's 0/1 coding.
+  race_d <- aggregate(RACE ~ CASEID,
+                      data = section2[!is.na(section2$RACE), ],
+                      FUN = function(x) x[1])
+  base$race <- as.integer(
+    race_d$RACE[match(base$id, race_d$CASEID)] != 1)
+
+  # Prior ART exposure (years before anchor_year). For each subject we
+  # take the earliest drugf1 record carrying an ART code (artCodes); if
+  # that year precedes anchor_year, prior_art_years = anchor - first;
+  # otherwise 0. Approximates ACTG175's preanti (days of prior ART).
+  prior_art <- drugf1[drugf1$DRGAV %in% artCodes, ]
+  first_art <- aggregate(AVQY ~ CASEID, data = prior_art, FUN = min)
+  names(first_art)[2] <- "first_art_yr"
+  base <- merge(base, first_art, by.x = "id", by.y = "CASEID",
+                all.x = TRUE)
+  base$prior_art_years <- ifelse(
+    !is.na(base$first_art_yr) & base$first_art_yr < base$anchor_year,
+    base$anchor_year - base$first_art_yr, 0)
+
   out <- data.frame(
     id = base$id, source = "MACS", treat = base$treat,
     log_time = base$log_time, status = base$status,
     age = base$age, wtkg = base$wtkg, cd4 = base$cd4, cd8 = base$cd8,
+    anchor_year = base$anchor_year,
+    race = base$race,
+    prior_art_years = base$prior_art_years,
     stringsAsFactors = FALSE)
   out <- out[complete.cases(out[, harmCovars]), ]
   cat("MACS frame:", nrow(out), "subjects\n")
@@ -245,8 +338,8 @@ cat(sprintf("MACS n=%d  treat0=%d  treat1=%d  events=%d\n",
 # 3. Fit M1 (RCT only) and M2 (RCT + MACS)
 # ---------------------------------------------------------------------
 
-N_POST <- 3000
-N_BURN <- 2000
+N_POST <- 5000
+N_BURN <- 5000
 
 # --- Non-fusion fits (M1, M3): CausalShrinkageForest, mirroring ACTG175.R
 #     Same model class, same hyperparameter calibration:
@@ -333,7 +426,7 @@ src_M2  <- as.integer(d_fuse$source == "RCT")
 fit_M2  <- run_fit_ff(d_fuse, src_M2, n_trees_deconf = 200)
 
 cat("\n", strrep("=", 70),
-    "\n  FIT M3: MACS only, naive OS (CausalShrinkageForest)\n",
+    "\n  FIT M3: MACS only, naive RWD (CausalShrinkageForest)\n",
     strrep("=", 70), "\n", sep = "")
 fit_M3 <- run_fit_csf(macs)
 
@@ -344,7 +437,7 @@ fit_M3 <- run_fit_csf(macs)
 # Evaluation indices per model: the population each estimand averages
 # over.  M1 = RCT population, M2 = RCT population (so the fusion ATE is
 # directly comparable to M1), M3 = MACS population (the only available
-# population in a pure OS analysis).
+# population in a pure RWD analysis).
 eval_idx_M1 <- seq_len(nrow(rct))
 eval_idx_M2 <- which(d_fuse$source == "RCT")
 eval_idx_M3 <- seq_len(nrow(macs))
@@ -540,6 +633,205 @@ p52 <- plot_km_overlay(fit_M2, eval_idx_M2, emp_df_M2, "M2 (RCT + MACS)")
 p53 <- plot_km_overlay(fit_M3, eval_idx_M3, emp_df_M3, "M3 (MACS only)")
 
 # ---------------------------------------------------------------------
+# 9b. Plots rows 6-7: per-arm KM overlays ACTG175 vs MACS
+#
+# MACS follow-up extends well past the RCT horizon; that is a strength
+# (more events, longer-term signal) but it also means the "full" view
+# and the "RCT-horizon" view tell different stories. Row 6 shows the
+# full follow-up; row 7 restricts the x-axis to max(rct$time) so the
+# two datasets are compared on the same horizon.
+# ---------------------------------------------------------------------
+
+rct_xmax <- max(exp(rct$log_time), na.rm = TRUE)
+
+km_by_dataset_one_arm <- function(treat_val) {
+  d <- rbind(
+    cbind(rct [rct $treat == treat_val, ], dataset = "ACTG175 (RCT)"),
+    cbind(macs[macs$treat == treat_val, ], dataset = "MACS (RWD)"))
+  fit <- survfit(Surv(log_time, status) ~ dataset, data = d)
+  s   <- summary(fit)
+  data.frame(time = exp(s$time), surv = s$surv,
+             lower = s$lower, upper = s$upper,
+             strata = s$strata)
+}
+km_by_dataset_both <- function() {
+  d <- rbind(
+    cbind(rct,  dataset = "ACTG175 (RCT)"),
+    cbind(macs, dataset = "MACS (RWD)"))
+  d$grp <- paste0(d$dataset, " | ",
+                  ifelse(d$treat == 0, "Z=0", "Z=1"))
+  fit <- survfit(Surv(log_time, status) ~ grp, data = d)
+  s   <- summary(fit)
+  data.frame(time = exp(s$time), surv = s$surv,
+             lower = s$lower, upper = s$upper,
+             strata = s$strata)
+}
+
+plot_overlay <- function(df, title, x_max = NULL, ribbon_alpha = 0.15) {
+  p <- ggplot(df,
+              aes(x = time, y = surv, colour = strata, fill = strata)) +
+    geom_step(linewidth = 0.7) +
+    geom_ribbon(aes(ymin = lower, ymax = upper),
+                alpha = ribbon_alpha, colour = NA) +
+    labs(x = "Years from baseline", y = "Survival probability",
+         colour = NULL, fill = NULL, title = title) +
+    theme_panel()
+  if (!is.null(x_max))
+    p <- p + coord_cartesian(xlim = c(0, x_max))
+  p
+}
+
+df_g0 <- km_by_dataset_one_arm(0)
+df_g1 <- km_by_dataset_one_arm(1)
+df_g  <- km_by_dataset_both()
+
+p61 <- plot_overlay(df_g0, "KM Z=0 (ZDV mono) - ACTG175 vs MACS")
+p62 <- plot_overlay(df_g1, "KM Z=1 (combo)    - ACTG175 vs MACS")
+p63 <- plot_overlay(df_g,  "KM both arms      - ACTG175 vs MACS",
+                    ribbon_alpha = 0.08)
+
+p71 <- plot_overlay(df_g0,
+                    sprintf("Z=0, x <= %.1f yr (RCT horizon)", rct_xmax),
+                    x_max = rct_xmax)
+p72 <- plot_overlay(df_g1,
+                    sprintf("Z=1, x <= %.1f yr (RCT horizon)", rct_xmax),
+                    x_max = rct_xmax)
+p73 <- plot_overlay(df_g,
+                    sprintf("Both arms, x <= %.1f yr (RCT horizon)",
+                            rct_xmax),
+                    x_max = rct_xmax, ribbon_alpha = 0.08)
+
+# ---------------------------------------------------------------------
+# 9c. Linear projection of CATE: M1 (RCT only) vs M2 (Fusion)
+#
+# Mirrors examples/projection_demo.R. Each posterior draw of tau(x) is
+# projected onto a linear basis in the harmonised covariates via a
+# Bayesian-bootstrap weighted least squares (Woody, Carvalho & Murray
+# 2020). The coefficients inherit posterior uncertainty without
+# refitting; the shift M1 -> M2 is exactly the effect of borrowing the
+# MACS RWD arm under the SAME basis evaluated at the SAME rows (RCT
+# subjects -- the target population).
+#
+# fusion_projection() doesn't expose row subsetting, so we use the
+# inline projector from the demo for both M1 (CSF, has no fit$meta)
+# and M2 (FF), restricted to the RCT rows of d_fuse. Non-intercept
+# columns are centred AND scaled so the coefficients are "per SD"
+# (necessary because age, cd4 etc. live on very different numeric
+# scales). anchor_year is dropped from the basis because it is
+# constant (1992) across all RCT subjects and would make the design
+# matrix rank-deficient on the RCT evaluation set.
+# ---------------------------------------------------------------------
+
+project_tau_matrix <- function(tau_draws, X_eval, basis,
+                               scale_cols = TRUE) {
+  R    <- nrow(tau_draws)
+  n_ev <- ncol(tau_draws)
+  stopifnot(nrow(X_eval) == n_ev)
+  Phi <- model.matrix(basis, data = X_eval)
+  non_int <- setdiff(colnames(Phi), "(Intercept)")
+  if (length(non_int))
+    Phi[, non_int] <- scale(Phi[, non_int],
+                            center = TRUE, scale = scale_cols)
+  g_w <- matrix(rgamma(R * n_ev, 1, 1), R, n_ev)
+  w   <- g_w / rowSums(g_w)
+  gamma <- matrix(NA_real_, R, ncol(Phi))
+  for (r in seq_len(R))
+    gamma[r, ] <- lm.wfit(Phi, tau_draws[r, ], w = w[r, ])$coefficients
+  colnames(gamma) <- colnames(Phi)
+  gamma
+}
+
+proj_basis <- ~ age + wtkg + cd4 + cd8 + race + prior_art_years
+X_rct_eval <- as.data.frame(rct[, all.vars(proj_basis)])
+
+rct_in_fuse <- which(d_fuse$source == "RCT")
+stopifnot(length(rct_in_fuse) == nrow(rct))
+
+cat("\n", strrep("=", 70),
+    "\n  PROJECT: M1 (RCT only) and M2 (Fusion) onto linear basis\n",
+    strrep("=", 70), "\n", sep = "")
+
+set.seed(1)
+g_proj_M1 <- project_tau_matrix(
+  fit_M1$train_predictions_sample_treat,
+  X_rct_eval, proj_basis)
+g_proj_M2 <- project_tau_matrix(
+  fit_M2$train_predictions_sample_treat[, rct_in_fuse, drop = FALSE],
+  X_rct_eval, proj_basis)
+
+psum <- function(v) c(mean = mean(v),
+                      lo   = quantile(v, 0.025, names = FALSE),
+                      hi   = quantile(v, 0.975, names = FALSE))
+
+proj_rows <- lapply(colnames(g_proj_M1), function(nm) {
+  s1 <- psum(g_proj_M1[, nm]); s2 <- psum(g_proj_M2[, nm])
+  rbind(
+    data.frame(coef = nm, model = "M1 (RCT only)",
+               mean = s1["mean"], lo = s1["lo"], hi = s1["hi"],
+               stringsAsFactors = FALSE),
+    data.frame(coef = nm, model = "M2 (Fusion)",
+               mean = s2["mean"], lo = s2["lo"], hi = s2["hi"],
+               stringsAsFactors = FALSE))
+})
+proj_df <- do.call(rbind, proj_rows)
+proj_df$coef  <- factor(proj_df$coef,
+                        levels = rev(colnames(g_proj_M1)))
+proj_df$model <- factor(proj_df$model,
+                        levels = c("M1 (RCT only)", "M2 (Fusion)"))
+
+# Console table
+cat("\nProjection coefficients on log-survival scale ",
+    "(non-intercept slopes are per SD of covariate):\n", sep = "")
+proj_tbl <- do.call(rbind, lapply(colnames(g_proj_M1), function(nm) {
+  s1 <- psum(g_proj_M1[, nm]); s2 <- psum(g_proj_M2[, nm])
+  data.frame(
+    coef  = nm,
+    M1    = sprintf("%+0.3f [%+0.3f, %+0.3f]",
+                    s1["mean"], s1["lo"], s1["hi"]),
+    M2    = sprintf("%+0.3f [%+0.3f, %+0.3f]",
+                    s2["mean"], s2["lo"], s2["hi"]),
+    shift = sprintf("%+0.3f", s2["mean"] - s1["mean"]),
+    stringsAsFactors = FALSE)
+}))
+print(proj_tbl, row.names = FALSE)
+
+# Forest-style ggplot: one row per coefficient, two intervals each
+# (M1 vs M2), dashed line at zero. The arrow between posterior means
+# is rendered with a thin segment so the shift M1 -> M2 reads at a glance.
+shift_df <- do.call(rbind, lapply(colnames(g_proj_M1), function(nm) {
+  data.frame(coef = nm,
+             x0 = mean(g_proj_M1[, nm]),
+             x1 = mean(g_proj_M2[, nm]),
+             stringsAsFactors = FALSE)
+}))
+shift_df$coef <- factor(shift_df$coef,
+                        levels = rev(colnames(g_proj_M1)))
+
+p_proj <- ggplot(proj_df,
+                 aes(x = mean, y = coef, colour = model)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50") +
+  geom_segment(data = shift_df,
+               aes(x = x0, xend = x1, y = coef, yend = coef),
+               inherit.aes = FALSE,
+               colour = "grey30", linewidth = 0.4,
+               arrow = grid::arrow(length = grid::unit(0.10, "inches"),
+                                   type = "closed")) +
+  geom_errorbarh(aes(xmin = lo, xmax = hi),
+                 position = position_dodge(width = 0.55),
+                 height = 0.22, linewidth = 0.6) +
+  geom_point(position = position_dodge(width = 0.55), size = 2.2) +
+  scale_colour_manual(values = c("M1 (RCT only)" = "firebrick",
+                                 "M2 (Fusion)"   = "steelblue")) +
+  labs(x = "Projection coefficient (CATE, log time-ratio)",
+       y = NULL, colour = NULL,
+       title = "Linear projection of CATE: M1 (RCT only) -> M2 (Fusion)",
+       subtitle = paste("Bayesian-bootstrap weighted LS;",
+                        "non-intercept slopes per SD;",
+                        "95% credible intervals;",
+                        "evaluated on RCT rows")) +
+  theme_panel()
+
+# ---------------------------------------------------------------------
 # 10. Stitch and export
 # ---------------------------------------------------------------------
 
@@ -547,13 +839,16 @@ panel <- (p11 | p12 | p13) /
          (p21 | p22 | p23) /
          (p31 | p32 | p33) /
          (p41 | p42 | p43) /
-         (p51 | p52 | p53) +
+         (p51 | p52 | p53) /
+         (p61 | p62 | p63) /
+         (p71 | p72 | p73) /
+         p_proj +
   plot_annotation(
     title    = "ACTG175 vs ACTG175+MACS fusion vs MACS only",
-    subtitle = "M1 = RCT only, M2 = RCT + MACS fusion, M3 = MACS only (naive OS)")
+    subtitle = "M1 = RCT only, M2 = RCT + MACS fusion, M3 = MACS only (naive RWD)")
 
-out_pdf <- "data/analysis/fusion_actg175_macs.pdf"
-ggsave(out_pdf, panel, width = 18, height = 18)
+out_pdf <- "data/analysis 0/fusion_actg175_macs.pdf"
+ggsave(out_pdf, panel, width = 18, height = 30)
 cat("\nSaved combined figure: ", out_pdf, "\n", sep = "")
 
 # Console ATE summary

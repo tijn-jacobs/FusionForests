@@ -1,6 +1,6 @@
 ## fusion_actg175.R
 ##
-## Survival fusion of the ACTG175 RCT with MACS and/or WIHS observational
+## Survival fusion of the ACTG175 RCT with MACS and/or WIHS RWD
 ## cohorts via FusionForest.
 ##
 ## Pipeline:
@@ -13,13 +13,25 @@
 ##         F3: RCT + MACS + WIHS
 ##   4. Compare ATE posteriors across the four fits
 ##
+## Endpoint: event-free survival (EFS-cd4-fix; variant v3 in
+## data/analysis 0/endpoint_comparison.R). ACTG175 contributes its
+## published composite `cens` = >=50% CD4 decline OR AIDS OR
+## all-cause death. MACS is reconstructed to match: AIDS (AIDSCASE in
+## {2,3}, DATE1yy), >=50% relative CD4 decline (reconstructed from
+## lab_rslt -- first lab where LEU3N <= 0.5 * earliest 1991-95 LEU3N),
+## and all-cause death (DEATH in {1,2,3,4}; death date redacted, so
+## death-event time falls back to the subject's last lab-visit year).
+## WIHS keeps its own endpoint (AIDS or death from outcome.csv) and
+## is not harmonised to ACTG175's CD4 component here -- treat F2/F3
+## fits as sensitivity rather than primary.
+##
 ## Treatment contrast (matches ACTG175$treat):
 ##   0 = ZDV monotherapy
 ##   1 = ZDV+ddI  OR  ZDV+ddC  OR  ddI monotherapy
 ##   excluded: ddC mono, ddI+ddC (186), AZT+ddI+ddC (187)
 ##
 ## Run from the project root:
-##   source("data/analysis/fusion_actg175.R")
+##   source("data/analysis 0/fusion_actg175.R")
 
 setwd("~/Library/CloudStorage/OneDrive-VrijeUniversiteitAmsterdam/Documents/GitHub/FusionForests/")
 
@@ -38,7 +50,7 @@ actgEra    <- 1991:1995
 harmCovars <- c("age", "wtkg", "cd4", "cd8")
 
 # ---------------------------------------------------------------------
-# 0. SAS .inp parser + fast fixed-width reader (from OS_exploration.R)
+# 0. SAS .inp parser + fast fixed-width reader (from RWD_exploration.R)
 # ---------------------------------------------------------------------
 
 parse_sas_inp <- function(path) {
@@ -123,7 +135,7 @@ build_rct <- function() {
 }
 
 # ---------------------------------------------------------------------
-# 2. Build MACS-OS frame
+# 2. Build MACS-RWD frame
 # ---------------------------------------------------------------------
 
 # Treatment classification helper (used by both MACS and WIHS):
@@ -140,7 +152,7 @@ classify_treat <- function(drg_set) {
 }
 
 build_macs <- function() {
-  cat("Building MACS-OS frame ...\n")
+  cat("Building MACS-RWD frame ...\n")
   inp <- function(f) file.path(macsDir, "sasinp", f)
   dat <- function(f) file.path(macsDir, "data",   f)
 
@@ -200,33 +212,58 @@ build_macs <- function() {
     stringsAsFactors = FALSE)
   base <- base[!is.na(base$treat), ]
 
-  # Outcome: time-to-(AIDS or CD4-decline or death-flag) on year scale
-  oc <- outcome
-  oc$aids_yr   <- ifelse(oc$AIDSCASE %in% c(2, 3) & oc$DATE1yy > 0,
-                         oc$DATE1yy, NA)
-  oc$cd4dec_yr <- ifelse(oc$SELFCD4Dyy > 0, oc$SELFCD4Dyy, NA)
-  oc$is_dead   <- oc$DEATH %in% c(1, 2)
-  oc$ev_yr     <- pmin(oc$aids_yr, oc$cd4dec_yr, na.rm = TRUE)
-  oc$has_event <- !is.na(oc$ev_yr) | oc$is_dead
+  # ----- MACS endpoint = EFS-cd4-fix (v3 in endpoint_comparison.R) ----
+  # Composite matched to ACTG175$cens:
+  #   (i)   AIDS dx:         AIDSCASE in {2, 3}, time = DATE1yy
+  #   (ii)  CD4 >=50% decl:  reconstructed from lab_rslt -- baseline =
+  #                          earliest 1991-95 LEU3N, event = first lab
+  #                          where LEU3N <= 0.5 * baseline
+  #   (iii) all-cause death: DEATH in {1, 2, 3, 4}; death DATE is
+  #                          redacted, so death-event time falls back
+  #                          to the subject's last lab-visit year
+  # See endpoint_comparison.R for the rule analysis.
 
-  # Last-seen year: latest LDATY across labs
+  lab_cd4 <- lab[!is.na(lab$LEU3N) & lab$LEU3N > 0 &
+                 !is.na(lab$LDATY) & lab$LDATY > 0, ]
+  lab_cd4 <- lab_cd4[order(lab_cd4$CASEID, lab_cd4$LDATY), ]
+  base_cd4 <- aggregate(LEU3N ~ CASEID,
+                        data = lab_cd4[lab_cd4$LDATY %in% actgEra, ],
+                        FUN = function(x) x[1])
+  names(base_cd4)[2] <- "cd4_base"
+  lab_cd4 <- merge(lab_cd4, base_cd4, by = "CASEID")
+  decl_rows <- lab_cd4[lab_cd4$LEU3N <= 0.5 * lab_cd4$cd4_base, ]
+  cd4_rel <- aggregate(LDATY ~ CASEID, data = decl_rows, FUN = min)
+  names(cd4_rel)[2] <- "cd4_rel_yr"
+
+  oc <- outcome
+  oc$aids_yr <- ifelse(oc$AIDSCASE %in% c(2, 3) & oc$DATE1yy > 0,
+                       oc$DATE1yy, NA_real_)
+  oc$is_dead <- !is.na(oc$DEATH) & oc$DEATH %in% c(1, 2, 3, 4)
+
   last_lab <- aggregate(LDATY ~ CASEID, data = lab,
                         FUN = function(x) max(x, na.rm = TRUE))
   names(last_lab)[2] <- "last_year"
 
-  base <- merge(base, oc[, c("CASEID", "ev_yr", "has_event")],
+  base <- merge(base, oc[, c("CASEID", "aids_yr", "is_dead")],
+                by.x = "id", by.y = "CASEID", all.x = TRUE)
+  base <- merge(base, cd4_rel,
                 by.x = "id", by.y = "CASEID", all.x = TRUE)
   base <- merge(base, last_lab,
                 by.x = "id", by.y = "CASEID", all.x = TRUE)
-  base$has_event[is.na(base$has_event)] <- FALSE
-  base$end_year <- ifelse(!is.na(base$ev_yr), base$ev_yr, base$last_year)
+  base$is_dead[is.na(base$is_dead)] <- FALSE
 
-  # Drop subjects with prior AIDS event before anchor (entry criterion)
-  prior_aids <- !is.na(base$ev_yr) & base$ev_yr < base$anchor_year
+  prior_aids <- !is.na(base$aids_yr) & base$aids_yr < base$anchor_year
   base <- base[!prior_aids, ]
 
-  base$log_time <- log(pmax(base$end_year - base$anchor_year, 0.5))
-  base$status  <- as.integer(base$has_event)
+  death_yr <- ifelse(base$is_dead, base$last_year, NA_real_)
+  comp <- cbind(base$aids_yr, base$cd4_rel_yr, death_yr)
+  comp[is.na(comp)] <- Inf
+  ev_yr <- pmin(comp[, 1], comp[, 2], comp[, 3])
+  ev_yr[is.infinite(ev_yr)] <- NA_real_
+  base$has_event <- !is.na(ev_yr)
+  base$end_year  <- ifelse(base$has_event, ev_yr, base$last_year)
+  base$log_time  <- log(pmax(base$end_year - base$anchor_year, 0.5))
+  base$status    <- as.integer(base$has_event)
 
   # Covariates: age, wtkg, cd4, cd8
   base$age <- base$anchor_year - aggregate(BORNY ~ CASEID, data = section2,
@@ -273,11 +310,11 @@ build_macs <- function() {
 }
 
 # ---------------------------------------------------------------------
-# 3. Build WIHS-OS frame
+# 3. Build WIHS-RWD frame
 # ---------------------------------------------------------------------
 
 build_wihs <- function() {
-  cat("Building WIHS-OS frame ...\n")
+  cat("Building WIHS-RWD frame ...\n")
   wcsv <- function(f) file.path(wihsDir, "CSV", f)
 
   f01     <- read.csv(wcsv("f01.csv"),     stringsAsFactors = FALSE)
@@ -438,7 +475,7 @@ km_gg <- ggplot(km_long, aes(x = time, y = surv, colour = strata,
   theme_minimal() +
   theme(legend.position = "bottom")
 print(km_gg)
-ggsave("data/analysis/km_by_dataset.pdf", km_gg, width = 10, height = 4)
+ggsave("data/analysis 0/km_by_dataset.pdf", km_gg, width = 10, height = 4)
 
 # Log-rank tests
 cat("\nLog-rank tests (treat 0 vs 1):\n")
@@ -462,7 +499,7 @@ fit_fusion <- function(label, sets) {
   d <- d[is.finite(d$log_time), ]
   X <- as.matrix(d[, harmCovars])
   src <- as.integer(d$source == "RCT")
-  cat(sprintf("\n[%s]  n_total = %d  (RCT %d / OS %d)\n",
+  cat(sprintf("\n[%s]  n_total = %d  (RCT %d / RWD %d)\n",
               label, nrow(d), sum(src == 1), sum(src == 0)))
   set.seed(1)
   fit <- FusionForest(
@@ -487,18 +524,18 @@ fit_fusion <- function(label, sets) {
   list(label = label, fit = fit, frame = d, src = src)
 }
 
-# F0: RCT only — baseline. Force last RCT row to act as a dummy OS row
+# F0: RCT only — baseline. Force last RCT row to act as a dummy RWD row
 # (FusionForest requires at least one source = 0).
 rct_only <- rct
 rct_only_sets <- list(rct_only)
-# Trick: pretend the last RCT row is OS so we still get a fit
+# Trick: pretend the last RCT row is RWD so we still get a fit
 rct_only_setsB <- list(rct_only)
 
-# Actually for "RCT only" baseline, mark a single arbitrary row as OS so
+# Actually for "RCT only" baseline, mark a single arbitrary row as RWD so
 # the constraint is met but it has minimal influence.
-mark_one_os <- function(d) { d$source[nrow(d)] <- "OS_dummy"; d }
+mark_one_rwd <- function(d) { d$source[nrow(d)] <- "RWD_dummy"; d }
 
-F0 <- fit_fusion("RCT only",   list(mark_one_os(rct)))
+F0 <- fit_fusion("RCT only",   list(mark_one_rwd(rct)))
 F1 <- fit_fusion("RCT + MACS", list(rct, macs))
 F2 <- fit_fusion("RCT + WIHS", list(rct, wihs))
 F3 <- fit_fusion("RCT + MACS + WIHS", list(rct, macs, wihs))
@@ -547,9 +584,9 @@ p_ate <- ggplot(ate_long, aes(x = ate, fill = fit, colour = fit)) +
   theme_minimal() +
   theme(legend.position = "bottom")
 print(p_ate)
-ggsave("data/analysis/ate_posteriors.pdf", p_ate, width = 8, height = 4.5)
+ggsave("data/analysis 0/ate_posteriors.pdf", p_ate, width = 8, height = 4.5)
 
-cat("\nDone.  Saved: data/analysis/km_by_dataset.pdf, ",
-    "data/analysis/ate_posteriors.pdf\n", sep = "")
+cat("\nDone.  Saved: data/analysis 0/km_by_dataset.pdf, ",
+    "data/analysis 0/ate_posteriors.pdf\n", sep = "")
 
 invisible(list(F0 = F0, F1 = F1, F2 = F2, F3 = F3, ate_tab = ate_tab))

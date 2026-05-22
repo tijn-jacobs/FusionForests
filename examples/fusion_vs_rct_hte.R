@@ -10,9 +10,9 @@
 ## (nu, q), and MCMC settings (N_post, N_burn) are identical:
 ##
 ##   1. Two-forest BCF on RCT data only   (unconfounded, low power)
-##   2. Two-forest BCF on OS data only    (naive — ignores confounding)
-##   3. Three-forest FusionForest (RCT+OS, with deconfounding)
-##   4. Four-forest FusionForest  (RCT+OS, deconfounding + deviation)
+##   2. Two-forest BCF on RWD data only   (naive — ignores confounding)
+##   3. Three-forest FusionForest (RCT+RWD, with deconfounding)
+##   4. Four-forest FusionForest  (RCT+RWD, deconfounding + deviation)
 ##
 ## For the two-forest models, the deconfounding forest is neutralised
 ## by setting number_of_trees_deconf = 1 and flagging a single training
@@ -111,14 +111,14 @@ q       <- 0.90
 # -------------------------------------------------------------------------
 # 3. MODEL 1: Two-forest BCF --- RCT only
 #
-# FusionForest requires >= 1 OS row. We flag one training
+# FusionForest requires >= 1 RWD row. We flag one training
 # observation as source = 0 and set number_of_trees_deconf = 1
 # so the deconfounding forest is effectively inert.
 # -------------------------------------------------------------------------
 cat("Fitting Model 1: Two-forest BCF (RCT only)...\n")
 
 src_rct      <- rep(1L, n_rct)
-src_rct[n_rct] <- 0L                    # single dummy OS row
+src_rct[n_rct] <- 0L                    # single dummy RWD row
 
 fit_rct <- FusionForest(
   y                         = y_rct,
@@ -151,24 +151,24 @@ fit_rct <- FusionForest(
 cat("  Done.\n\n")
 
 # -------------------------------------------------------------------------
-# 4. MODEL 2: Two-forest BCF --- OS only (naive, ignores confounding)
+# 4. MODEL 2: Two-forest BCF --- RWD only (naive, ignores confounding)
 #
 # Same trick: all observations labelled source = 1 except one dummy
-# source = 0 row, so c(X) is inert. By treating OS data as if it
+# source = 0 row, so c(X) is inert. By treating RWD as if it
 # were randomised we get a naive BCF that does not adjust for
 # unmeasured confounding.
 # -------------------------------------------------------------------------
-cat("Fitting Model 2: Two-forest BCF (OS only)...\n")
+cat("Fitting Model 2: Two-forest BCF (RWD only)...\n")
 
-src_os       <- rep(1L, n_rwd)
-src_os[n_rwd] <- 0L                     # single dummy OS row
+src_rwd       <- rep(1L, n_rwd)
+src_rwd[n_rwd] <- 0L                     # single dummy RWD row
 
-fit_os <- FusionForest(
+fit_rwd <- FusionForest(
   y                         = y_rwd,
   X_train_control           = X_rwd,
   X_train_treat             = X_rwd,
   treatment_indicator_train  = trt_rwd,
-  source_indicator_train     = src_os,
+  source_indicator_train     = src_rwd,
   X_test_control            = X_all,
   X_test_treat              = X_all,
   treatment_indicator_test   = trt_all,
@@ -194,9 +194,9 @@ fit_os <- FusionForest(
 cat("  Done.\n\n")
 
 # -------------------------------------------------------------------------
-# 5. MODEL 3: Three-forest FusionForest (RCT + OS)
+# 5. MODEL 3: Three-forest FusionForest (RCT + RWD)
 # -------------------------------------------------------------------------
-cat("Fitting Model 3: Three-forest FusionForest (RCT + OS)...\n")
+cat("Fitting Model 3: Three-forest FusionForest (RCT + RWD)...\n")
 
 fit_three <- FusionForest(
   y                         = y_all,
@@ -229,9 +229,9 @@ fit_three <- FusionForest(
 cat("  Done.\n\n")
 
 # -------------------------------------------------------------------------
-# 6. MODEL 4: Four-forest FusionForest (RCT + OS)
+# 6. MODEL 4: Four-forest FusionForest (RCT + RWD)
 # -------------------------------------------------------------------------
-cat("Fitting Model 4: Four-forest FusionForest (RCT + OS)...\n")
+cat("Fitting Model 4: Four-forest FusionForest (RCT + RWD)...\n")
 
 fit_four <- FusionForest(
   y                         = y_all,
@@ -269,21 +269,21 @@ cat("  Done.\n\n")
 # 7. EXTRACT CATE ESTIMATES
 # -------------------------------------------------------------------------
 cate_rct   <- fit_rct$test_predictions_treat
-cate_os    <- fit_os$test_predictions_treat
+cate_rwd    <- fit_rwd$test_predictions_treat
 cate_three <- fit_three$test_predictions_treat
 cate_four  <- fit_four$test_predictions_treat
 
 cate_rct_samples   <- fit_rct$test_predictions_sample_treat
-cate_os_samples    <- fit_os$test_predictions_sample_treat
+cate_rwd_samples    <- fit_rwd$test_predictions_sample_treat
 cate_three_samples <- fit_three$test_predictions_sample_treat
 cate_four_samples  <- fit_four$test_predictions_sample_treat
 
 # -------------------------------------------------------------------------
 # 8. EVALUATE PERFORMANCE
 # -------------------------------------------------------------------------
-model_names <- c("RCT only", "OS only", "Three-forest", "Four-forest")
-cate_list   <- list(cate_rct, cate_os, cate_three, cate_four)
-sample_list <- list(cate_rct_samples, cate_os_samples,
+model_names <- c("RCT only", "RWD only", "Three-forest", "Four-forest")
+cate_list   <- list(cate_rct, cate_rwd, cate_three, cate_four)
+sample_list <- list(cate_rct_samples, cate_rwd_samples,
                     cate_three_samples, cate_four_samples)
 
 rmse_vec <- cov_vec <- width_vec <- numeric(4)
