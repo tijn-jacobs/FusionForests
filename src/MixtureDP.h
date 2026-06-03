@@ -7,7 +7,7 @@
 // Centered Dirichlet process mixture of Gaussians on the residual distribution,
 // adapted from Henderson et al. (2020, Biostatistics) and Yang et al. (2010).
 //
-// Five modes:
+// Six modes:
 //   GAUSSIAN        : no mixture, single normal residual (this class is a no-op)
 //   SHARED_DP       : one DP pooled across all observations
 //   SOURCE_DP       : independent DPs per data source, shared sigma (Stage A)
@@ -20,15 +20,21 @@
 //                     per-source means mu_s, table-count augmentation for the
 //                     top-level sticks (Antoniak-Teh), Escobar-West updates
 //                     for the concentration parameters gamma and M_s.
+//   SOURCE_HDP_SCALE: Stage B + per-source sigma_g.  Same hierarchical sharing
+//                     of atoms as SOURCE_HDP, but each source carries its own
+//                     residual scale.  Label sampling and shared-atom posterior
+//                     use the per-source sigma_g; sigma_g is updated each sweep
+//                     via the same IG conjugate step as SOURCE_DP_SCALE.
 //
 // Per-source state is held in std::vector-of-vector containers indexed by
-// group g in [0, num_groups_).  SHARED_DP uses num_groups_ = 1; SOURCE_DP* /
-// SOURCE_HDP use num_groups_ = 2 with group 0 = real-world data (S=0) and
+// group g in [0, num_groups_).  SHARED_DP uses num_groups_ = 1; all SOURCE_*
+// modes use num_groups_ = 2 with group 0 = real-world data (S=0) and
 // group 1 = randomised trial (S=1).
 class MixtureDP {
 public:
   enum Mode { GAUSSIAN = 0, SHARED_DP = 1, SOURCE_DP = 2,
-              SOURCE_DP_SCALE = 3, SOURCE_HDP = 4 };
+              SOURCE_DP_SCALE = 3, SOURCE_HDP = 4,
+              SOURCE_HDP_SCALE = 5 };
 
   MixtureDP(int mode, size_t n_total, size_t K,
             double prior_atom_variance,
@@ -108,6 +114,7 @@ private:
   // HDP Gibbs steps
   void updateLabelsGroupHDP(int g, const double* residuals, double sigma, Random& random);
   void updateAtomsShared   (const double* residuals, double sigma, Random& random);
+  void updateAtomsSharedPerSourceSigma(const double* residuals, Random& random);
   void updateBeta          (Random& random);
   void updateMixHDP        (int g, Random& random);
   void updateMassHDP       (int g, Random& random);

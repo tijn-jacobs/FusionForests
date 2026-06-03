@@ -7,6 +7,9 @@
 FusionForest(
   y,
   status = NULL,
+  observed_left_time = NULL,
+  observed_right_time = NULL,
+  interval_censoring_indicator = NULL,
   X_train_control,
   X_train_treat,
   treatment_indicator_train,
@@ -20,12 +23,21 @@ FusionForest(
   timescale = "time",
   decomposition = "four-forest",
   number_of_trees_control = 200,
-  number_of_trees_treat = 200,
-  number_of_trees_deconf = 200,
-  number_of_trees_deviation = 200,
-  k_g = 2,
-  power = 2,
-  base = 0.95,
+  number_of_trees_treat = 100,
+  number_of_trees_deconf = 50,
+  number_of_trees_deviation = 50,
+  k_control = 0.5,
+  k_treat = 0.5,
+  k_deconf = 0.5,
+  k_deviation = 0.5,
+  power_control = 2,
+  base_control = 0.95,
+  power_deviation = 2,
+  base_deviation = 0.95,
+  power_treat = 3,
+  base_treat = 0.95,
+  power_deconf = 3,
+  base_deconf = 0.25,
   p_grow = 0.4,
   p_prune = 0.4,
   nu = 3,
@@ -36,7 +48,8 @@ FusionForest(
   treatment_coding = c("centered", "binary", "adaptive"),
   propensity_train = NULL,
   propensity_test = NULL,
-  error_dist = c("gaussian", "shared_dp", "source_dp", "source_dp_scale", "source_hdp"),
+  error_dist = c("gaussian", "shared_dp", "source_dp", "source_dp_scale", "source_hdp",
+    "source_hdp_scale"),
   error_truncation_K = 50L,
   error_atom_scale = 0.5,
   error_mass_init = 1,
@@ -48,7 +61,33 @@ FusionForest(
 \item{y}{Numeric vector of outcomes (survival times or continuous responses).}
 
 \item{status}{Integer vector of event indicators (\code{1} = event observed,
-\code{0} = censored).  Required when \code{outcome_type = "right-censored"}.}
+\code{0} = censored).  Required when \code{outcome_type = "right-censored"}.
+When \code{interval_censoring_indicator[i] == 1}, \code{status[i]} should
+be \code{0} (the event is known to lie in an interval, not at a point).}
+
+\item{observed_left_time, observed_right_time, interval_censoring_indicator}{Optional numeric vectors of length \code{n}, used only for
+right-censored outcomes to allow interval-censored events.  For each
+observation \eqn{i}:
+\describe{
+\item{\code{status[i] = 1}}{Event observed at \code{y[i]}; no
+augmentation. \code{observed_left_time[i]} and
+\code{observed_right_time[i]} are ignored.}
+\item{\code{status[i] = 0} and \code{interval_censoring_indicator[i] = 0}}{
+Standard right-censoring at \code{observed_right_time[i]} (event
+time unknown but \eqn{> \code{observed_right_time[i]}}).}
+\item{\code{status[i] = 0} and \code{interval_censoring_indicator[i] = 1}}{
+Interval-censored: event lies in
+\code{(observed_left_time[i], observed_right_time[i]]}.  At each
+sweep the event time is augmented by a truncated-normal draw on
+that interval.}
+}
+When all three are \code{NULL} (the default) the wrapper falls back
+to right-censoring with \code{observed_right_time = y} and
+\code{interval_censoring_indicator = 0}, exactly reproducing the
+historical right-censored behaviour.  Bounds are supplied on the
+same scale as \code{y} (e.g. raw survival time when
+\code{timescale = "time"}; log-time when \code{timescale = "log"}).
+Ignored when \code{outcome_type != "right-censored"}.}
 
 \item{X_train_control}{Numeric matrix of covariates for the prognostic
 (\eqn{m_0} or \eqn{\mu}) and deconfounding (\eqn{c}) forests.  One row
@@ -77,23 +116,36 @@ for the test set (same coding as the training-set equivalents).}
 \item{timescale}{Character; \code{"time"} (raw survival times, will be
 log-transformed internally) or \code{"log"} (already on log scale).}
 
-\item{decomposition}{Character; \code{"four-forest"} (default) for the
-\eqn{\mu + g} decomposition or \code{"three-forest"} for the original
-single-\eqn{m_0} model.}
+\item{decomposition}{Character; must be \code{"four-forest"} (the
+default and currently the only option exposed in this R interface).
+The three-forest path is deprecated; see the description above.}
 
-\item{number_of_trees_control, number_of_trees_treat, number_of_trees_deconf}{Number of trees in each BART ensemble.  Default 200.}
+\item{number_of_trees_control, number_of_trees_treat, number_of_trees_deconf}{Number of trees in each BART ensemble.  Defaults: 200 (control), 100
+(treat), 50 (deconf).}
 
-\item{number_of_trees_deviation}{Number of trees for the \eqn{g} forest
-(four-forest mode only).  Default 200.}
+\item{number_of_trees_deviation}{Number of trees for the \eqn{g} forest.
+Default 50.}
 
-\item{k_g}{Leaf-prior scale for the deviation forest \eqn{g}.
-Larger values shrink \eqn{g} toward zero (stronger borrowing).
-\code{k_g = Inf} disables \eqn{g} entirely (full pooling).
-Default 2 (standard BART scale).  Ignored in three-forest mode.}
+\item{k_control, k_treat, k_deconf, k_deviation}{Leaf-prior scales for the four
+forests, used as \eqn{\omega_X = k_X / \sqrt{m_X}} where \eqn{m_X}
+is the corresponding number of trees.  Larger values give a more
+diffuse leaf prior (weaker shrinkage); smaller values give a more
+concentrated prior (stronger shrinkage).  The defaults
+\code{k_control = k_treat = k_deconf = k_deviation = 0.5} reproduce the
+standard \eqn{0.5 / \sqrt{m}} scaling used in BART/BCF.
+\code{k_deviation} is the deviation-forest scale (formerly \code{k_g});
+setting \code{k_deviation = 0} collapses the deviation prior to a point
+mass at zero and disables \eqn{g} entirely (full pooling).}
 
-\item{power, base}{Tree topology prior parameters.  The probability that a
-node at depth \eqn{d} is non-terminal is
-\eqn{\texttt{base} / (1 + d)^{\texttt{power}}}.}
+\item{power_control, base_control, power_deviation, base_deviation, power_treat, base_treat, power_deconf, base_deconf}{Tree-topology prior parameters, set separately for each of the four
+forests.  The probability that a node at depth \eqn{d} is non-terminal is
+\eqn{\texttt{base} / (1 + d)^{\texttt{power}}} (larger \code{power} or
+smaller \code{base} gives shallower trees).  There is no shared global
+\code{power}/\code{base}; each forest carries its own pair and is set
+independently.  Defaults follow METHODOLOGY.tex: the baseline \eqn{\mu}
+(control) and deviation \eqn{g} use \code{(2, 0.95)}; the treatment
+effect \eqn{\tau} uses \code{(3, 0.95)}; the confounding function
+\eqn{c} (deconf) uses \code{(3, 0.25)}.}
 
 \item{p_grow, p_prune}{Probabilities of proposing a grow or prune move at
 each MCMC step.}
@@ -133,7 +185,10 @@ sufficient statistics match the full-data likelihood; rows with
 propensity scores in (0, 1) for the training and test rows.  Required
 when \code{treatment_coding = "adaptive"}; ignored otherwise.}
 
-\item{error_dist}{Character; residual-distribution prior.  One of:
+\item{error_dist}{Character; residual-distribution prior.  One of the
+options below.  See \file{inst/error_distributions.md} for a full
+reference (model statements, Gibbs steps, posterior storage, and a
+selection guide).
 \describe{
 \item{\code{"gaussian"} (default)}{Single normal residual,
 \eqn{\varepsilon_i \sim N(0, \sigma^2)}.}
@@ -156,6 +211,12 @@ means \eqn{\mu_s} restore identifiability of the structural
 components.  Concentration parameters \eqn{\gamma, M_0, M_1} are
 updated via Escobar-West auxiliary-variable steps; the top-level
 sticks \eqn{\beta} use the Antoniak-Teh table-count augmentation.}
+\item{\code{"source_hdp_scale"}}{Same as \code{"source_hdp"} but with
+per-source error scales \eqn{\sigma_s}.  Label sampling and the
+precision-weighted shared-atom posterior use \eqn{\sigma_s}, and each
+\eqn{\sigma_s} is refreshed via the inverse-gamma conjugate step from
+\code{"source_dp_scale"}.  Useful when the two sources are believed
+to share residual \emph{shape} (atoms) but differ in \emph{spread}.}
 }}
 
 \item{error_truncation_K}{Integer; truncation level for the stick-breaking
@@ -184,21 +245,18 @@ A named list with components:
 \item{train_predictions, test_predictions}{Posterior mean of the total
 fitted values.}
 \item{train_predictions_control, test_predictions_control}{Posterior mean
-of the shared baseline \eqn{\mu(X)} (four-forest) or \eqn{m_0(X)}
-(three-forest).}
+of the shared baseline \eqn{\mu(X)}.}
 \item{train_predictions_treat, test_predictions_treat}{Posterior mean of
 the CATE \eqn{\tau(X)}.}
 \item{train_predictions_deconf, test_predictions_deconf}{Posterior mean of
 the confounding function \eqn{c(X)} (RWD rows only for training).}
 \item{train_predictions_deviation, test_predictions_deviation}{Posterior
-mean of the RWD deviation \eqn{g(X)} (four-forest only; RWD rows only
-for training).}
+mean of the RWD deviation \eqn{g(X)} (RWD rows only for training).}
 \item{sigma}{Posterior sample of \eqn{\sigma} (or the fixed value if
 \code{sigma} was supplied).}
 \item{acceptance_ratio_control, acceptance_ratio_treat,
 acceptance_ratio_deconf}{Tree-update acceptance rates.}
-\item{acceptance_ratio_deviation}{Acceptance rate for \eqn{g}
-(four-forest only).}
+\item{acceptance_ratio_deviation}{Acceptance rate for \eqn{g}.}
 \item{train_predictions_sample_control, ...}{Full posterior sample matrices
 (only present when \code{store_posterior_sample = TRUE}).}
 }
@@ -208,19 +266,22 @@ Bayesian data-fusion model combining an RCT and an observational study to
 estimate heterogeneous treatment effects.
 }
 \details{
-Two decompositions are available, selected via
-\code{decomposition}:
-\describe{
-\item{\code{"three-forest"}}{The original model with a single prognostic
-forest:
-\deqn{\log(T) = m_0(X) + b\,[\tau(X) + (1-S)\,c(X)] +
-      \sigma\varepsilon}}
-\item{\code{"four-forest"} (default)}{Replaces \eqn{m_0} with a
-MAP-prior decomposition:
+The model uses a MAP-prior four-forest decomposition:
 \deqn{\log(T) = \mu(X) + (1-S)\,g(X) + b\,[\tau(X) + (1-S)\,c(X)] +
-      \sigma\varepsilon}
-where \eqn{\mu(X)} is a shared baseline (all data) and \eqn{g(X)}
-captures the RWD-specific deviation (RWD only).  The borrowing
-parameter \code{k_g} controls shrinkage of \eqn{g} toward zero.}
-}
+  \sigma\varepsilon,}
+where \eqn{\mu(X)} is a shared baseline fit to all data and \eqn{g(X)}
+captures the RWD-specific deviation.  Each forest has a Gaussian leaf
+prior \eqn{N(0, \omega^2)} parameterised uniformly as
+\deqn{\omega_X \;=\; k_X / \sqrt{m_X},}
+where \eqn{m_X} is the number of trees in forest \eqn{X} and the
+user-tunable scale \eqn{k_X} controls how informative the prior is
+(smaller \eqn{k_X} \eqn{\Rightarrow} stronger shrinkage toward zero).
+The deviation forest's scale \code{k_deviation} sets the strength of the
+MAP-prior borrowing between RCT and RWD.
+
+The earlier three-forest decomposition with a single prognostic
+\eqn{m_0(X)} is deprecated in this R interface but the underlying
+\code{FusionForest_cpp} backend remains in the package and can be
+re-exposed by accepting \code{"three-forest"} again in the
+\code{decomposition} argument.
 }

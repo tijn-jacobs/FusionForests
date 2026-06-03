@@ -5,6 +5,8 @@
 Rcpp::List FusionForest4_cpp(
   SEXP nSEXP, SEXP p_treatSEXP, SEXP p_controlSEXP, SEXP X_train_treatSEXP,
   SEXP X_train_controlSEXP, SEXP ySEXP, SEXP status_indicatorSEXP, SEXP is_survivalSEXP,
+  SEXP observed_left_timeSEXP, SEXP observed_right_timeSEXP,
+  SEXP interval_censoring_indicatorSEXP,
   SEXP treatment_indicatorSEXP, SEXP source_indicatorSEXP,
   SEXP n_testSEXP, SEXP X_test_controlSEXP, SEXP X_test_treatSEXP, SEXP X_test_deconfSEXP,
   SEXP X_test_deviationSEXP,
@@ -60,6 +62,13 @@ Rcpp::List FusionForest4_cpp(
   double* status_indicator = &status_indicator_vector[0];
   std::vector<double> y_observed_vector(y_vector.begin(), y_vector.end());
   double* y_observed = y_observed_vector.data();
+  // Interval-censoring bounds; see FusionForest_cpp for the contract.
+  Rcpp::NumericVector observed_left_time_vector(observed_left_timeSEXP);
+  double* observed_left_time = &observed_left_time_vector[0];
+  Rcpp::NumericVector observed_right_time_vector(observed_right_timeSEXP);
+  double* observed_right_time = &observed_right_time_vector[0];
+  Rcpp::NumericVector interval_censoring_indicator_vector(interval_censoring_indicatorSEXP);
+  double* interval_censoring_indicator = &interval_censoring_indicator_vector[0];
   Rcpp::IntegerVector source_indicator_vector(source_indicatorSEXP);
   int* source_indicator = &source_indicator_vector[0];
 
@@ -276,8 +285,9 @@ Rcpp::List FusionForest4_cpp(
                     /*lambda_sigma=*/lambda);
   const bool dp_active     = mixture.active();
   const int  dp_groups     = mixture.num_groups();
-  const bool dp_scale_mode = (mixture_mode == MixtureDP::SOURCE_DP_SCALE);
-  const bool dp_hdp_mode   = (mixture_mode == MixtureDP::SOURCE_HDP);
+  const bool dp_hdp_scale_mode = (mixture_mode == MixtureDP::SOURCE_HDP_SCALE);
+  const bool dp_scale_mode = (mixture_mode == MixtureDP::SOURCE_DP_SCALE) || dp_hdp_scale_mode;
+  const bool dp_hdp_mode   = (mixture_mode == MixtureDP::SOURCE_HDP) || dp_hdp_scale_mode;
 
   Rcpp::List dp_mix_prop_list (dp_active ? dp_groups : 0);
   Rcpp::List dp_locations_list(dp_active ? dp_groups : 0);
@@ -585,9 +595,11 @@ Rcpp::List FusionForest4_cpp(
                   y, n, total_plus_shift, nu, lambda, random);
 
     // -- Augment censored observations --
-    AugmentCensoredObservations(is_survival, y, y_observed,
-                                status_indicator, total_plus_shift,
-                                sigma, n, random);
+    AugmentCensoredObservations(is_survival, y,
+                                observed_left_time, status_indicator,
+                                observed_right_time,
+                                interval_censoring_indicator,
+                                total_plus_shift, sigma, n, random);
 
 
     // -- Post-burn-in storage --

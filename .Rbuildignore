@@ -9,4 +9,19 @@
 ^CONTRIBUTING\.md$
 ^background_for_claude_code_part1\.md$
 ^examples$
-^src/README\.md$
+
+## Heavy folders not part of the package proper
+^data$
+^notes$
+^info$
+^inst/AFTrees-master$
+^src/deprecated$
+
+## Stray files at the repo root
+^\.RDataTmp$
+^\.Rhistory$
+^\.DS_Store$
+^TEST\.md$
+^error_distribution_notes\.md$
+^texput\.log$
+^CLAUDE\.md$

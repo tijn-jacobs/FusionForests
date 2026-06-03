@@ -193,21 +193,19 @@ test_that("FusionForest four-forest runs on right-censored outcomes", {
   expect_true("train_predictions_deviation" %in% names(fit))
 })
 
-test_that("FusionForest three-forest still works with explicit arg", {
-  fit <- FusionForest(
-    y                         = y_cnt,
-    X_train_control           = X,
-    X_train_treat             = X,
-    treatment_indicator_train = trt,
-    source_indicator_train    = src,
-    decomposition             = "three-forest",
-    N_post = N_post, N_burn = N_burn, verbose = FALSE
+test_that("FusionForest rejects the deprecated three-forest decomposition", {
+  expect_error(
+    FusionForest(
+      y                         = y_cnt,
+      X_train_control           = X,
+      X_train_treat             = X,
+      treatment_indicator_train = trt,
+      source_indicator_train    = src,
+      decomposition             = "three-forest",
+      N_post = N_post, N_burn = N_burn, verbose = FALSE
+    ),
+    regexp = "no longer supported"
   )
-
-  expect_type(fit, "list")
-  expect_length(fit$train_predictions, n)
-  expect_true(all(is.finite(fit$train_predictions)))
-  expect_false("train_predictions_deviation" %in% names(fit))
 })
 
 test_that("FusionForest four-forest posterior samples when requested", {

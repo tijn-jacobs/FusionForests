@@ -1,0 +1,142 @@
+\documentclass[11pt]{article}
+
+%% Page geometry
+\usepackage[a4paper, margin=1in]{geometry}
+
+%% Core math + fonts
+\usepackage{amsthm,amsmath,amsfonts,amssymb}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+%% Citations
+\usepackage[authoryear, round]{natbib}
+
+%% Hyperlinks
+\usepackage[colorlinks, citecolor=blue, urlcolor=blue, linkcolor=blue]{hyperref}
+\usepackage{xurl}
+
+%% Graphics & figures
+\usepackage{graphicx}
+\graphicspath{{figures/}{./figures/}}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{booktabs}
+
+%% Algorithms
+\usepackage[linesnumbered, ruled, vlined]{algorithm2e}
+
+%% TikZ for diagrams
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,fit,calc,positioning}
+\tikzset{box/.style={draw, diamond, thick, text centered, minimum height=0.5cm, minimum width=1cm}}
+\tikzset{line/.style={draw, thick, -latex'}}
+
+%% Misc
+\usepackage{comment}
+\usepackage{dsfont}
+\usepackage{enumitem}
+\usepackage{changepage}
+\usepackage{bm}
+
+%% Theorem environments
+\theoremstyle{plain}
+\newtheorem{axiom}{Axiom}
+\newtheorem{claim}[axiom]{Claim}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{assumption}{Assumption}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem*{example}{Example}
+\newtheorem*{fact}{Fact}
+
+\theoremstyle{remark}
+\newtheorem{case}{Case}
+\newtheorem{remark}{Remark}
+
+%% Custom math commands
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\1}{\mathds{1}}
+\newcommand{\p}{\mathbb{P}}
+\renewcommand{\H}{\mathcal{H}}
+\newcommand{\T}{\mathcal{T}}
+\newcommand{\ind}{\perp\!\!\!\perp}
+\newcommand{\RCT}{\mathrm{RCT}}
+\newcommand{\RWD}{\mathrm{RWD}}
+\newcommand{\AF}{\mathrm{AF}}
+\newcommand{\expit}{\operatorname{expit}}
+
+
+\title{Bayesian nonparametric fusion of randomised and real-world
+  survival data for heterogeneous treatment effects}
+
+
+
+\author{
+  Tijn Jacobs\thanks{Department of Mathematics, Vrije Universiteit Amsterdam. \texttt{t.jacobs@vu.nl}} \and
+  Wessel N.\ van Wieringen\thanks{Department of Epidemiology and Data Science, Amsterdam University Medical Centre. \texttt{w.n.van.wieringen@vu.nl}} \and
+  St\'ephanie L.\ van der Pas\thanks{Department of Mathematics, Vrije Universiteit Amsterdam. \texttt{s.l.vander.pas@vu.nl}}
+}
+
+\date{\today}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.8em}
+
+
+\begin{document}
+\maketitle
+
+
+
+\begin{abstract}
+We develop a Bayesian nonparametric framework to estimate heterogeneous treatment effects on survival outcomes from a randomised controlled trial and real-world data.
+We relax the unconfoundedness assumption on the real-world data.
+We model the survival time with an accelerated failure time decomposition into a baseline prognosis, a treatment effect, and a confounding function.
+The confounding function absorbs the bias in the real-world treated arm.
+Each component receives a Bayesian tree ensemble prior.
+We share the baseline prognosis across the two sources while allowing for between-source heterogeneity.
+We model the error distribution nonparametrically with a hierarchical Dirichlet process mixture.
+We allow for  both right- and interval-censored data.
+A simulation study shows efficiency gains over a trial-only analysis across varying levels of confounding and between-source heterogeneity.
+We combine the ACTG~175 trial with the Multicenter AIDS Cohort Study to study the effect of antiretroviral therapy for HIV.
+
+\medskip
+\noindent\textbf{Keywords:} Heterogeneous treatment effects; data fusion; real-world evidence; unmeasured confounding; Bayesian additive regression trees; survival analysis.
+\end{abstract}
+
+\bigskip
+\noindent\textbf{Alternative titles:} 
+\begin{itemize}
+  \item Bayesian nonparametric fusion of randomised and real-world survival data for heterogeneous treatment effects
+  \item Heterogeneous treatment effects on survival from randomised and real-world data under unmeasured confounding
+  \item A confounding-function approach to combining trials and real-world data for heterogeneous survival effects
+  \item Bayesian data fusion for heterogeneous survival treatment effects
+\end{itemize}
+
+
+\input{../introduction/INTRODUCTION}
+
+\input{../methodology/METHODOLOGY}
+
+\input{../simulation/SIMULATION}
+
+\input{../data_analysis/ANALYSIS}
+
+\input{DISCUSSION}
+
+
+\newpage
+\bibliographystyle{apalike}
+\bibliography{references}
+
+
+% \newpage
+% \section{Supplementary materials}
+
+% \input{../methodology/METHODOLOGY_SM}
+
+\end{document}

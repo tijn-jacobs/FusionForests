@@ -1,0 +1,87 @@
+% !TEX root = ../general/main.tex
+\section{Simulation study}
+We compare the Bayesian fusion forest on the combined data sources with a Bayesian causal forest on the RCT and RWD alone.
+We vary the strength of the unmeasured confounding in the real-world data, and the between-source heterogeneity in baseline prognosis.
+
+
+\subsection{Simulation setup}
+
+We draw $p = 10$ covariates $X \sim \mathcal{N}(0, \Sigma)$ in both sources.
+We impose an AR(1) correlation $\Sigma_{ij} = \rho^{|i-j|}$ with $\rho = 0.3$.
+We use five active covariates and five noise covariates.
+We generate the outcome:
+\begin{equation}
+  \begin{aligned}
+    \log T_{\RCT} &= m_0(x) + A\, \tau(x) + \varepsilon_{\RCT}, \\
+    \log T_{\RWD} &= m_0(x) + \lambda_d\, d(x) + A\, \tau(x)
+                     + \lambda_u\, A\, U + \varepsilon_{\RWD},
+  \end{aligned}
+  \label{eq:sim-dgp}
+\end{equation}
+with components:
+\begin{equation}
+  m_0(x) = 4 x_1 - 2 x_2 x_3 + x_4^2, \quad \tau(x) = 1/2 + 2 x_1 - x_2^2, \quad d(x) = 2 x_4 - x_5.
+\end{equation}
+The function $\tau$ is the true CATE on the log-time scale.
+We randomise treatment in the trial $A \sim \mathrm{Bernoulli}(1/2)$.
+We let real-world treatment depend on an unmeasured confounder $U \sim \mathrm{Uniform}(0, 1)$.
+We assign $A \sim \mathrm{Bernoulli}\bigl(\expit(x_1 + U)\bigr)$.
+The confounder enters the outcome only in the treated arm.
+We control the between-source heterogeneity through $\lambda_d$.
+We control the confounding through $\lambda_u$.
+We model the trial error as $\varepsilon_{\RCT} \sim \mathcal{N}(0, \sigma^2)$ with $\sigma = 3/4$.
+We draw the real-world error from a standardised Gumbel law.
+We set $\varepsilon_{\RWD} = \tfrac{\sqrt{6}}{\pi}\, \gamma_{\mathrm{E}} - G$ with $G \sim \mathrm{Gumbel}(0, \sqrt{6}/\pi)$.
+This error has mean zero and unit variance.
+Trial and real-world event times are conditionally log-normal and Weibull, respectively.
+We right-censor the trial by an exponential censoring time, tuned to circa $35\%$ censoring.
+We interval-censor the real-world data at eight inspection times.
+Events past the last inspection are right-censored. 
+This contributes to circa $20\%$ of the RWD observations.
+
+We fit the Bayesian fusion forest to the combined data with default parameters.
+The single-source baseline is an accelerated failure time Bayesian causal forest, fitted to the trial and to the real-world data separately \citep{jacobs_software}.
+We run 1000 Monte Carlo replications.
+Each fit draws 5000 posterior samples after 5000 burn-in iterations.
+Our primary metric is the root mean squared error of the CATE.
+We also report coverage, posterior variance and bias of the CATE estimates.
+
+
+\subsection{Simulation results}
+
+We first vary the confounding strength $\lambda_u$ and hold the between-source heterogeneity fixed at $\lambda_d = 1$.
+Figure~\ref{fig:sim-lambda-u} reports the results.
+The real-world-only estimate is unbiased at $\lambda_u = 0$.
+Its bias then grows roughly linearly with $\lambda_u$, to circa $0.4$ at $\lambda_u = 2$.
+The trial-only estimate is unaffected by $\lambda_u$.
+The Bayesian fusion forest stays essentially unbiased across the whole range.
+The Bayesian fusion forest also attains a lower RMSE than the trial-only baseline at every level.
+Coverage is near nominal for the fusion and trial-only estimates.
+The real-world-only estimate loses coverage as its bias grows.
+The fusion posterior variance is roughly half that of the trial-only baseline throughout.
+This reflects the precision gained by borrowing the larger real-world sample.
+
+\begin{figure}[tb]
+  \centering
+  \includegraphics[width=0.8\textwidth]{sim_vary_lambda_u}
+  \caption{CATE metrics under varying unmeasured confounding strength $\lambda_u$, with the RWD prognostic deviation held at $\lambda_d = 1$. From top-left to bottom-right: pointwise RMSE, mean bias, 95\% credible-interval coverage, and posterior variance of $\hat\tau(x)$, averaged over the evaluation set and across simulation replicates. Dashed reference lines indicate zero bias and nominal coverage.}
+  \label{fig:sim-lambda-u}
+\end{figure}
+
+We report the results for varying between-source heterogeneity $\lambda_d$ at fixed confounding $\lambda_u = 1$ in Figure~\ref{fig:sim-lambda-d}.
+All three estimators are essentially flat in $\lambda_d$.
+The fusion and trial-only estimates stay unbiased and at nominal coverage.
+The real-world-only estimate keeps the bias from the fixed confounding.
+RMSE and posterior variance are stable across $\lambda_d$.
+
+\begin{figure}[tb]
+  \centering
+  \includegraphics[width=0.8\textwidth]{sim_vary_lambda_d}
+  \caption{CATE metrics under varying between-source heterogeneity $\lambda_d$, with the unmeasured confounding held at $\lambda_u = 1$. Panels, methods, and reference lines as in Figure~\ref{fig:sim-lambda-u}.}
+  \label{fig:sim-lambda-d}
+\end{figure}
+
+The two experiments show that the fusion forest is robust to both nuisances.
+The fusion forest corrects for the unmeasured confounding in the real-world data and stays unbiased as the confounding strengthens.
+It accommodates the prognostic heterogeneity between the sources and is unaffected as the heterogeneity grows.
+It also exploits the larger real-world sample and achieves lower RMSE and posterior variance than the trial-only baseline at every grid point.

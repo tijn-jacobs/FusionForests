@@ -132,8 +132,8 @@ Rcpp::List SimpleBCF_cpp(
     true, false, 1.0);
   forest_prog.SetUpForest(
     p_prog, n, X_train_prog, aug_prog,
-    static_cast<size_t>(100), omega_prog);
-  if (irs > 0) forest_prog.SetIRS(irs);
+    nullptr, omega_prog);
+  (void) irs;  // IRS modes not currently wired into ForestEngine; ignored.
 
   ForestEngine forest_treat(no_trees_treat);
   forest_treat.SetTreePrior(
@@ -142,8 +142,7 @@ Rcpp::List SimpleBCF_cpp(
     true, false, 1.0);
   forest_treat.SetUpForest(
     p_treat, n, X_train_treat, aug_treat,
-    static_cast<size_t>(100), omega_treat);
-  if (irs > 0) forest_treat.SetIRS(irs);
+    nullptr, omega_treat);
 
 
   // ---- Timing ----
@@ -216,21 +215,12 @@ Rcpp::List SimpleBCF_cpp(
       }
 
       if (n_test > 0) {
-        if (irs > 0) {
-          forest_prog.Predict(
-            p_prog, n_test, X_test_prog,
-            testpred_prog, random);
-          forest_treat.Predict(
-            p_treat, n_test, X_test_treat,
-            testpred_treat, random);
-        } else {
-          forest_prog.Predict(
-            p_prog, n_test, X_test_prog,
-            testpred_prog);
-          forest_treat.Predict(
-            p_treat, n_test, X_test_treat,
-            testpred_treat);
-        }
+        forest_prog.Predict(
+          p_prog, n_test, X_test_prog,
+          testpred_prog);
+        forest_treat.Predict(
+          p_treat, n_test, X_test_treat,
+          testpred_treat);
         for (size_t k = 0; k < n_test; ++k) {
           test_pred_prog_mean[k]  += testpred_prog[k];
           test_pred_treat_mean[k] += testpred_treat[k];

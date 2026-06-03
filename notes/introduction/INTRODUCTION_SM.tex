@@ -1,0 +1,245 @@
+% !TEX root = ../general/main.tex
+\newpage
+
+% ====================================================================
+%  WORKING NOTES. Not part of the final manuscript.
+%  One section per planned paragraph, plus a roadmap and parked
+%  background material.
+% ====================================================================
+
+\section*{Roadmap: structure of the introduction}
+
+\begin{enumerate}
+  \item \textbf{Motivation.} Set up the clinical and scientific stakes.
+        HTE estimation matters for precision medicine in survival settings.
+        RCTs are the gold standard for HTE identification but are typically underpowered for heterogeneity.
+        RWD is large and representative of clinical practice but confounded by design.
+        Combining the two is attractive in principle.
+        Close with: this paper develops a method to do so for survival outcomes.
+  \item \textbf{Specific challenges.} What makes the fusion problem hard.
+        Three points: (i) unmeasured confounding in the RWD that no design fix can remove; (ii) heterogeneity in the prognostic baseline between RCT and RWD populations even when the causal effect transports; (iii) the survival outcome with right censoring, plus the choice of causal estimand on the time scale.
+        Motivate the structural ingredients of the method without revealing them yet.
+  \item \textbf{Existing confounding-function approaches.} The frequentist tradition: Yang, Kallus, Yao, Ye, Mao.
+  \item \textbf{Bayesian approaches to borrowing and fusion.} A counterpart paragraph on the Bayesian-borrowing literature.
+        Cover the commensurate and power-prior MAP tradition (Neuenschwander, Hobbs, Hupf), which targets control-arm augmentation rather than HTE; BART-based external data integration (Zhou \& Ji); and the Causal-ICM multi-task GP framework (Dimitriou et al.).
+        Close with the observation that none targets HTE estimation for survival outcomes with explicit confounding-function adjustment.
+        That is the gap.
+  \item \textbf{Contribution and overview of the method.} What we do and what is new.
+        (i) The estimand is the CATE on the log-time scale, equivalently the acceleration factor.
+        (ii) Adopt the $m_0 + \tau \cdot A + (1-S)\cdot A \cdot c$ decomposition.
+        (iii) Each component receives a BART prior, with hierarchical borrowing on $m_0$ and shrinkage on $c$.
+        (iv) The residual is nonparametric via an HDP-CDP that allows source-specific shape.
+        (v) Exact posterior inference gives finite-sample uncertainty quantification rather than asymptotic theory.
+        Close with the takeaway: efficiency gains over RCT-only HTE estimation when $c$ is small or smoothly varying, with graceful degradation otherwise.
+\end{enumerate}
+
+\textbf{Paragraph 6 is removed.} A per-section outline of the paper is redundant.
+
+\textbf{Notes on choices.}
+\begin{itemize}
+  \item The split between paragraphs 3 and 4 is the main structural decision.
+        For a short intro, merge them into one related-work paragraph and lean on the frequentist side.
+        For a methods outlet (Biostatistics, JASA Applications \& Case Studies, Bayesian Analysis), keep them separate.
+  \item Paragraphs 2 and 5 mirror each other on purpose.
+        Paragraph 2 raises three challenges.
+        Paragraph 5 resolves them in the same order.
+  \item The acceleration-factor justification in paragraph 5 could be its own short paragraph if it needs more space.
+        The methodology section already has a careful AF discussion, so keep it inside paragraph 5 unless a reviewer pushes back.
+  \item If the paper has a strong applied motivation, drop the example into paragraph 1 to anchor it.
+        Otherwise stay generic.
+\end{itemize}
+
+
+\section*{Paragraph 1. Motivation}
+
+\textbf{Draft.}
+
+Heterogeneity in patient response to treatment is central to precision medicine: average effects mask the variation across individuals that drives clinical decisions [Hamburg \& Collins, 2010; Kent et al., 2018].
+In survival outcomes --- endpoints that dominate oncology, cardiovascular, and infectious-disease research --- heterogeneous treatment effect (HTE) estimation is particularly consequential, since the benefit of a therapy may depend on baseline disease severity, comorbidities, and other patient-level factors [Henderson et al., 2020].
+Randomized controlled trials (RCTs) remain the gold standard for causal effect estimation but are typically powered for marginal effects and underpowered for the subgroup-level contrasts that HTE estimation requires [Rothwell, 2005], and restrictive eligibility further limits the populations to which their conclusions transport.
+Real-world data (RWD) from electronic health records, registries, and longitudinal cohorts is increasingly available, larger in scale, and more representative of clinical practice, and is now formally recognized as supplementary evidence by regulators [Sherman et al., 2016; FDA, 2021].
+Its cost is unmeasured confounding: without randomization, treatment assignment depends on factors only partially captured by recorded covariates.
+The complementary strengths of the two sources motivate a fusion approach that leverages RCT identification with RWD power and representativeness [Colnet et al., 2024].
+This paper develops such a method for HTE estimation with survival outcomes, motivated by HIV antiretroviral therapy --- a setting where treatment effect heterogeneity by baseline CD4 count, viral load, and age is well established [Egger et al., 2002] --- and applied to the ACTG175 trial [Hammer et al., 1996] augmented by the Multicenter AIDS Cohort Study (MACS) [Kaslow et al., 1987].
+
+\textbf{To revise.}
+\begin{itemize}
+  \item Put each sentence on its own line.
+  \item Add the BibTeX entries for the bracketed citations and switch them to \texttt{\textbackslash citep}.
+  \item Start directly with what we do, then sketch the context.
+        Avoid vague openings such as ``\dots is central to precision medicine''.
+  \item Check against the writing guidelines.
+\end{itemize}
+
+
+
+\newpage
+\section*{Paragraph 2. Specific challenges}
+
+\textbf{Summary.} Paragraph~2 sets up the three challenges that motivate the methodological choices to come.
+\begin{enumerate}
+    \item \emph{Unmeasured confounding in the RWD.}
+          This breaks the no-unmeasured-confounders assumption.
+          Sensitivity analysis addresses it within a single source.
+          It does not exploit the identification that an external RCT provides.
+    \item \emph{Between-source heterogeneity in the prognostic baseline.}
+          The CATE can transport across sources while the control-arm distribution still differs.
+          Eligibility, follow-up, calendar time, and case mix all contribute.
+    \item \emph{Survival outcome with right censoring.}
+          The choice of causal estimand on the time scale matters.
+          The hazard ratio is non-collapsible and carries a built-in selection bias.
+          The RMST and the acceleration factor are clinically interpretable and causally well behaved.
+\end{enumerate}
+The paragraph closes by anticipating the contribution.
+It addresses all three challenges jointly in a single Bayesian framework.
+Paragraph~2 and Paragraph~5 mirror each other on purpose.
+Paragraph~2 raises the three challenges, and paragraph~5 resolves them in the same order.
+
+\textbf{Proposed paragraph.}
+
+This fusion problem poses three challenges for survival HTE estimation.
+The first is unmeasured confounding in the RWD.
+Treatment is not randomized in observational data.
+Assignment depends on factors that recorded covariates capture only in part.
+The no-unmeasured-confounders assumption is therefore rarely defensible, and the observational contrast is biased for the causal effect \citep{rosenbaum2002observational,vanderweele2017evalue}.
+Sensitivity analysis probes robustness within a single study.
+It does not use the identification that an external RCT provides.
+A fusion approach exploits exactly that identification.
+The second challenge is between-source heterogeneity in the prognostic baseline.
+The conditional treatment effect may transport across sources while the baseline does not.
+RCT and RWD populations differ in eligibility, follow-up, and case mix \citep{stuart2011propensity,degtiar2023review}.
+Any of these can shift the control-arm outcome distribution.
+A method that pools naively absorbs this shift into biased effect estimates.
+The third challenge is the survival outcome itself.
+Right censoring leaves the event time unobserved for some subjects.
+The causal estimand on the time scale is also a modelling choice.
+The hazard ratio is the conventional target, but a poor one for HTE.
+It is non-collapsible, and it carries a built-in selection bias under unmeasured heterogeneity \citep{hernan2010,Aalen2015}.
+The restricted mean survival time \citep{Royston2013,Uno2014} and the acceleration factor \citep{Brathovde2024} avoid both problems.
+Both admit a direct clinical interpretation.
+We adopt them as our survival-scale estimands.
+We address the three challenges jointly in one Bayesian framework.
+The structure of the model mirrors them in turn.
+
+\textbf{Citations.} All nine references already live in \texttt{../general/references.bib}.
+The keys:
+\begin{itemize}
+    \item Rosenbaum (2002): \texttt{rosenbaum2002observational}
+    \item VanderWeele \& Ding (2017): \texttt{vanderweele2017evalue}
+    \item Stuart et al. (2011): \texttt{stuart2011propensity}
+    \item Degtiar \& Rose (2023): \texttt{degtiar2023review}
+    \item Hern\'an (2010): \texttt{hernan2010}
+    \item Aalen et al. (2015): \texttt{Aalen2015}
+    \item Royston \& Parmar (2013): \texttt{Royston2013}
+    \item Uno et al. (2014): \texttt{Uno2014}
+    \item Brathovde et al. (2024): \texttt{Brathovde2024}
+\end{itemize}
+
+\textbf{To adjust.}
+\begin{itemize}
+  \item Right censoring in general, but interval censoring in particular.
+        Observational studies often collect data only at fixed visit times, which gives interval censoring.
+        The method should handle that case.
+\end{itemize}
+
+
+
+\newpage
+\section*{Paragraph 3. Confounding-function approaches}
+
+A growing literature combines RCT and observational data to estimate heterogeneous treatment effects by modelling the bias from unmeasured confounding through a \emph{confounding function}.
+\citet{YangLiuZengWang2025} introduce this approach in a semiparametric framework for continuous outcomes, deriving the efficiency bounds and jointly estimating the HTE and confounding function via estimating equations.
+\citet{Kallus2018} propose an earlier two-step ``experimental grounding'' estimator that learns a parametric bias function from the RCT and uses it to debias an observational HTE estimator.
+\citet{Yao2024} extend this strategy to settings where the RWD has incomplete treatment or outcome information, learning the bias function on the overlapping covariate region between the two sources.
+In the survival setting, \citet{Ye2025} develop a penalised integrative estimator under an accelerated failure time specification with right censoring and high-dimensional covariates, treating the confounding function as a sparse additive component to be selected jointly with the HTE.
+Most closely, \citet{mao2025statistical} target the difference in conditional restricted mean survival times and introduce an \emph{omnibus bias function} that aggregates confounding, censoring, and outcome heterogeneity into a single penalised-sieve nuisance, providing the most direct frequentist counterpart to the framework developed here.
+Our contribution departs from these by adopting a Bayesian nonparametric specification throughout: each component of the outcome decomposition receives a BART prior, the residual distribution is modelled with a hierarchical Dirichlet process mixture allowing source-specific shape, and inference proceeds through exact posterior sampling rather than asymptotic semiparametric theory.
+
+\textbf{To do.}
+\begin{itemize}
+  \item Look in these papers to see what they cite.
+  \item Open question: methods for combining data with extended follow-up?
+\end{itemize}
+
+
+
+\newpage
+\section*{Paragraph 4. Bayesian borrowing and fusion}
+
+\textbf{Proposed structure} (single paragraph, two internal halves and a closer).
+\begin{itemize}
+  \item The traditional Bayesian-borrowing lineage (power priors, MAP, commensurate priors, semiparametric extensions) all target marginal effects or control-arm augmentation, not HTE.
+        Close this half with Alt et al. as the survival extension of the lineage.
+  \item The newer HTE-focused Bayesian fusion strand: Zhou \& Ji (BART) and Dimitriou et al. (multi-task GP / Causal-ICM).
+        Highlight what each does differently (functional vs.\ global bias treatment, GP vs.\ tree-based).
+  \item Closing observation: none targets HTE for survival with explicit confounding-function adjustment.
+        That is the gap.
+\end{itemize}
+
+\textbf{Option A (concise, single paragraph).}
+
+A parallel line of work develops Bayesian methods that borrow information across studies to augment clinical trial analyses.
+The foundational contributions target average treatment effects or control-arm augmentation rather than heterogeneous effects: power priors \citep{ibrahim2000power} and the meta-analytic-predictive (MAP) prior of \citet{neuenschwander2010} let external or historical data contribute to the current analysis through a weighted or hierarchical likelihood; commensurate priors \citep{hobbs2011,hobbs2012commensurate} make the borrowing adaptive by shrinking cross-source disagreement to zero when the data are commensurate; and semiparametric extensions \citep{hupf2021bayesian} relax the Gaussian-deviation assumption of the standard MAP.
+These constructions have been extended to time-to-event analysis through hierarchical proportional-hazards models for control-arm augmentation \citep{alt2025control}, providing the closest Bayesian survival analogue of the present setting, but the estimand remains a marginal effect.
+A smaller and more recent literature targets heterogeneous effects directly: \citet{zhou2021incorporating} integrate external data into a randomised trial through Bayesian additive regression trees and allow flexible nonparametric pooling of outcome surfaces, but without an explicit model for unmeasured confounding in the external source; and \citet{dimitriou2025causal} develop Causal-ICM, a multi-task Gaussian process framework in which a borrowing parameter is selected data-adaptively and yields closed-form uncertainty propagation.
+None of these contributions targets HTE estimation for survival outcomes under unmeasured confounding through an explicit confounding-function decomposition.
+This paper addresses that gap.
+
+\textbf{Option B (expanded, two paragraphs).}
+
+A parallel line of work develops Bayesian methods that borrow information across studies to augment clinical trial analyses.
+The Bayesian framework is naturally suited to such borrowing: historical or external data can be encoded as an informative prior that contributes to the analysis without supplanting the current sample.
+The earliest formalisation is the power prior of \citet{ibrahim2000power}, which raises the historical likelihood to a fractional power that controls the strength of borrowing.
+The meta-analytic-predictive (MAP) prior of \citet{neuenschwander2010} formulates this idea hierarchically: a predictive distribution for the current trial parameter is derived from a meta-analysis of historical studies and used as an informative prior, automatically accounting for between-study heterogeneity in the strength of borrowing.
+The MAP framework has since become the standard approach for incorporating historical controls in clinical pharmacology and regulatory practice.
+Robust mixture variants \citep{schmidli2014robust} guard against prior-data conflict by mixing the informative MAP component with a weakly informative one; commensurate priors \citep{hobbs2011,hobbs2012commensurate} reparameterise the borrowing through a precision parameter on the cross-source discrepancy, with discrepancy-dependent shrinkage that adapts to the observed commensurability; and semiparametric extensions \citep{hupf2021bayesian} replace the Gaussian heterogeneity distribution at the second level with a Dirichlet-process mixture, allowing flexible borrowing in the presence of outlying historical studies.
+These constructions have been extended to time-to-event analysis through hierarchical proportional-hazards models for control-arm augmentation \citep{alt2025control}, providing the closest Bayesian survival analogue of the present setting.
+Their common feature is that the target estimand is a marginal effect or a control-arm summary, not the heterogeneous treatment effect.
+
+A smaller and more recent literature within the Bayesian tradition targets heterogeneous treatment effects directly.
+\citet{zhou2021incorporating} integrate external data into a randomised trial through Bayesian additive regression trees, allowing flexible nonparametric pooling of outcome surfaces but without an explicit model for unmeasured confounding in the external source.
+\citet{dimitriou2025causal} develop Causal-ICM, a multi-task Gaussian process framework in which a scalar borrowing parameter is selected data-adaptively and yields closed-form uncertainty propagation.
+The borrowing mechanism acts globally on the contribution of the observational source rather than as an explicit functional model of bias.
+Neither of these contributions targets HTE estimation for survival outcomes under unmeasured confounding through an explicit confounding-function decomposition.
+This paper addresses that gap.
+
+
+
+\newpage
+\section*{Paragraph 5. Contribution and overview}
+
+This paragraph makes the contribution concrete after the gap statement at the end of paragraph 4.
+Key beats from the plan.
+\begin{itemize}
+  \item Estimand: the CATE on the log-time scale, equivalently the acceleration factor.
+        Defend the choice briefly (collapsibility, clinical interpretability, the hazard-ratio problems already cited in paragraph 2 via Hern\'an and Aalen).
+  \item The decomposition that organises the method: $m_0(X, S) + \tau(X)\cdot A + (1-S)\cdot A \cdot c(X)$.
+  \item The prior structure on each component: BART for all three regression functions; hierarchical borrowing on $m_0$; a shrinkage prior on $c$ that pulls toward zero in the absence of evidence for confounding.
+  \item The nonparametric residual: hierarchical Dirichlet process mixture allowing source-specific shape.
+  \item Inference: exact posterior sampling, finite-sample uncertainty quantification, no reliance on asymptotic semiparametric theory.
+  \item High-level takeaway: efficiency gains over RCT-only HTE estimation when $c$ is small or smoothly varying, with graceful degradation otherwise.
+\end{itemize}
+
+This paragraph should mirror paragraph 2 so the contribution responds point by point.
+Confounding maps to $c(X)$.
+Between-source heterogeneity maps to a hierarchical $m_0$.
+The survival outcome, censoring, and estimand choice map to the AFT decomposition with the AF as the target estimand.
+
+\textbf{Proposal.}
+
+We develop a Bayesian nonparametric framework for HTE estimation in survival outcomes that combines RCT and RWD without imposing unconfoundedness on the observational source.
+Our estimand is the conditional treatment effect on the log-time scale, equivalently the conditional acceleration factor $\exp\{\tau(X)\}$, which admits a direct multiplicative interpretation on the survival time and avoids the collapsibility and built-in selection bias issues of the hazard ratio under unmeasured heterogeneity \citep{Brathovde2024}.
+We work within an accelerated failure time model whose conditional mean decomposes into three structurally meaningful components: a prognostic baseline $m_0(X, S)$ that is shared across sources up to a source-specific deviation; a heterogeneous treatment effect $\tau(X)$ that transports across sources by assumption; and a confounding function $c(X)$ that absorbs the bias from unmeasured confounding in the RWD treated arm.
+Each component receives a Bayesian additive regression tree prior \citep{chipman2010bart}, with a hierarchical meta-analytic-predictive structure on $m_0$ that adaptively borrows the prognostic baseline across sources, and a shrinkage prior on $c$ that pulls towards zero in the absence of evidence for residual confounding.
+The residual log-survival is modelled with a source-specific hierarchical Dirichlet process mixture, allowing the error distributions in the RCT and RWD to differ in shape while sharing latent structure.
+Posterior inference is carried out by Gibbs sampling and yields finite-sample uncertainty quantification at the patient-specific and population-aggregated levels, without recourse to asymptotic semiparametric theory.
+The result is an estimator that recovers efficiency gains over an RCT-only analysis when the confounding function is small or smoothly varying, and degrades gracefully otherwise.
+
+
+\section*{Parked: background on BART}
+
+\textit{Probably not needed in the introduction.
+Move to the back or an appendix if a supervisor asks for it later.}
+
+Since its introduction by \citet{chipman2010bart}, Bayesian additive regression trees (BART) have become a widely adopted tool for flexible nonparametric regression, owing to their ability to capture complex nonlinearities and high-order interactions without requiring the functional form to be specified in advance, while at the same time delivering principled posterior uncertainty quantification through a coherent Bayesian framework.
+Empirically, BART has been shown to be competitive with, or to outperform, established machine-learning alternatives such as random forests and gradient boosting on a broad range of benchmark tasks, while typically requiring little tuning beyond the defaults.

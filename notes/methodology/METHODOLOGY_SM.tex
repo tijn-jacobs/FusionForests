@@ -1,0 +1,981 @@
+% !TEX root = ../general/main.tex
+
+\subsection{Proofs}\label{sm:proofs}
+
+\paragraph{Proof of Proposition~\ref{prop:decomp}.}
+We evaluate $\E[\log T \mid A, X, S]$ for each value of $(A, S)$.
+
+\emph{Case $A = 0$.}
+By the definition of $m_0$, the right-hand side of \eqref{eq:decomp} reduces to $m_0(X, S)$, which matches the left-hand side.
+
+\emph{Case $A = 1$, $S = 1$ (RCT).}
+Consistency (Assumption~\ref{ass:sutva}) gives $\log T = \log T(1)$ when $A = 1$, and Assumption~\ref{ass:rct-unconf} gives $T(1) \,\ind\, A \mid X, S = 1$, so:
+\begin{equation}
+\E[\log T \mid A = 1,\, X,\, S = 1] \;=\; \E[\log T(1) \mid X,\, S = 1].
+\end{equation}
+We split this conditional expectation as:
+\begin{equation}
+\E[\log T(1) \mid X,\, S = 1] \;=\; \E[\log T(0) \mid X,\, S = 1] \,+\, \E[\log T(1) - \log T(0) \mid X,\, S = 1].
+\end{equation}
+The first term equals $m_0(X, 1)$ by Assumption~\ref{ass:rct-unconf}.
+The second term equals $\tau(X)$ by Assumption~\ref{ass:transport}.
+
+\emph{Case $A = 1$, $S = 0$ (RWD).}
+The definition of $c$ in \eqref{eq:cf} rearranges to:
+\begin{equation}
+\E[\log T \mid A = 1,\, X,\, S = 0] \;=\; m_0(X, 0) \,+\, \tau(X) \,+\, c(X),
+\end{equation}
+which matches the right-hand side of \eqref{eq:decomp}. \qed
+
+\paragraph{Proof of Proposition~\ref{prop:ident}.}
+Part~(i) follows by taking the difference of the $A = 1, S = 1$ and $A = 0, S = 1$ cases of \eqref{eq:decomp}.
+Part~(ii) is immediate from rearranging \eqref{eq:cf}.
+Part~(iii) follows because \eqref{eq:decomp} restricted to $S = 0$ identifies only $m_0(X, 0)$ and the composite $\tau(X) + c(X)$. \qed
+
+
+
+
+\newpage
+\subsection{Structural interpretation of the confounding function}\label{sm:scm}
+
+\paragraph{Context and goal.}
+The main text treats the RWD as potentially confounded without specifying the source of the confounding.
+The confounding function $c(x)$ was defined in \eqref{eq:cf} as the residual bias in the RWD treated-versus-control contrast that the causal effect $\tau$ does not explain.
+This is an operational definition: it says how to compute $c$ from the observed conditional means, but it says nothing about what real-world mechanisms generate the bias.
+
+The aim of this section is to give $c(x)$ a causal-mechanistic interpretation.
+We achieve this by introducing a latent random vector $U \in \mathcal{U}$, called the \emph{unmeasured confounder}, which stands in for any prognostic factor that affects survival but was not recorded in $X$.
+Examples include frailty, comorbidities, biomarkers, performance status, genotype, and behavioural risk.
+Under a structural model that lets $U$ enter the baseline and the treatment effect, the confounding function decomposes into two interpretable terms: an imbalance in the baseline prognostic function between the RWD treatment arms, and a term capturing effect modification by $U$.
+
+The decomposition has three uses.
+First, it makes precise what $c(x)$ measures in causal terms.
+Second, it identifies the conditions under which $c(x)$ vanishes.
+This in turn motivates the shrinkage prior placed on $c$ in the modelling section.
+Third, it provides an entry point for sensitivity analyses that bound the magnitude of $c$ in terms of properties of $U$.
+
+\paragraph{Structural outcome model.}
+We posit an outcome equation on the log-time scale:
+\begin{equation}
+\log T(a) \;=\; f_0(X, U) \,+\, a\,\tau^*(X, U) \,+\, \varepsilon, \qquad \varepsilon \,\ind\, (X, U, A, S).
+\label{eq:scm}
+\end{equation}
+The components have the following meanings.
+$X \in \mathcal{X}$ is the vector of observed pre-treatment covariates introduced in the main text.
+$U \in \mathcal{U}$ is the latent vector of unmeasured covariates described above; it is unknown to the analyst and never enters the likelihood used for inference.
+$f_0(X, U)$ is the baseline log-transformed survival under control, that is, the conditional mean of $\log T(0)$ given $(X, U)$.
+$\tau^*(X, U) = \E[\log T(1) - \log T(0) \mid X, U]$ is the treatment effect on the log scale conditional on the full covariate vector $(X, U)$.
+$\varepsilon$ is an exogenous mean-zero error, independent of $(X, U, A, S)$; its distribution is left unspecified and follows the same flexible nonparametric form used in the main text.
+The CATE on the log scale arises as the conditional mean of $\tau^*$ over $U$ given $X$:
+\begin{equation}
+\tau(x) \;=\; \E[\tau^*(X, U) \mid X = x].
+\label{eq:cate-marginal}
+\end{equation}
+The model imposes additive separability of the baseline and the treatment effect.
+It does not restrict the joint distribution of $(X, U, A)$ in the RWD, so the RWD remains free to be confounded through $U$.
+
+\paragraph{Structural form of $c(x)$.}
+
+\begin{proposition}[Structural form of the confounding function]\label{prop:cf-structural}
+Under the structural model \eqref{eq:scm} and Assumptions~\ref{ass:sutva}--\ref{ass:transport}, the confounding function admits the decomposition:
+\begin{equation}
+c(x) \;=\; \underbrace{\E[f_0(X, U) \mid X = x, A = 1, S = 0] - \E[f_0(X, U) \mid X = x, A = 0, S = 0]}_{\text{prognostic imbalance}} \,+\, \underbrace{\delta_\tau(x)}_{\text{effect modification by }U},
+\label{eq:cf-structural}
+\end{equation}
+where:
+\begin{equation}
+\delta_\tau(x) \;=\; \E[\tau^*(X, U) \mid X = x, A = 1, S = 0] \,-\, \tau(x).
+\label{eq:delta-tau}
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+Consistency (Assumption~\ref{ass:sutva}) gives $\log T = \log T(A)$ for every observation.
+We evaluate the two conditional expectations entering the definition \eqref{eq:cf} of the confounding function.
+In the RWD treated arm:
+\begin{equation}
+\E[\log T \mid X = x,\, A = 1,\, S = 0] \;=\; \E\bigl[f_0(X, U) + \tau^*(X, U) + \varepsilon \,\big|\, X = x,\, A = 1,\, S = 0\bigr],
+\end{equation}
+and in the RWD control arm:
+\begin{equation}
+\E[\log T \mid X = x,\, A = 0,\, S = 0] \;=\; \E\bigl[f_0(X, U) + \varepsilon \,\big|\, X = x,\, A = 0,\, S = 0\bigr].
+\end{equation}
+The error term contributes zero in both expressions because $\varepsilon$ has mean zero and is independent of $(X, U, A, S)$.
+The difference of the two expectations is
+\begin{multline}
+\E[\log T \mid X = x,\, A = 1,\, S = 0] \,-\, \E[\log T \mid X = x,\, A = 0,\, S = 0] \\
+\;=\; \E\bigl[f_0(X, U) \,\big|\, X = x,\, A = 1,\, S = 0\bigr] \,-\, \E\bigl[f_0(X, U) \,\big|\, X = x,\, A = 0,\, S = 0\bigr] \\
+\,+\, \E\bigl[\tau^*(X, U) \,\big|\, X = x,\, A = 1,\, S = 0\bigr].
+\end{multline}
+We subtract $\tau(x)$ from both sides and apply the definition \eqref{eq:cf} of $c(x)$.
+The result is \eqref{eq:cf-structural}, with $\delta_\tau(x)$ as in \eqref{eq:delta-tau}.
+\end{proof}
+
+\paragraph{Reduction under no unobserved effect modification.}
+The structural form simplifies sharply when the treatment effect does not depend on $U$.
+
+\begin{corollary}[Reduction to prognostic imbalance]\label{cor:no-effect-mod}
+If $\tau^*(X, U)$ depends on the covariates only through $X$, i.e.\ $\tau^*(X, U) = \tau(X)$, then $\delta_\tau(x) = 0$ and the confounding function reduces to:
+\begin{equation}
+c(x) \;=\; \E[f_0(X, U) \mid X = x,\, A = 1,\, S = 0] \,-\, \E[f_0(X, U) \mid X = x,\, A = 0,\, S = 0].
+\label{eq:cf-baseline}
+\end{equation}
+\end{corollary}
+
+\begin{proof}
+If $\tau^*(X, U) = \tau(X)$, then $\E[\tau^*(X, U) \mid X = x,\, A = 1,\, S = 0] = \tau(x)$, so $\delta_\tau(x) = 0$.
+Substitution into \eqref{eq:cf-structural} yields \eqref{eq:cf-baseline}.
+\end{proof}
+
+\paragraph{Interpretation of the two components.}
+The two pieces of \eqref{eq:cf-structural} have distinct substantive meanings.
+
+The \emph{prognostic imbalance} term reflects that treated and control observations in the RWD differ in their distribution of $U$ given $X$.
+Such an imbalance arises whenever treatment assignment in the RWD depends on unmeasured prognostic factors.
+For example, suppose $U$ encodes frailty.
+At the same observed covariate value $x$, frailer patients are less likely to be assigned the treatment.
+Then $U$ is on average lower in the RWD treated arm than in the RWD control arm at the same $x$, and the conditional expectations of $f_0(X, U)$ differ across arms.
+The sign and magnitude of the imbalance depend on the strength of the $U$-$A$ association and on the dependence of $f_0$ on $U$.
+
+The term $\delta_\tau(x)$ captures \emph{effect modification by $U$}.
+It is non-zero only when $\tau^*$ itself depends on $U$ and the distribution of $U$ given $X$ in the treated RWD arm differs from that in the population.
+For intuition, suppose treatment works better for patients with a certain unmeasured trait.
+If the RWD selectively treats patients with that trait, the RWD treated arm exhibits a stronger effect than the population CATE.
+This piece is identically zero under Corollary~\ref{cor:no-effect-mod}.
+
+\paragraph{When does the confounding function vanish?}
+By Proposition~\ref{prop:cf-structural}, $c(x) = 0$ at $x$ whenever both the prognostic imbalance and $\delta_\tau(x)$ vanish.
+A simple sufficient condition is the unmeasured-confounder independence $U \,\ind\, A \mid X, S = 0$: the unmeasured covariate is balanced across RWD treatment arms conditional on $X$.
+This is the standard no-unmeasured-confounding assumption in the RWD.
+Our framework deliberately avoids assuming it; the role of $c(x)$ is precisely to absorb the bias when this independence fails.
+
+\paragraph{Implications for modelling and sensitivity.}
+The structural form has two implications for what follows.
+First, $c(x)$ is small when prognostic imbalance is mild and effect modification by $U$ is weak.
+The shrinkage prior on $c$ \textbf{[PLACEHOLDER: to be introduced in the modelling section]} is then well-justified.
+Second, the magnitude of $c(x)$ admits a sensitivity-analysis interpretation: bounds on how strongly $U$ is associated with $A$ in the RWD and with $f_0$ translate into bounds on $c(x)$.
+\textbf{[PLACEHOLDER: brief discussion of relevant sensitivity-analysis frameworks (e.g., Rosenbaum, E-values, Robins--Rotnitzky) and where they fit in the paper.]}
+
+\newpage
+\subsection{Structural causal model interpretation of the confounding function (expanded)}\label{sm:scm-full}
+
+\paragraph{Context and goal.}
+The previous section interprets $c(x)$ through a structural outcome model.
+That model is silent on how the other variables in the problem are generated.
+It posits a functional form for $\log T(a)$ but leaves the mechanisms behind $X$, $U$, $S$, and $A$ unspecified.
+The main-text assumptions, Assumptions~\ref{ass:sutva}--\ref{ass:transport}, carry the remaining structure as conditional independencies.
+
+We give here a fuller treatment via a structural causal model \citep[SCM;][]{pearl2009causality, peters2017elements}.
+An SCM specifies a structural equation for every endogenous variable and a joint distribution over exogenous noises.
+The resulting framework is still very broad.
+It is also a sub-class of the regression model used for inference in the main text.
+The SCM has three advantages over the outcome-model treatment.
+First, it makes the data-generating mechanism explicit.
+Second, it lets us recover the main-text assumptions from a small set of structural conditions.
+Third, it provides a mechanism-level language for sensitivity analyses on $c(x)$.
+
+\paragraph{The structural causal model.}
+We posit the following SCM over the random vector $(X, U, S, A, T)$:
+\begin{equation}
+\begin{aligned}
+X &\;=\; f_X(N_X),\\
+U &\;=\; f_U(X, N_U),\\
+S &\;=\; f_S(X, N_S),\\
+A &\;=\; f_A(X, U, S, N_A),\\
+T &\;=\; f_T(X, U, A, N_T).
+\end{aligned}
+\label{eq:fscm}
+\end{equation}
+The exogenous noises $(N_X, N_U, N_S, N_A, N_T)$ are mutually independent.
+The structural functions $f_X, \ldots, f_T$ are otherwise unrestricted.
+We model the source $S$ as a function of $X$ alone, so that $N_U$ and $N_S$ are independent.
+The latent vector $U$ enters every downstream equation, reflecting that we leave its causal role open.
+The potential outcomes are obtained by intervention on $A$:
+\begin{equation}
+T(a) \;:=\; f_T(X, U, a, N_T), \qquad a \in \{0, 1\}.
+\label{eq:fscm-po}
+\end{equation}
+The observational outcome equals $T(A)$ by construction, which recovers consistency.
+
+We further restrict $f_T$ to admit an additive separation of the baseline and the treatment effect on the log-time scale:
+\begin{equation}
+\log T(a) \;=\; f_0(X, U) \,+\, a\,\tau^*(X, U) \,+\, \varepsilon,
+\label{eq:fscm-outcome}
+\end{equation}
+where $\varepsilon = \varepsilon(N_T)$ has mean zero and is independent of $(X, U, A, S)$.
+Equation~\eqref{eq:fscm-outcome} recovers the outcome model of the previous section.
+The remaining equations in \eqref{eq:fscm} are new.
+They expose the selection mechanism $f_S$ and the treatment-assignment mechanism $f_A$ that the outcome model left implicit.
+
+\paragraph{Graphical representation.}
+The SCM induces the directed acyclic graph in Figure~\ref{fig:scm-dag}.
+The graph displays the causal mechanisms and makes the role of $U$ visible.
+The arrow $U \to A$ is the source of confounding in the RWD.
+The same arrow is degenerate in the RCT under the randomisation restriction below.
+
+\begin{figure}[tb]
+\centering
+\begin{tikzpicture}[
+  >=latex,
+  obs/.style={circle, draw, thick, minimum size=0.85cm, inner sep=0pt},
+  lat/.style={circle, draw, thick, dashed, minimum size=0.85cm, inner sep=0pt},
+  arr/.style={->, thick}
+]
+  \node[obs] (X) at (0, 0)    {$X$};
+  \node[lat] (U) at (2.2, 1.2) {$U$};
+  \node[obs] (S) at (2.2, -1.2) {$S$};
+  \node[obs] (A) at (4.4, 0)  {$A$};
+  \node[obs] (T) at (6.6, 0)  {$T$};
+
+  \draw[arr] (X) -- (U);
+  \draw[arr] (X) -- (S);
+  \draw[arr] (X) to[bend left=20] (A);
+  \draw[arr] (X) to[bend left=65] (T);
+  \draw[arr] (U) -- (A);
+  \draw[arr] (U) to[bend left=20] (T);
+  \draw[arr] (S) -- (A);
+  \draw[arr] (A) -- (T);
+\end{tikzpicture}
+\caption{DAG implied by the SCM \eqref{eq:fscm}. Observed variables are solid; the unmeasured confounder $U$ is dashed. The arrow $U \to A$ is degenerate when $S = 1$ under the RCT randomisation restriction \eqref{eq:fscm-rct}.}
+\label{fig:scm-dag}
+\end{figure}
+
+\paragraph{Recovering the main-text assumptions.}
+Each of the main-text assumptions maps to an explicit constraint on the SCM.
+We list them in turn.
+
+\emph{Consistency (Assumption~\ref{ass:sutva})} holds by construction.
+The structural equation for $T$ gives $T = f_T(X, U, A, N_T) = T(A)$.
+
+\emph{Unconfoundedness of the RCT (Assumption~\ref{ass:rct-unconf})} restricts $f_A$ on the event $\{S = 1\}$.
+The RCT mechanism does not depend on $U$:
+\begin{equation}
+f_A(X, U, 1, N_A) \;=\; f_A^{\mathrm{RCT}}(X, N_A).
+\label{eq:fscm-rct}
+\end{equation}
+Together with the independence of $N_A$ from $(N_U, N_T)$, this restriction gives $A \,\ind\, (U, T(0), T(1)) \mid X, S = 1$.
+
+\emph{Positivity (Assumption~\ref{ass:positivity-both})} requires that the conditional distribution of $A$ given $(X, S)$ have full support on $\{0, 1\}$ in both sources.
+This is a non-degeneracy condition on $f_A$ jointly with the noise $N_A$.
+
+\emph{Cross-source exchangeability (Assumption~\ref{ass:transport})} reduces to two conditions.
+First, $f_T$ has no $S$ argument, so the conditional distribution of $T(a)$ given $(X, U)$ does not depend on $S$.
+Second, the distribution of $U$ given $X$ is the same in both sources:
+\begin{equation}
+U \mid X, S = 1 \;\overset{d}{=}\; U \mid X, S = 0.
+\label{eq:fscm-uxs}
+\end{equation}
+The second condition follows from our construction.
+We let $S$ depend on $X$ but not on $N_U$, so $U \,\ind\, S \mid X$.
+In the selection-diagram language of \citet{bareinboim2016causal}, $S$ acts as a selection node attached to $X$ but disconnected from $U$.
+
+\emph{Conditionally independent censoring (Assumption~\ref{ass:censoring})} is a statement about the censoring mechanism.
+It is separate from the outcome SCM and we treat it as outside \eqref{eq:fscm}.
+
+\paragraph{The SCM as a sub-class of the regression model.}
+The regression model \eqref{eq:aft-model} places nonparametric priors on the conditional-mean components $m_0$, $\tau$, and $c$.
+It is agnostic about the joint distribution of $(X, U, A, S)$.
+The SCM \eqref{eq:fscm}--\eqref{eq:fscm-outcome} is one particular family of data-generating processes compatible with that regression model.
+Each component of the regression model arises as a conditional expectation under the SCM:
+\begin{equation}
+m_0(x, s) \;=\; \E[f_0(X, U) \mid X = x, S = s], \qquad \tau(x) \;=\; \E[\tau^*(X, U) \mid X = x],
+\label{eq:fscm-induced}
+\end{equation}
+and $c(x)$ is the residual contrast defined by \eqref{eq:cf}.
+The SCM family is still very broad.
+It permits arbitrary nonlinear mechanisms, multivariate $U$ of unrestricted dimension, and arbitrary dependence of $A$ on $(X, U)$ in the RWD.
+The only structural restrictions are the additive form \eqref{eq:fscm-outcome}, the source-symmetric outcome equation, and the independence \eqref{eq:fscm-uxs} of $U$ from $S$ given $X$.
+The first restriction is the AFT modelling choice.
+The latter two are precisely what cross-source exchangeability buys us.
+
+\paragraph{Identification within the SCM.}
+The identification result of Proposition~\ref{prop:ident} carries over without change.
+The RCT slice of the SCM gives $\E[\log T \mid X, A = 1, S = 1] - \E[\log T \mid X, A = 0, S = 1] = \tau(X)$ via \eqref{eq:fscm-rct} and \eqref{eq:fscm-uxs}.
+The RWD slice identifies $\tau(x) + c(x)$ as the observed treated-versus-control contrast.
+The SCM contributes no additional identifying restrictions.
+The latent vector $U$ remains unidentified.
+
+\paragraph{Structural form of $c(x)$.}
+We re-derive the structural form of the confounding function within the SCM.
+The argument is the same as in Proposition~\ref{prop:cf-structural}.
+The SCM makes the conditioning sets transparent.
+Decompositions of this form go back to \citet{brumback2004sensitivity} for marginal structural models and \citet{vanderweele2011bias} for general outcomes.
+
+\begin{proposition}[Structural form of $c$ under the SCM]\label{prop:cf-fscm}
+Under the SCM \eqref{eq:fscm}--\eqref{eq:fscm-outcome} with restrictions \eqref{eq:fscm-rct} and \eqref{eq:fscm-uxs}, the confounding function satisfies
+\begin{equation}
+c(x) \;=\; \Delta f_0(x) \,+\, \delta_\tau(x),
+\label{eq:cf-fscm}
+\end{equation}
+with the prognostic-imbalance term
+\begin{equation}
+\Delta f_0(x) \;=\; \E[f_0(X, U) \mid X = x, A = 1, S = 0] \,-\, \E[f_0(X, U) \mid X = x, A = 0, S = 0],
+\label{eq:fscm-delta-f0}
+\end{equation}
+and the effect-modification term $\delta_\tau(x)$ defined as in \eqref{eq:delta-tau}.
+\end{proposition}
+
+\begin{proof}
+We use \eqref{eq:fscm-outcome} and the mean-zero independence of $\varepsilon$ to write
+\begin{align*}
+\E[\log T \mid X{=}x, A{=}1, S{=}0]
+  &\;=\; \E[f_0(X, U) + \tau^*(X, U) \mid X{=}x, A{=}1, S{=}0],\\
+\E[\log T \mid X{=}x, A{=}0, S{=}0]
+  &\;=\; \E[f_0(X, U) \mid X{=}x, A{=}0, S{=}0].
+\end{align*}
+Subtraction gives the RWD treated-versus-control contrast as a sum of two terms in $f_0$ and one term in $\tau^*$.
+We subtract $\tau(x) = \E[\tau^*(X, U) \mid X = x]$ on both sides.
+The definition \eqref{eq:cf} of $c(x)$ yields \eqref{eq:cf-fscm}.
+\end{proof}
+
+\paragraph{Structural conditions for $c \equiv 0$.}
+The SCM lets us read off transparent sufficient conditions under which the confounding function vanishes.
+
+\begin{corollary}[Structural conditions for vanishing $c$]\label{cor:c-zero-fscm}
+Under the SCM, $c(x) \equiv 0$ if either of the following holds.
+\begin{enumerate}[label=\textup{(\roman*)}]
+\item The RWD treatment mechanism does not depend on $U$:
+$f_A(X, U, 0, N_A) = f_A^{\mathrm{RWD}}(X, N_A)$.
+\item Both $f_0$ and $\tau^*$ depend on covariates only through $X$.
+\end{enumerate}
+Either condition is sufficient. Neither is necessary.
+\end{corollary}
+
+\begin{proof}
+Under (i), $U \,\ind\, A \mid X, S = 0$. The conditional distribution of $U$ given $(X, A, S = 0)$ does not depend on $A$. Both $\Delta f_0(x)$ and $\delta_\tau(x)$ vanish.
+Under (ii), $f_0(X, U) = f_0(X)$ and $\tau^*(X, U) = \tau(X)$. The conditional expectations in \eqref{eq:cf-fscm} reduce to $f_0(x)$ and $\tau(x)$, so $\Delta f_0 \equiv 0$ and $\delta_\tau \equiv 0$.
+\end{proof}
+
+Condition (i) is the standard no-unmeasured-confounding assumption applied to the RWD.
+Our framework does not impose it.
+The confounding function exists precisely to absorb the bias when (i) fails.
+Condition (ii) describes a setting in which $U$ is causally inert for the outcome.
+In that case the latent $U$ can be marginalised away without loss.
+
+\paragraph{Parametric instance.}
+A linear-Gaussian instance of the SCM makes the structural sources of $c(x)$ tangible.
+Take $f_0(X, U) = \beta_0 + \beta_X^\top X + \beta_U U$ and $\tau^*(X, U) = \gamma_0 + \gamma_X^\top X + \gamma_U U$.
+Take an RWD treatment mechanism $\p(A = 1 \mid X, U, S = 0) = \Phi(\alpha_0 + \alpha_X^\top X + \alpha_U U)$, with $U \mid X \sim N(0, \sigma_U^2)$.
+The two pieces of \eqref{eq:cf-fscm} become
+\begin{equation}
+\Delta f_0(x) \;=\; \beta_U\,\bigl\{\E[U \mid X{=}x, A{=}1, S{=}0] - \E[U \mid X{=}x, A{=}0, S{=}0]\bigr\},
+\end{equation}
+and
+\begin{equation}
+\delta_\tau(x) \;=\; \gamma_U\,\bigl\{\E[U \mid X{=}x, A{=}1, S{=}0] - \E[U \mid X{=}x]\bigr\}.
+\end{equation}
+Each conditional mean of $U$ in the RWD is a monotone function of $\alpha_U$.
+The size of $c(x)$ is governed by three structural quantities.
+The first is $\alpha_U$, the strength of confounding in the treatment mechanism.
+The second is $\beta_U$, the baseline dependence on $U$.
+The third is $\gamma_U$, the strength of effect modification by $U$.
+Any one of them being zero kills the corresponding piece.
+All three zero recovers $c(x) \equiv 0$.
+
+\paragraph{Sensitivity-analysis framing.}
+The SCM provides mechanism-level handles for sensitivity analysis.
+Two structural quantities govern the magnitude of $c$.
+The first is the dependence of $A$ on $U$ in the RWD, governed by $f_A(\cdot, \cdot, 0, \cdot)$.
+The second is the dependence of $f_0$ and $\tau^*$ on $U$.
+Standard sensitivity-analysis frameworks parameterise these quantities and induce bounds on the bias.
+Rosenbaum bounds \citep{rosenbaum2002observational} constrain the odds-ratio dependence of $A$ on $U$.
+The E-value of \citet{vanderweele2017evalue} summarises the joint association strength required to nullify an observed effect.
+The framework of \citet{robins2000sensitivity} bounds the bias under prescribed deviations from ignorability.
+\citet{YangLiuZengWang2025} apply confounding-function methods to a setting close to ours.
+Each framework translates into an implied envelope on $c(x)$ via \eqref{eq:cf-fscm}.
+The Bayesian counterpart of these analyses is the shrinkage prior on $c$ introduced in the modelling section.
+The prior downweights large values of $c$ without ruling them out.
+The data are free to pull $c$ away from zero where the bias is strong.
+
+\paragraph{Implications for modelling.}
+The SCM clarifies what the shrinkage prior on $c$ encodes.
+Shrinkage towards zero is consistent with the structural picture in which $U$ is approximately balanced across RWD arms at most values of $X$ and effect modification by $U$ is mild.
+The prior does not force these conditions.
+The shrinkage strength controls how aggressively the RWD informs $\tau$ through the shared baseline $m_0$.
+A weaker prior on $c$ trusts the RWD less.
+A stronger prior on $c$ approximates the conventional no-unmeasured-confounding assumption in the RWD.
+The full SCM treatment makes the prior interpretable as a soft version of Corollary~\ref{cor:c-zero-fscm}(i).
+Related RCT--RWD fusion strategies that learn a confounding-bias function from a small experimental sample include \citet{Kallus2018} and \citet{YangLiuZengWang2025}.
+
+\newpage
+\subsection{Posterior computation for the HDPM error model}\label{sm:hdp-error}
+
+This section of the Supplementary Materials gives the full hierarchical model after truncation, the conditional distributions of each block of the Gibbs sampler, and recommendations for hyperparameter calibration and practical implementation.
+
+\paragraph{Truncation and full hierarchical model.}
+For computation we truncate the top-level stick-breaking at a finite level $K$ \citep{ishwaran2001gibbs}: $u_K = 1$, so $\beta_K = 1 - \sum_{k < K} \beta_k$ and $\beta_k = 0$ for $k > K$.
+Conditional on the truncated $\bm{\beta} \in \Delta^{K-1}$ we use the finite-dimensional approximation:
+\begin{equation}
+\bm{\pi}_s \mid \bm{\beta},\, M_s \;\sim\; \mathrm{Dirichlet}(M_s \beta_1, \ldots, M_s \beta_K),
+\label{eq:hdp-pi-prior}
+\end{equation}
+the standard truncated representation of the hierarchical Dirichlet process \citep{teh2006hierarchical, wang2009variational}.
+The approximation becomes exact as $K \to \infty$.
+We use a default $K = 50$, which has been adequate in our simulations.
+The largest occupied component index should be monitored across iterations to confirm that the truncation does not bind.
+
+We introduce latent cluster assignments $Z_i \in \{1, \ldots, K\}$ such that the latent location for observation $i$ is $\theta_{Z_i}^* - \mu_{S_i}$.
+The full hierarchical model is:
+\begin{align}
+\log T_i \mid Z_i,\, \bm{\theta}^*,\, \bm{\sigma}^2,\, m_0,\, \tau,\, c &\;\sim\; N\!\big(\eta_i,\; \sigma_{S_i}^2\big),\\
+\quad\eta_i &\;=\; m_0(X_i, S_i) + A_i\, \tau(X_i) + A_i(1 - S_i)\, c(X_i) + \theta_{Z_i}^* - \mu_{S_i},\\
+Z_i \mid \bm{\pi}_{S_i} &\;\sim\; \mathrm{Categorical}(\bm{\pi}_{S_i}),\\
+\bm{\pi}_s \mid \bm{\beta},\, M_s &\;\sim\; \mathrm{Dirichlet}(M_s \beta_1, \ldots, M_s \beta_K), \qquad s \in \{0, 1\},\\
+\bm{\beta} \mid \gamma &\;\sim\; \mathrm{Stick}_K(\gamma),\\
+\theta_k^* &\;\stackrel{\mathrm{iid}}{\sim}\; N(0, \sigma_\theta^2), \qquad k = 1, \ldots, K,\\
+m_0, \tau, c &\;\sim\; \mathrm{BART},\\
+\sigma_s^2 &\;\sim\; \nu\lambda / \chi^2_\nu, \qquad s \in \{0, 1\},\\
+\gamma &\;\sim\; \mathrm{Gamma}(a_\gamma, b_\gamma),\\
+M_s &\;\sim\; \mathrm{Gamma}(a_M, b_M), \qquad s \in \{0, 1\},
+\end{align}
+with $\mu_s = \sum_k \pi_{sk} \theta_k^*$ a deterministic function of $\bm{\pi}_s$ and $\bm{\theta}^*$.
+The notation $\mathrm{Stick}_K(\gamma)$ denotes the truncated stick-breaking distribution with $\mathrm{Beta}(1, \gamma)$ breaks.
+
+\paragraph{Gibbs sampler.}
+For each observation $i$, define the partial residual:
+\begin{equation}
+R_i \;:=\; \log T_i - m_0(X_i, S_i) - A_i\, \tau(X_i) - A_i(1 - S_i)\, c(X_i).
+\label{eq:app-Ri}
+\end{equation}
+Conditional on the BART components and the latent cluster assignment $Z_i = k$, we have $R_i \sim N(\theta_k^* - \mu_{S_i}, \sigma_{S_i}^2)$.
+One sweep of the sampler executes the following steps.
+
+\paragraph{Step 1 (data augmentation for censoring).}
+For each $i$ with $\delta_i = 0$, draw:
+\begin{equation}
+\log T_i \mid \cdot \;\sim\; \mathrm{TruncatedNormal}(\eta_i,\, \sigma_{S_i}^2;\, [\log C_i, \infty)),
+\end{equation}
+with $\eta_i$ as defined above.
+
+\paragraph{Step 2 (BART backfitting).}
+UPDATE THIS SECTION! We have four forests, also the deviation forest.
+The three forests are updated sequentially via Bayesian backfitting \citep{chipman2010bart}.
+The working response for each forest is the partial residual obtained by subtracting all other components and the current cluster shift $\theta_{Z_i}^* - \mu_{S_i}$:
+\begin{align}
+R_i^{(m_0)} &\;=\; \log T_i - A_i \tau(X_i) - A_i(1-S_i) c(X_i) - (\theta_{Z_i}^* - \mu_{S_i}),\\
+R_i^{(\tau)} &\;=\; \log T_i - m_0(X_i, S_i) - (1-S_i) c(X_i) - (\theta_{Z_i}^* - \mu_{S_i}), && i \text{ with } A_i = 1,\\
+R_i^{(c)} &\;=\; \log T_i - m_0(X_i, 0) - \tau(X_i) - (\theta_{Z_i}^* - \mu_0), && i \text{ with } A_i = 1,\, S_i = 0.
+\end{align}
+Each working response is treated as Gaussian with mean equal to the relevant forest and per-observation variance $\sigma_{S_i}^2$.
+Control observations carry no information about $\tau$.
+RCT observations and untreated RWD observations carry no information about $c$.
+After the BART updates, recompute $R_i$ from \eqref{eq:app-Ri}.
+
+\paragraph{Step 3 (cluster assignments).}
+For each $i$, sample:
+\begin{equation}
+P(Z_i = k \mid \cdot) \;\propto\; \pi_{S_i, k}\, \phi\!\left(\frac{R_i - (\theta_k^* - \mu_{S_i})}{\sigma_{S_i}}\right), \qquad k = 1, \ldots, K.
+\label{eq:app-cluster}
+\end{equation}
+
+\paragraph{Step 4 (unconstrained atoms).}
+Atoms are sampled in the unconstrained parameterisation and the centring is reapplied deterministically.
+Let $n_{sk} = \sum_i \1\{S_i = s, Z_i = k\}$ and $\tilde R_{sk} = \sum_{i : Z_i = k,\, S_i = s} (R_i + \mu_s)$.
+The conjugate Gaussian update is precision-weighted across sources:
+\begin{equation}
+\theta_k^* \mid \cdot \;\sim\; N\!\left(\frac{\sum_{s} \sigma_s^{-2}\, \tilde R_{sk}}{\sigma_\theta^{-2} + \sum_{s} \sigma_s^{-2}\, n_{sk}},\; \bigl(\sigma_\theta^{-2} + \sum_{s} \sigma_s^{-2}\, n_{sk}\bigr)^{-1}\right), \qquad k = 1, \ldots, K.
+\label{eq:app-atom-update}
+\end{equation}
+After updating all atoms, recompute $\mu_s = \sum_k \pi_{sk} \theta_k^*$ and $\theta_{sk} = \theta_k^* - \mu_s$ for $s \in \{0, 1\}$.
+As discussed in \citet{yang2010semiparametric}, this parameter-expansion strategy preserves the correct marginal posterior for the centred quantities.
+
+\paragraph{Step 5 (top-level sticks).}
+The top-level stick weights are updated using the auxiliary table-count augmentation of \citet{teh2006hierarchical}.
+Let $n_{sk} = \sum_i \1\{S_i = s,\, Z_i = k\}$.
+For each $(s, k)$ with $n_{sk} > 0$, sample the auxiliary table count $t_{sk}$ via the Antoniak representation \citep{antoniak1974mixtures}:
+\begin{equation}
+t_{sk} \;=\; \sum_{j=1}^{n_{sk}} B_{sk,j}, \qquad B_{sk,j} \;\sim\; \mathrm{Bernoulli}\!\left(\frac{M_s \beta_k}{M_s \beta_k + j - 1}\right),
+\end{equation}
+and set $t_{sk} = 0$ if $n_{sk} = 0$.
+Let $t_{\cdot k} = t_{0k} + t_{1k}$.
+Update the truncated sticks:
+\begin{equation}
+u_k \mid \cdot \;\sim\; \mathrm{Beta}\!\left(1 + t_{\cdot k},\; \gamma + \sum_{l > k} t_{\cdot l}\right), \qquad k = 1, \ldots, K - 1,
+\end{equation}
+with $u_K = 1$, and recompute $\beta_k = u_k \prod_{l < k}(1 - u_l)$.
+
+\paragraph{Step 6 (source-specific weights).}
+For each $s \in \{0, 1\}$, sample:
+\begin{equation}
+\bm{\pi}_s \mid \cdot \;\sim\; \mathrm{Dirichlet}(M_s \beta_1 + n_{s1},\, \ldots,\, M_s \beta_K + n_{sK}).
+\end{equation}
+Recompute $\mu_s$ and the centred atoms.
+
+\paragraph{Step 7 (concentration parameters).}
+The concentration parameters $\gamma$ and $M_0, M_1$ are updated using the auxiliary-variable approach of \citet{escobar1995bayesian}.
+For $\gamma$, let $K^*$ denote the number of occupied top-level components and $t_{\cdot\cdot} = \sum_{s,k} t_{sk}$ the total table count.
+Sample $\eta_\gamma \mid \gamma, t_{\cdot\cdot} \sim \mathrm{Beta}(\gamma + 1, t_{\cdot\cdot})$, then:
+\begin{equation}
+\gamma \mid \cdot \;\sim\; \omega_\gamma\, \mathrm{Gamma}(a_\gamma + K^*,\, b_\gamma - \log \eta_\gamma) + (1 - \omega_\gamma)\, \mathrm{Gamma}(a_\gamma + K^* - 1,\, b_\gamma - \log \eta_\gamma),
+\end{equation}
+with $\omega_\gamma / (1 - \omega_\gamma) = (a_\gamma + K^* - 1) / [t_{\cdot\cdot}(b_\gamma - \log \eta_\gamma)]$.
+The analogous update for $M_s$ replaces $K^*$ by the source-specific table count $t_{s\cdot} = \sum_k t_{sk}$ and uses $\eta_{M, s} \sim \mathrm{Beta}(M_s + 1, n_s)$.
+See \citet[Appendix A]{teh2006hierarchical} for the derivation.
+
+\paragraph{Step 8 (error scale).}
+The conjugate update for the residual variance is:
+\begin{equation}
+\sigma_s^2 \mid \cdot \;\sim\; \mathrm{InverseGamma}\!\left(\frac{\nu + n_s}{2},\; \frac{\nu\lambda + \hat s_s^2}{2}\right), \qquad \hat s_s^2 = \sum_{i : S_i = s} \big(R_i - (\theta_{Z_i}^* - \mu_s)\big)^2, \qquad s \in \{0, 1\}.
+\end{equation}
+
+\paragraph{Hyperparameter calibration.}
+We adopt the BART defaults of \citet{chipman2010bart} with the AFT-specific adaptations of \citet{henderson2020individualized}: $J = 200$ trees, $\alpha = 0.95$, $\beta = 2$, and the response transformation $y_i^{\mathrm{tr}} = y_i \exp(-\hat\mu_{\mathrm{AFT}})$ based on a preliminary parametric log-normal AFT fit.
+The error-scale hyperparameters $\lambda$ and $\sigma_\theta^2$ are calibrated using the Yamato-type approximation \citep{yamato1984characteristic}.
+The quantity $\sum_k \pi_{sk}(\theta_k^* - \mu_s)^2 / \sigma_\theta^2$ is approximately $\chi^2_1$ in distribution.
+The induced prior on the marginal residual variance $\mathrm{Var}(\varepsilon \mid S = s)$ can therefore be matched in tail probability to a preliminary parametric estimate $\hat\sigma_\varepsilon^2$.
+The approximation applies within each source separately.
+We use a default tail probability $q = 0.5$.
+
+The concentration hyperpriors are $\gamma \sim \mathrm{Gamma}(a_\gamma, b_\gamma)$ and $M_s \sim \mathrm{Gamma}(a_M, b_M)$ for $s \in \{0, 1\}$, with $a_\gamma = a_M = 2$ and $b_\gamma = b_M = 0.1$.
+This places prior mean $20$ on each concentration with prior mode $10$.
+
+\paragraph{Practical considerations.}
+Track $\max_i Z_i$ across iterations.
+If the largest occupied index equals $K$ in more than a negligible fraction of iterations, the truncation is too tight and $K$ should be increased.
+For initialisation, use the standard \citet{chipman2010bart} initialisation for the BART components.
+Cluster labels can be assigned by $k$-means on residuals from a preliminary parametric fit.
+Set $\bm{\beta} = (1/K, \ldots, 1/K)$, $\bm{\pi}_s = \bm{\beta}$, and $\gamma = M_0 = M_1 = 1$.
+
+\newpage
+\subsection{The hierarchical $m_0$ prior as a meta-analytic-predictive prior}\label{sm:map-m0}
+
+The meta-analytic-predictive (MAP) prior of \citet{neuenschwander2010} is a hierarchical Bayesian construction for borrowing strength between studies.
+We derive our specification \eqref{eq:m0-decomp-prop} of $m_0(X, S)$ as a function-valued instance of the MAP construction.
+
+\paragraph{Setup of the MAP prior.}
+Consider $K$ studies with study-specific parameters $\theta_1, \ldots, \theta_K$.
+The MAP prior assumes a Gaussian hierarchical structure:
+\begin{align}
+\theta_k \mid \mu, \sigma_d^2 &\;\sim\; N(\mu, \sigma_d^2), \qquad k = 1, \ldots, K, \\
+\mu &\;\sim\; p(\mu), \\
+\sigma_d &\;\sim\; p(\sigma_d).
+\label{eq:map-scalar}
+\end{align}
+The shared mean $\mu$ is the borrowing target.
+The heterogeneity variance $\sigma_d^2$ controls how strongly each $\theta_k$ is shrunk towards $\mu$.
+Small $\sigma_d$ enforces near-equality of the $\theta_k$, i.e.\ strong borrowing.
+Large $\sigma_d$ allows the $\theta_k$ to drift apart, i.e.\ weak borrowing.
+The hierarchical structure lets the data determine the degree of borrowing through the posterior of $\sigma_d$.
+
+\paragraph{Function-valued extension.}
+Our two studies are the RWD ($s = 0$) and the RCT ($s = 1$), and the study-specific parameter is the prognostic function evaluated at source $s$:
+\begin{equation}
+\theta_s(X) \;:=\; m_0(X, s), \qquad s \in \{0, 1\}.
+\end{equation}
+We extend \eqref{eq:map-scalar} from a scalar to a function by replacing the shared mean with a shared function and the Gaussian deviation with a function-valued deviation:
+\begin{align}
+m_0(X, s) &\;=\; m_0^{\mathrm{sh}}(X) + d_s(X), \qquad s \in \{0, 1\}, \\
+m_0^{\mathrm{sh}} &\;\sim\; \mathrm{BART}(\sigma_{h, \mathrm{sh}}^2), \\
+d_s &\;\sim\; \mathrm{BART}(\sigma_d^2), \qquad \text{independently across } s.
+\label{eq:map-functional}
+\end{align}
+The BART prior plays the role of a nonparametric prior over functions.
+The leaf-prior variance $\sigma_d^2$ now controls cross-source heterogeneity in the same way as the scalar MAP.
+The construction is heterogeneous because the deviation is allowed to vary with $X$.
+The standard MAP assigns a hyperprior to $\sigma_d$ and lets the data drive borrowing through its posterior.
+We instead treat $\sigma_d$ as a calibrated hyperparameter, in line with standard BART practice for leaf-prior scales; the calibration is given below.
+
+\paragraph{Anchored simplification used in the main text.}
+The main-text specification \eqref{eq:m0-decomp-prop} anchors at the RCT by setting $d_1 \equiv 0$ and writing $d_0 = d$, giving:
+\begin{equation}
+m_0(X, S) \;=\; m_0^{\mathrm{sh}}(X) + (1 - S) \cdot d(X).
+\end{equation}
+This anchors the prognostic function at the RCT level and treats the RWD as the source that drifts from it.
+The anchored form is parsimonious and integrates cleanly with the backfitting sampler.
+The fully symmetric form \eqref{eq:map-functional} with separate $d_0$ and $d_1$ retains the same identifiability of $\tau$ and $c$ and is preferable when neither source plays the role of a natural reference.
+
+\paragraph{Semiparametric extension of \citet{hupf2021bayesian}.}
+The standard MAP \eqref{eq:map-scalar} assumes Gaussian deviations, which is restrictive when one or more studies are outliers.
+\citet{hupf2021bayesian} extend MAP to flexible deviations through a Dirichlet-process-based prior on the heterogeneity distribution.
+The BART-based deviation in our functional MAP \eqref{eq:map-functional} plays an analogous role at the function level.
+It allows the shape of $d_s$ to depart from a parametric form whenever the data demand it, while retaining the borrowing target $m_0^{\mathrm{sh}}$.
+
+\paragraph{Calibration of the borrowing scale.}
+We treat $\sigma_d$ as a calibrated hyperparameter rather than sampling it.
+The leaf-prior standard deviation of the deviation forest is set by the Chipman--George--McCulloch rule \citep{chipman2010bart}:
+\begin{equation}
+\sigma_d \;=\; \frac{k_d}{2\sqrt{m_d}},
+\label{eq:map-sigma-d}
+\end{equation}
+where $m_d$ is the number of trees in the deviation forest and $k_d > 0$ is the tuning constant of the Chipman calibration applied to the deviation forest, playing the role of the borrowing-strength dial.
+Small $k_d$ shrinks $d$ towards zero and induces strong borrowing of the RWD prognostic towards the RCT prognostic.
+Large $k_d$ relaxes the prior and lets $d$ depart further from zero.
+We take $k_d = 1$ by default, in line with the uniform Chipman calibration of the main text.
+A fully Bayesian alternative is to put a hyperprior on $\sigma_d$ as in the standard MAP \citep{neuenschwander2010}; this trades the simplicity of the BART convention for additional data-driven adaptation of the borrowing strength.
+
+\newpage
+\subsection{Outer Gibbs sampler and tree updates}\label{sm:computation}
+
+The posterior is sampled by a blocked Gibbs sampler built on an extended Bayesian backfitting approach \citep{chipman2010bart, hahn2020bayesian}.
+One sweep of the sampler is summarised in Algorithm~\ref{alg:outer-gibbs}.
+The sampler interleaves data augmentation for censored observations, single-tree reversible-jump updates of the four forests, an update of the borrowing scale $\sigma_d$, and an update of the HDPM error block.
+
+\paragraph{Single-tree reversible-jump updates.}
+Each tree-and-step-height pair $(\mathcal{T}_j^f, \mathcal{H}_j^f)$ is updated by one of three reversible-jump proposals: \texttt{GROW}, \texttt{PRUNE}, or \texttt{CHANGE}.
+The proposal mechanism follows \citet{chipman2010bart} with the AFT-specific adaptations of \citet{henderson2020individualized}.
+Full derivations of the acceptance ratios are given in the references cited above and are not reproduced here.
+The conjugate Gaussian update of the leaf step heights is performed jointly with the structural proposal.
+
+\paragraph{Partial residuals.}
+Each forest is updated against a partial residual that subtracts the contributions of the other three forests and the current cluster shift $\theta_{Z_i}^* - \mu_{S_i}$ from the residual mixture.
+The active subset of observations differs across forests.
+The shared baseline $m_0^{\mathrm{sh}}$ uses all observations.
+The deviation $d$ uses the RCT observations only.
+The treatment effect $\tau$ uses the treated observations from both sources.
+The confounding function $c$ uses the treated RWD observations.
+
+\paragraph{Borrowing-scale update.}
+The borrowing scale $\sigma_d$ of the heterogeneous MAP prior in Supplementary Materials~\ref{sm:map-m0} is sampled from its conjugate posterior at the end of each sweep.
+
+\paragraph{HDPM error block.}
+The blocked update of the error distribution is summarised in Algorithm~\ref{alg:hdp-error}.
+Each step corresponds to a conjugate Categorical, Gaussian, Beta, Dirichlet, Gamma, or inverse-Gamma update.
+The full mathematical specification of every step is given in Supplementary Materials~\ref{sm:hdp-error}.
+
+\paragraph{Data augmentation for censoring.}
+Observations with $\delta_i = 0$ have their unobserved $\log T_i$ drawn from a truncated normal restricted to $[\log C_i, \infty)$ at the start of each sweep \citep{tanner1987}.
+
+\begin{algorithm}[tb]
+\caption{Outer Gibbs sampler --- one sweep}
+\label{alg:outer-gibbs}
+\KwIn{Current forests $(\mathcal{T}_j^f, \mathcal{H}_j^f)$ for $f \in \{m_0^{\mathrm{sh}}, d, \tau, c\}$; observed follow-up times $\tilde T_i$ and event indicators $\delta_i$; HDPM error state; borrowing scale $\sigma_d$.}
+\vspace{1ex}
+
+\For{$i = 1$ \KwTo $n$ with $\delta_i = 0$}{
+  Draw $\log T_i$ from a truncated normal restricted to $[\log C_i, \infty)$\;
+}
+\vspace{1ex}
+
+\ForEach{forest $f \in \{m_0^{\mathrm{sh}}, d, \tau, c\}$}{
+  \For{$j = 1$ \KwTo $m_f$}{
+    Compute the partial residual $\mathcal{R}_j^f$ on the active subset for $f$\;
+    Update $(\mathcal{T}_j^f, \mathcal{H}_j^f)$ by a single-tree reversible-jump step\;
+  }
+}
+\vspace{1ex}
+
+Update the borrowing scale $\sigma_d$ from its conjugate posterior\;
+\vspace{1ex}
+
+Update the HDPM error block (Algorithm~\ref{alg:hdp-error})\;
+\end{algorithm}
+
+\begin{algorithm}[tb]
+\caption{HDPM error block --- one update}
+\label{alg:hdp-error}
+\KwIn{Partial residuals $R_i = \log T_i - m_0^{\mathrm{sh}}(X_i) - S_i d(X_i) - A_i \tau(X_i) - A_i(1 - S_i) c(X_i)$; current atoms $\bm{\theta}^*$, sticks $\bm{\beta}$, source weights $\bm{\pi}_0, \bm{\pi}_1$, concentrations $\gamma, M_0, M_1$, error scales $\sigma_0^2, \sigma_1^2$.}
+\vspace{1ex}
+
+\For{$i = 1$ \KwTo $n$}{
+  Sample cluster assignment $Z_i$ from the categorical full conditional\;
+}
+\vspace{1ex}
+
+\For{$k = 1$ \KwTo $K$}{
+  Update the unconstrained atom $\theta_k^*$ from its conjugate Gaussian posterior\;
+}
+Recompute $\mu_s = \sum_k \pi_{sk} \theta_k^*$ and the centred atoms\;
+\vspace{1ex}
+
+Sample auxiliary table counts $t_{sk}$ via the Antoniak representation\;
+Update top-level sticks $u_k$ from Beta posteriors, then recompute $\beta_k$\;
+\vspace{1ex}
+
+\ForEach{$s \in \{0, 1\}$}{
+  Update source weights $\bm{\pi}_s$ from a Dirichlet posterior\;
+}
+Recompute $\mu_s$ and the centred atoms\;
+\vspace{1ex}
+
+Update concentrations $\gamma, M_0, M_1$ via the Escobar--West auxiliary-variable scheme\;
+\vspace{1ex}
+
+\ForEach{$s \in \{0, 1\}$}{
+  Update the error scale $\sigma_s^2$ from its conjugate inverse-gamma posterior\;
+}
+\end{algorithm}
+
+\newpage
+\subsection{Posterior computation \textnormal{\textit{[merged draft for review]}}}\label{sm:posterior-computation-merged}
+
+\textit{Merged and streamlined replacement of the previous Supplementary-Materials sections on the HDPM error model (\ref{sm:hdp-error}) and the outer Gibbs sampler (\ref{sm:computation}). Added as a separate section so the originals can be compared against it before deletion.}
+
+These Supplementary Materials specify the full conditional distribution of every block of the posterior sampler.
+We sample the posterior by a blocked Gibbs sampler built on extended Bayesian backfitting \citep{hastie2000bayesian}.
+The next subsections describe the outer sampler at a high level and then give the update for each block in turn.
+
+\subsubsection*{Outer Gibbs sampler}
+
+One iteration of the sampler consists of three blocks executed in order: updates of the four forests $f \in \{m_0^{\mathrm{sh}}, d, \tau, c\}$ in turn, an update of the HDPM error block, and data augmentation of the censored event times.
+Algorithm~\ref{alg:outer-gibbs-m} summarises one iteration, and Algorithm~\ref{alg:hdp-error-m} summarises the inner update of the HDPM error block.
+After burn-in, each iteration produces one posterior sample of the full parameter vector.
+The leaf-variance hyperparameters of the four forests, including the borrowing scale $\sigma_d$ of the deviation forest, are treated as calibrated hyperparameters and held fixed across iterations.
+Their calibration is described at the end of these Supplementary Materials.
+
+\subsubsection*{Forest updates}
+
+The four forests are updated sequentially by Bayesian backfitting.
+Each tree is updated by a birth-death Metropolis-Hastings step on the tree structure, following \citet{chipman2010bart} with the AFT-specific adaptations of \citet{henderson2020individualized}.
+The leaf step heights are drawn from their conjugate Gaussian posterior conditional on the tree structure.
+Each forest is updated against a partial residual that subtracts the contributions of the other three forests and the current cluster shift $\theta_{Z_i}^* - \mu_{S_i}$ from $\log T_i$.
+The active subset of observations differs across forests: $m_0^{\mathrm{sh}}$ uses all observations, $d$ uses the RCT observations, $\tau$ uses the treated observations from both sources, and $c$ uses the treated RWD observations.
+
+\subsubsection*{Updating the HDPM error block}
+
+The HDPM error block updates the latent variables of the nonparametric error distribution: cluster assignments, atoms, top-level stick weights, source-specific weights, concentration parameters, and the per-source residual variances.
+All full conditionals are conjugate.
+We first state the truncation of the top-level stick-breaking and the resulting hierarchical model, and then give the full conditional for each update in turn.
+
+For computation we truncate the top-level stick-breaking at a finite level $K$ \citep{ishwaran2001gibbs}, setting $u_K = 1$ so that $\beta_K = 1 - \sum_{k < K} \beta_k$ and $\beta_k = 0$ for $k > K$.
+Conditional on the truncated $\bm{\beta} \in \Delta^{K-1}$, the source-specific weights have a finite-dimensional Dirichlet prior:
+\begin{equation}
+\bm{\pi}_s \mid \bm{\beta},\, M_s \;\sim\; \mathrm{Dirichlet}(M_s \beta_1, \ldots, M_s \beta_K),
+\label{eq:hdp-pi-prior-m}
+\end{equation}
+the standard truncated representation of the hierarchical Dirichlet process \citep{teh2006hierarchical, wang2009variational}.
+The approximation becomes exact as $K \to \infty$, and we use a default of $K = 50$.
+We introduce latent cluster assignments $Z_i \in \{1, \ldots, K\}$ such that the latent location for observation $i$ is $\theta_{Z_i}^* - \mu_{S_i}$, with $\mu_s = \sum_k \pi_{sk} \theta_k^*$.
+The full hierarchical model after truncation is then:
+\begin{align}
+\log T_i \mid \cdot &\;\sim\; N(\eta_i,\; \sigma_{S_i}^2),\\
+Z_i \mid \bm{\pi}_{S_i} &\;\sim\; \mathrm{Categorical}(\bm{\pi}_{S_i}),\\
+\bm{\pi}_s \mid \bm{\beta},\, M_s &\;\sim\; \mathrm{Dirichlet}(M_s \beta_1, \ldots, M_s \beta_K), \quad s \in \{0, 1\},\\
+\bm{\beta} \mid \gamma &\;\sim\; \mathrm{Stick}_K(\gamma),\\
+\theta_k^* &\;\stackrel{\mathrm{iid}}{\sim}\; N(0, \sigma_\theta^2), \quad k = 1, \ldots, K,\\
+\sigma_s^2 &\;\sim\; \nu\lambda / \chi^2_\nu, \quad s \in \{0, 1\},\\
+\gamma &\;\sim\; \mathrm{Gamma}(a_\gamma, b_\gamma),\\
+M_s &\;\sim\; \mathrm{Gamma}(a_M, b_M), \quad s \in \{0, 1\},
+\end{align}
+where $\mathrm{Stick}_K(\gamma)$ denotes the truncated stick-breaking distribution with $\mathrm{Beta}(1, \gamma)$ breaks.
+
+The full conditionals below are all conjugate given the forests and the augmented event times.
+We define the partial residual
+\begin{equation}
+R_i \;:=\; \log T_i - m_0^{\mathrm{sh}}(X_i) - (1 - S_i)\, d(X_i) - A_i\, \tau(X_i) - A_i(1 - S_i)\, c(X_i),
+\label{eq:app-Ri-m}
+\end{equation}
+so that $R_i \mid Z_i = k \sim N(\theta_k^* - \mu_{S_i}, \sigma_{S_i}^2)$.
+The cluster assignments are then sampled by
+\begin{equation}
+P(Z_i = k \mid \cdot) \;\propto\; \pi_{S_i, k}\, \phi\!\left(\frac{R_i - (\theta_k^* - \mu_{S_i})}{\sigma_{S_i}}\right), \quad k = 1, \ldots, K.
+\label{eq:app-cluster-m}
+\end{equation}
+
+We sample atoms in the unconstrained parameterisation and reapply centring deterministically.
+Let $n_{sk} = \sum_i \1\{S_i = s, Z_i = k\}$ and $\tilde R_{sk} = \sum_{i : Z_i = k,\, S_i = s} (R_i + \mu_s)$.
+The conjugate Gaussian update is precision-weighted across sources:
+\begin{equation}
+\theta_k^* \mid \cdot \;\sim\; N\!\left(\frac{\sum_{s} \sigma_s^{-2}\, \tilde R_{sk}}{\sigma_\theta^{-2} + \sum_{s} \sigma_s^{-2}\, n_{sk}},\; \bigl(\sigma_\theta^{-2} + \sum_{s} \sigma_s^{-2}\, n_{sk}\bigr)^{-1}\right), \quad k = 1, \ldots, K.
+\label{eq:app-atom-update-m}
+\end{equation}
+We then recompute $\mu_s = \sum_k \pi_{sk} \theta_k^*$ and the centred atoms $\theta_{sk} = \theta_k^* - \mu_s$.
+This parameter-expansion strategy preserves the correct marginal posterior for the centred quantities \citep{yang2010semiparametric}.
+
+The top-level stick weights are updated by the auxiliary table-count augmentation of \citet{teh2006hierarchical}.
+For each $(s, k)$ with $n_{sk} > 0$ we sample the auxiliary table count via the Antoniak representation \citep{antoniak1974mixtures}:
+\begin{equation}
+t_{sk} \;=\; \sum_{j=1}^{n_{sk}} B_{sk,j}, \quad B_{sk,j} \;\sim\; \mathrm{Bernoulli}\!\left(\frac{M_s \beta_k}{M_s \beta_k + j - 1}\right),
+\end{equation}
+and set $t_{sk} = 0$ when $n_{sk} = 0$.
+With $t_{\cdot k} = t_{0k} + t_{1k}$, the truncated sticks are updated by
+\begin{equation}
+u_k \mid \cdot \;\sim\; \mathrm{Beta}\!\left(1 + t_{\cdot k},\; \gamma + \sum_{l > k} t_{\cdot l}\right), \quad k = 1, \ldots, K - 1,
+\end{equation}
+with $u_K = 1$ and $\beta_k = u_k \prod_{l < k}(1 - u_l)$.
+The source-specific weights then follow
+\begin{equation}
+\bm{\pi}_s \mid \cdot \;\sim\; \mathrm{Dirichlet}(M_s \beta_1 + n_{s1},\, \ldots,\, M_s \beta_K + n_{sK}), \quad s \in \{0, 1\},
+\end{equation}
+after which we recompute $\mu_s$ and the centred atoms.
+
+The concentration parameters $\gamma$ and $M_0, M_1$ are updated by the auxiliary-variable scheme of \citet{escobar1995bayesian}.
+Let $K^*$ denote the number of occupied top-level components and $t_{\cdot\cdot} = \sum_{s,k} t_{sk}$ the total table count.
+We draw $\eta_\gamma \mid \gamma, t_{\cdot\cdot} \sim \mathrm{Beta}(\gamma + 1, t_{\cdot\cdot})$ and then
+\begin{equation}
+\gamma \mid \cdot \;\sim\; \omega_\gamma\, \mathrm{Gamma}(a_\gamma + K^*,\, b_\gamma - \log \eta_\gamma) + (1 - \omega_\gamma)\, \mathrm{Gamma}(a_\gamma + K^* - 1,\, b_\gamma - \log \eta_\gamma),
+\end{equation}
+with $\omega_\gamma / (1 - \omega_\gamma) = (a_\gamma + K^* - 1) / [t_{\cdot\cdot}(b_\gamma - \log \eta_\gamma)]$.
+The analogous update for $M_s$ replaces $K^*$ by the source-specific table count $t_{s\cdot} = \sum_k t_{sk}$ and uses $\eta_{M, s} \sim \mathrm{Beta}(M_s + 1, n_s)$.
+The derivation is in \citet[Appendix A]{teh2006hierarchical}.
+
+The conjugate update of the residual variance closes the block:
+\begin{equation}
+\sigma_s^2 \mid \cdot \;\sim\; \mathrm{InverseGamma}\!\left(\frac{\nu + n_s}{2},\; \frac{\nu\lambda + \hat s_s^2}{2}\right), \quad \hat s_s^2 = \sum_{i : S_i = s} \big(R_i - (\theta_{Z_i}^* - \mu_s)\big)^2, \quad s \in \{0, 1\}.
+\end{equation}
+
+\subsubsection*{Data augmentation for censored event times}
+
+Each iteration closes with data augmentation of the unobserved event times for right-censored observations \citep{tanner1987}.
+For every $i$ with $\delta_i = 0$ we draw
+\begin{equation}
+\log T_i \mid \cdot \;\sim\; \mathrm{TruncatedNormal}\!\left(\eta_i,\, \sigma_{S_i}^2;\, [\log C_i, \infty)\right),
+\end{equation}
+where $\eta_i = m_0^{\mathrm{sh}}(X_i) + (1 - S_i)\, d(X_i) + A_i\, \tau(X_i) + A_i(1 - S_i)\, c(X_i) + \theta_{Z_i}^* - \mu_{S_i}$ is the conditional mean of $\log T_i$ at the current parameter values.
+The augmented values then serve as the working response for the next iteration.
+
+\subsubsection*{Hyperparameter calibration and initialisation}
+
+We adopt the BART defaults of \citet{chipman2010bart} with the AFT-specific adaptations of \citet{henderson2020individualized}: $J = 200$ trees, $\alpha = 0.95$, $\beta = 2$, and the response transformation $y_i^{\mathrm{tr}} = y_i \exp(-\hat\mu_{\mathrm{AFT}})$ based on a preliminary parametric log-normal AFT fit.
+The leaf-prior standard deviation of each forest $f$ is calibrated by the Chipman--George--McCulloch rule $\sigma_{h, f} = k_f / (2\sqrt{m_f})$, where $m_f$ is the number of trees in the forest and $k_f > 0$ is a tuning constant.
+The borrowing scale of the deviation forest is the special case $\sigma_d = k_d / (2\sqrt{m_d})$.
+Small $k_d$ shrinks the deviation $d$ towards zero and induces strong borrowing of the RWD prognostic towards the RCT prognostic; large $k_d$ relaxes the prior and lets $d$ depart further from zero.
+The default $k_f = 1$ for every forest $f$ matches the main-text calibration.
+The error-scale hyperparameters $\lambda$ and $\sigma_\theta^2$ are calibrated by a Yamato-type approximation \citep{yamato1984characteristic}.
+The quantity $\sum_k \pi_{sk}(\theta_k^* - \mu_s)^2 / \sigma_\theta^2$ is approximately $\chi^2_1$, so the induced prior on the marginal residual variance $\mathrm{Var}(\varepsilon \mid S = s)$ can be matched in tail probability to a preliminary parametric estimate $\hat\sigma_\varepsilon^2$.
+The approximation is applied within each source separately, with a default tail probability of $q = 0.5$.
+For the concentration hyperpriors we use $a_\gamma = a_M = 2$ and $b_\gamma = b_M = 0.1$, which places prior mean $20$ and prior mode $10$ on each concentration.
+We initialise the BART components by the defaults of \citet{chipman2010bart}, the cluster labels by $k$-means on residuals from a preliminary parametric fit, and the HDPM weights by $\bm{\beta} = (1/K, \ldots, 1/K)$, $\bm{\pi}_s = \bm{\beta}$, and $\gamma = M_0 = M_1 = 1$.
+We track $\max_i Z_i$ across iterations; if it equals $K$ in more than a negligible fraction of iterations, the truncation level $K$ should be increased.
+
+\begin{algorithm}[tb]
+\caption{Outer Gibbs sampler, one iteration.}
+\label{alg:outer-gibbs-m}
+\KwIn{Current forests $(\mathcal{T}_j^f, \mathcal{H}_j^f)$ for $f \in \{m_0^{\mathrm{sh}}, d, \tau, c\}$; current augmented event times $\log T_i$; HDPM error state. Calibrated hyperparameters $\sigma_{h, f}$ for each forest are held fixed.}
+\vspace{1ex}
+
+\ForEach{forest $f \in \{m_0^{\mathrm{sh}}, d, \tau, c\}$}{
+  \For{$j = 1$ \KwTo $m_f$}{
+    Compute the partial residual $\mathcal{R}_j^f$ on the active subset for $f$\;
+    Update $\mathcal{T}_j^f$ by a birth-death Metropolis-Hastings step, then draw $\mathcal{H}_j^f$ from its conjugate posterior\;
+  }
+}
+\vspace{1ex}
+
+Update the HDPM error block (Algorithm~\ref{alg:hdp-error-m})\;
+\vspace{1ex}
+
+\For{$i = 1$ \KwTo $n$ with $\delta_i = 0$}{
+  Draw $\log T_i$ from a truncated normal restricted to $[\log C_i, \infty)$\;
+}
+\end{algorithm}
+
+\begin{algorithm}[tb]
+\caption{Update of the HDPM parameters block.}
+\label{alg:hdp-error-m}
+\KwIn{Partial residuals $R_i$ from \eqref{eq:app-Ri-m}; current atoms $\bm{\theta}^*$, sticks $\bm{\beta}$, source weights $\bm{\pi}_0, \bm{\pi}_1$, concentrations $\gamma, M_0, M_1$, error scales $\sigma_0^2, \sigma_1^2$.}
+\vspace{1ex}
+
+\For{$i = 1$ \KwTo $n$}{
+  Sample cluster assignment $Z_i$ from the categorical full conditional in \eqref{eq:app-cluster-m}\;
+}
+\vspace{1ex}
+
+\For{$k = 1$ \KwTo $K$}{
+  Update the unconstrained atom $\theta_k^*$ from its conjugate Gaussian posterior in \eqref{eq:app-atom-update-m}\;
+}
+Recompute $\mu_s = \sum_k \pi_{sk} \theta_k^*$ and the centred atoms\;
+\vspace{1ex}
+
+Sample auxiliary table counts $t_{sk}$ via the Antoniak representation\;
+Update top-level sticks $u_k$ from Beta posteriors, then recompute $\beta_k$\;
+\vspace{1ex}
+
+\ForEach{$s \in \{0, 1\}$}{
+  Update source weights $\bm{\pi}_s$ from a Dirichlet posterior\;
+}
+Recompute $\mu_s$ and the centred atoms\;
+\vspace{1ex}
+
+Update concentrations $\gamma, M_0, M_1$ via the Escobar-West auxiliary-variable scheme\;
+\vspace{1ex}
+
+\ForEach{$s \in \{0, 1\}$}{
+  Update the error scale $\sigma_s^2$ from its conjugate inverse-gamma posterior\;
+}
+\end{algorithm}
+
+
+%% ===== Working notes (status / to-do) — NOT part of the manuscript =====
+\begin{comment}
+\clearpage
+\subsection*{Supplementary Materials: Section structure and writing status}\label{sm:status}
+
+This section records the current state of the methodology section: the proposed final structure, what is drafted, what remains, and the open items that need attention.
+
+\paragraph{Proposed structure of the methodology section.}
+\textit{Main text.}
+\begin{enumerate}[itemsep=2pt]
+  \item \textbf{Causal framework} --- data sources, notation, potential outcomes, censoring formulation, CATE and acceleration factor, assumptions, and the identification trade-off (RWD unconfoundedness against CATE transportability).
+  \item \textbf{Accelerated failure time decomposition} --- confounding function $c(x)$, the additive decomposition of $\E[\log T \mid A, X, S]$, identification of $\tau$ and $c$, the AFT outcome model.
+  \item \textbf{Nonparametric error distribution} --- hierarchical Dirichlet process mixture of normals (HDPM) with source-specific scales $\sigma_s$.
+  \item \textbf{Overview of BART} --- Bayesian additive regression trees as the prior for the regression functions, with the $\mathrm{BART}(m, k, \alpha, \beta)$ shorthand and the tree-structure / step-height prior decomposition.
+  \item \textbf{Prior specification} --- BART priors on $m_0^{\mathrm{sh}}, d, \tau, c$ with regularisation matched to each component, the $\sigma_s$ scaled-inverse-$\chi^2$ prior, standardisation of the response, and the hierarchical model summary.
+  \item \textbf{Posterior inference} --- hierarchical Bayesian Bootstrap for marginalising the CATE, posterior computation via extended Bayesian backfitting, and ideas for posterior summaries of heterogeneity, borrowing, and residual fit still to be developed.
+\end{enumerate}
+
+\textit{Supplementary Materials.}
+\begin{enumerate}[label=\Alph*., itemsep=2pt]
+  \item \textbf{Proofs} --- Propositions~\ref{prop:decomp} and~\ref{prop:ident}.
+  \item \textbf{Structural interpretation of $c$} --- reduced-form structural reading via an unmeasured confounder $U$.
+  \item \textbf{Structural causal model for $c$ (expanded)} --- full SCM, DAG, parametric instance, sensitivity-analysis framing.
+  \item \textbf{Posterior computation for the HDPM error model} --- truncation, full hierarchical model, eight-step Gibbs sampler with source-specific scales, hyperparameter calibration.
+  \item \textbf{Hierarchical $m_0$ as a meta-analytic-predictive prior} --- derivation from the MAP framework of \citet{neuenschwander2010}.
+  \item \textbf{Outer Gibbs sampler and tree updates} --- extended Bayesian backfitting algorithm and HDPM error block, with two algorithm boxes.
+\end{enumerate}
+
+\paragraph{Status overview.}
+\begin{center}
+\begin{tabular}{@{}p{4.5cm} l p{8cm}@{}}
+\toprule
+Section & Status & Notes \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Main text.}} \\
+1. Causal framework & Drafted & Interval-censoring formulation in place; identification trade-off paragraph proofread. \\
+2. AFT decomposition & Drafted & Propositions, proofs, structural-reading remark; meta-comment on the $m_0$ parametrisation still embedded. \\
+3. Nonparametric error distribution & Drafted & HDPM construction with per-source $\sigma_s$ and the $\sigma_s^2 \sim \nu\lambda / \chi^2_\nu$ prior calibrated following \citet{chipman2010bart}. \\
+4. Overview of BART & Drafted & Concise; tree-structure and step-height prior named explicitly. \\
+5. Prior specification & Drafted & Regularisation framing matched to each component; recommended default $k_f = 1$ across the four forests, supported by the prior simulation study. \\
+6. Posterior inference & Partially drafted & Hierarchical Bayesian Bootstrap for the ATE drafted; posterior-computation paragraph drafted; itemised placeholders for treatment-effect summaries, heterogeneity, borrowing, and residual fit still to be filled out. \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Supplementary Materials.}} \\
+A. Proofs & Drafted & Two short proofs. \\
+B. Structural interpretation of $c$ & Drafted & Reduced-form reading with proof. \\
+C. Structural causal model (expanded) & Drafted & Overlap with B; decide whether to merge or to clearly delineate roles. \\
+D. Posterior computation HDPM & Drafted & Eight-step sampler with source-specific scales; atom update is precision-weighted. \\
+E. Hierarchical $m_0$ MAP prior & Drafted & Functional MAP derivation; half-Normal scale hyperprior placeholder. \\
+F. Outer Gibbs sampler and tree updates & Drafted & Algorithm 1 (outer sweep) and Algorithm 2 (HDPM error block). \\
+G. Posterior computation \textit{[merged draft]} & For-review only & Streamlined merger of D and F kept alongside the originals; pending decision before deletion of D + F or of G. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+
+\paragraph{Outstanding items.}
+\begin{itemize}[itemsep=2pt]
+  \item \textbf{Section~6 (Posterior inference) is partially drafted.} The ATE/BB paragraph and the posterior-computation paragraph are in place. The four itemised topics (treatment-effect estimands, heterogeneity, borrowing, residual fit) are still placeholder bullets and need to be expanded into prose.
+  \item \textbf{Inline \texttt{[PLACEHOLDER: \ldots]} markers} remain at two locations in the SCM Supplementary Materials: the shrinkage-prior connection in the AFT-decomposition remark, and the sensitivity-analysis framing in the SCM section.
+  \item \textbf{``To be verified''} flag inside the conditional-unconfoundedness weakening of randomisation remark (Section~1).
+  \item \textbf{Two Supplementary-Materials sections on the structural model} (\texttt{sm:scm} and \texttt{sm:scm-full}). The reduced and expanded versions still overlap.
+  \item \textbf{Merged-draft posterior-computation Supplementary-Materials section} (\texttt{sm:posterior-computation-merged}). Streamlined replacement for D and F kept alongside the originals; decide which to keep before circulation.
+  \item \textbf{Robust-MAP citation placeholder} (\texttt{[CITE:Schmidli et al.\ 2014]}) in the Supplementary Materials for the heterogeneity hyperprior. Schmidli 2014 is not yet in the bib.
+  \item \textbf{General-to-do block} at the foot of the file is the author's working notes. Remove before circulation.
+\end{itemize}
+
+\paragraph{Logical next steps.}
+\begin{enumerate}[itemsep=2pt]
+  \item \textbf{Write out Section~6 (Posterior inference).} Expand the four itemised topics into prose: treatment-effect estimands (CATE, AF, possibly TE-VIM), heterogeneity diagnostics, borrowing diagnostics ($\sigma_d$, $c$-shrinkage), and residual-fit diagnostics (active mixture clusters, $F_0$ vs $F_1$).
+  \item \textbf{Resolve the SCM Supplementary-Materials overlap.} Either merge \texttt{sm:scm} and \texttt{sm:scm-full} into one staged section, or sharpen the distinct roles so the reader is not tempted to read both.
+  \item \textbf{Resolve the posterior-computation Supplementary-Materials overlap.} Either keep the merged streamlined version (G) and delete D + F, or keep D + F and delete G.
+  \item \textbf{Citation to add to the bib.} Schmidli et al.\ 2014 for the robust MAP heterogeneity prior, and replace the corresponding \texttt{[CITE:\ldots]} marker.
+  \item \textbf{Final stylistic sweep on Section~6 and the SCM Supplementary Materials.} Sections 1--5 have been audited for \texttt{-ing} openers, em-dashes, prose semicolons, and multi-comma sentences; the remaining material has not.
+\end{enumerate}
+
+
+
+\hrule
+
+\textbf{GENERAL TO DO}
+\begin{itemize}
+  \item very thorough check of section Prior specification.
+  \item Think about Posterior inference;
+  \item check structural causal model section in the Supplementary Materials thoroughly.
+  \item Check for other references for the paragrpah on the between-study-heterogeneity of the CATE, and our relaxation of the confoundedness assumption.
+\end{itemize}
+
+
+\hrule
+
+
+
+
+\end{comment}

@@ -1,0 +1,79 @@
+% !TEX root = ../general/main.tex
+\section{Overview}
+
+This section is a working scaffold. It records the planned structure of the
+data-analysis section and the facts to keep fixed while we draft. We write the
+section one paragraph at a time, then fold this overview in or remove it at the
+end.
+
+We answer one question. What is the effect of zidovudine (ZDV) monotherapy
+versus the pooled combination regimens on event-free survival, and how does it
+vary across patients? We fuse the ACTG~175 trial with the MACS cohort using
+FusionForest. The trial identifies the treatment effect. The cohort extends
+follow-up and reflects treatment in routine care. The confounding function
+shields the effect from the cohort's confounding by indication.
+
+\subsection*{Planned structure}
+
+\begin{enumerate}
+  \item \textbf{Lead paragraph.} The question and the fusion strategy in a few
+        sentences.
+  \item \textbf{Data and cohort} (Table~1). The two sources, the binary
+        treatment contrast, the EFS endpoint, the trial-aligned cohort, the
+        covariates, and the follow-up horizons.
+  \item \textbf{Survival curves} (Figure~1). Kaplan--Meier by arm and source.
+        The trial shows combination therapy ahead. The cohort shows the
+        reverse, which motivates the confounding function.
+  \item \textbf{Model and estimands.} The four-forest AFT decomposition, the
+        source-specific error, and the reported estimands: CATE $\tau(x)$, the
+        acceleration factor $\exp\{\tau(x)\}$, and the ATE. The RCT-only
+        comparator.
+  \item \textbf{Results.}
+        \begin{itemize}
+          \item ATE, fusion versus RCT-only (Table~2, Figure~2).
+          \item Heterogeneity in $\tau(x)$ (Figure~3).
+          \item Confounding function, source deviation, and source-specific
+                error (Figure~4).
+        \end{itemize}
+  \item \textbf{Interpretation.} Tie the results back to the goals set in the
+        introduction.
+\end{enumerate}
+
+\subsection*{Notes to remember}
+
+\begin{itemize}
+  \item \textbf{Endpoint.} Call it EFS throughout. Do not foreground that the
+        current RWD side is overall survival. The numbers are provisional.
+  \item \textbf{Style} (\texttt{general/WRITING\_GUIDE.MD}). Short active
+        sentences. Topic sentence first. \texttt{We \dots} openings. Few signal
+        words. No em-dashes. Report a point estimate with a 95\% credible
+        interval, never a $p$-value. \texttt{booktabs} tables.
+  \item \textbf{Cohort.} RCT (ACTG~175, male) $n = 1771$: $Z{=}0$ (ZDV mono)
+        $432$, $Z{=}1$ (combination) $1339$, with $447$ events. RWD (MACS,
+        baseline CD4 $200$--$500$) $n = 373$: $Z{=}0$ $138$, $Z{=}1$ $235$, with
+        $227$ events. Combined $n = 2144$. RCT horizon ${\approx}\,3.4$~y, MACS
+        ${\approx}\,25$~y.
+  \item \textbf{Covariates.} Age, baseline CD4, baseline CD8, calendar (anchor)
+        year, race, prior antiretroviral years. Prior ARV exposure is the
+        flagged effect modifier.
+  \item \textbf{Numbers} (\texttt{analysis 1/analysis\_summary.txt}). ATE on the
+        log scale: RCT-only $0.559$ $[0.440, 0.679]$, fusion $0.508$
+        $[0.358, 0.670]$. Acceleration factor: RCT-only $1.75$ $[1.55, 1.97]$,
+        fusion $1.67$ $[1.43, 1.95]$. $\mathrm{AF} > 1$ means ZDV monotherapy is
+        inferior.
+  \item \textbf{Figures.} Figure~1 is page~2 of
+        \texttt{analysis 0/survival\_curves\_manuscript.pdf}. Figures~2--4 are
+        pages~1--4 of \texttt{analysis 1/analysis\_figures\_050.pdf}. Copy the
+        needed pages into \texttt{images/} with space-free names.
+  \item \textbf{Reuse, do not duplicate.} \texttt{clinical\_background.tex}
+        (sources, error argument) and \texttt{endpoints.tex} (endpoint and
+        cohort construction). Citation keys already in
+        \texttt{../general/references.bib}: \texttt{hammer1996},
+        \texttt{kaslow1987}, \texttt{delta1996}, \texttt{larder1989},
+        \texttt{concorde1994}, \texttt{hernan2010}.
+  \item \textbf{Caveats.} The ATE numbers are from the provisional (v5) run.
+        The heterogeneity and confounding prose is figure-driven. Specific
+        subgroup and $c(x)$ values stay qualitative or placeholder until read
+        off the final figures.
+\end{itemize}
+

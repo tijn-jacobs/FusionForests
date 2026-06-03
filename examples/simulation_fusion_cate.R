@@ -36,8 +36,8 @@ n_trees_treat  <- 100
 n_trees_deconf <- 200
 n_trees_dev    <- 50
 
-# Leaf-prior scale for deviation forest
-k_g <- 2
+# Leaf-prior scale for deviation forest (omega_g = k_g / sqrt(m_g))
+k_g <- 0.25
 
 # MCMC
 N_post <- 2000
@@ -99,7 +99,7 @@ run_one_rep <- function(rep_id) {
     treatment_indicator_train = trt_rct,
     source_indicator_train    = src,
     outcome_type              = "continuous",
-    decomposition             = "three-forest",
+    decomposition             = "four-forest",
     treatment_coding          = "centered",
     number_of_trees_control   = n_trees_prog,
     number_of_trees_treat     = n_trees_treat,
@@ -122,7 +122,7 @@ run_one_rep <- function(rep_id) {
     treatment_indicator_train = trt_rwd,
     source_indicator_train    = src,
     outcome_type              = "continuous",
-    decomposition             = "three-forest",
+    decomposition             = "four-forest",
     treatment_coding          = "centered",
     number_of_trees_control   = n_trees_prog,
     number_of_trees_treat     = n_trees_treat,
@@ -144,7 +144,7 @@ run_one_rep <- function(rep_id) {
     treatment_indicator_train = trt_all,
     source_indicator_train    = source_all,
     outcome_type              = "continuous",
-    decomposition             = "three-forest",
+    decomposition             = "four-forest",
     treatment_coding          = "centered",
     number_of_trees_control   = n_trees_prog,
     number_of_trees_treat     = n_trees_treat,

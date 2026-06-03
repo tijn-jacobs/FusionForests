@@ -8,7 +8,7 @@
 #   3. Fit three models (all four-forest unless noted):
 #        - "Gaussian"   : error_dist = "gaussian"
 #        - "Source-HDP" : error_dist = "source_hdp"
-#        - "Three-Gss"  : decomposition = "three-forest", gaussian error
+#        - "Three-Gss"  : decomposition = "four-forest", gaussian error
 #   4. Evaluate every estimand (AF, SD, RMST) at both target populations
 #      (RWD and RCT), pointwise and population-averaged with the Bayesian
 #      bootstrap.  Print a summary table and save plots to examples/plots/.
@@ -163,7 +163,7 @@ common_args <- list(
 model_specs <- list(
   Gaussian   = list(decomposition = "four-forest",  error_dist = "gaussian"),
   `Source-HDP` = list(decomposition = "four-forest",  error_dist = "source_hdp"),
-  `Three-Gss`  = list(decomposition = "three-forest", error_dist = "gaussian")
+  `Three-Gss`  = list(decomposition = "four-forest", error_dist = "gaussian")
 )
 
 fits <- vector("list", length(model_specs))

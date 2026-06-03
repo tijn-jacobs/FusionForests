@@ -1,0 +1,20 @@
+============================================================
+  ATE posterior (hierarchical Bayesian bootstrap)
+    M1 target: F_RCT      (regular BB over RCT subjects)
+    M2 target: combined   (HBB with alpha = (n_0, n_1))
+============================================================
+
+Log-survival scale  (positive => treated longer log-survival):
+  M1 (RCT only)           mean = +0.530, median = +0.530, 95% CrI = [+0.412, +0.651]
+  M2 (Fusion)             mean = +0.497, median = +0.498, 95% CrI = [+0.354, +0.641]
+
+Acceleration-factor scale  (exp; 1.0 => no effect):
+  M1 (RCT only)           mean = +1.703, median = +1.699, 95% CrI = [+1.510, +1.918]
+  M2 (Fusion)             mean = +1.649, median = +1.645, 95% CrI = [+1.425, +1.898]
+
+Cohort: RCT n = 1771  (Z=0: 432, Z=1: 1339; events 447)
+        MACS n = 373  (Z=0: 138, Z=1: 235; events 227)
+
+Settings: Chipman k = 1.0 (uniform), wrapper k_X = 0.50,
+          trees (sh, d, tau, c) = (200, 50, 100, 50),
+          N_burn = 5000, N_post = 5000, error_dist = source_hdp_scale

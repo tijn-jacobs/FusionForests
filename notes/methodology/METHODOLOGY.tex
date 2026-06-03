@@ -1,0 +1,344 @@
+% !TEX root = ../general/main.tex
+\section{Methodology}
+
+\subsection{Causal framework}
+
+We consider data from two sources: a randomised controlled trial (RCT) and a real-world data study (RWD).
+The data-source indicator $S \in \{0, 1\}$ takes the value $S = 1$ for RCT observations and $S = 0$ for RWD observations.
+The RCT contributes $n_1$ independent observations and the RWD contributes $n_0$ independent observations.
+We observe a vector of pre-treatment covariates $X \in \mathbb{R}^p$ and a binary treatment $A \in \{0, 1\}$ for each individual.
+The outcome of interest is the nonnegative survival time $T$, subject to censoring.
+We allow two types of censoring: right censoring, and interval censoring.
+For each subject we observe a pair $(L, R)$ with $0 \leq L \leq R \leq \infty$ satisfying $T \in [L, R]$, together with a censoring-type indicator $\delta \in \{0, 1, 2\}$.
+We use the convention that $R = \infty$ stands for $T \in [L, \infty)$.
+These correspond to exact observation ($\delta = 1$: $L = R = T$), right censoring ($\delta = 0$: $L = C$ and $R = \infty$, for some censoring time $C$), and interval censoring ($\delta = 2$: $0 \leq L < R < \infty$).
+The standard right-censored setup is recovered when $\delta \in \{0, 1\}$ for every subject.
+We write $\mathcal{C}$ for the inspection and censoring process underlying $(L, R, \delta)$, and refer to \citet{sun2006statistical} for background.
+We adopt the potential-outcomes framework \citep{rubin1974}: $T(a)$, $\mathcal{C}(a)$, and the corresponding observations $(L(a), R(a), \delta(a))$ are defined analogously under treatment $A = a$.
+
+
+We estimate the conditional average treatment effect (CATE):
+\begin{equation}
+\tau(x) = \E[\log T(1) - \log T(0) \mid X = x].
+\label{eq:cate}
+\end{equation}
+The CATE captures the heterogeneity of the treatment effect across covariate values.
+The corresponding estimand on the multiplicative time scale is the acceleration factor $\exp\{\tau(x)\}$.
+The acceleration factor admits a direct interpretation on the survival-time scale: at every quantile of the survival distribution, treatment rescales the survival time by a constant multiplicative factor \citep{Brathovde2024}.
+This time-scaling is more intuitive in a clinical setting than the relative change in event rate conveyed by a hazard ratio \citep{Swindell2009}.
+The acceleration factor also enjoys causal properties that the hazard ratio lacks.
+\citet{Brathovde2024} show that the observed acceleration factor identifies its causal counterpart under exchangeability and consistency.
+This identification continues to hold under unmeasured frailty and treatment-effect heterogeneity.
+The hazard ratio loses its causal interpretation in those same settings, because conditioning on survival induces a built-in selection bias \citep{hernan2010}.
+The acceleration factor is collapsible: the marginal and conditional acceleration factors coincide when the treatment effect is homogeneous, regardless of the distribution of unmeasured baseline risk \citep{Aalen2015, Crowther2023}.
+
+We impose conditions on the causal structure of the problem and on the censoring mechanism.
+\vspace*{-\parskip}
+\begin{adjustwidth}{1.5em}{1.5em}
+\setlength{\parskip}{0pt}
+\begin{assumption}[Consistency]\label{ass:sutva}
+$T = A\,T(1) + (1 - A)\,T(0)$.
+\end{assumption}
+
+\begin{assumption}[Unconfoundedness of the RCT]\label{ass:rct-unconf}
+$T(a) \,\ind\, A \mid X,\, S = 1$ for each $a\in\{0, 1\}$.
+\end{assumption}
+
+\begin{assumption}[Positivity]\label{ass:positivity-both}
+$0 < \p(A = 1 \mid X = x,\, S = s) < 1$ for each $s \in \{0, 1\}$ and all $x$ in the support of $X \mid S = s$.
+\end{assumption}
+
+\begin{assumption}[Cross-source exchangeability]\label{ass:transport}
+$T(a) \mid X,\, S = 1 \;\overset{d}{=}\; T(a) \mid X,\, S = 0$, for each $a \in \{0, 1\}$.
+\end{assumption}
+
+\begin{assumption}[Conditionally non-informative censoring]\label{ass:censoring}
+$T(a) \,\ind\, \mathcal{C}(a) \mid X,\, A,\, S$ for each  $a\in\{0, 1\}$.
+\end{assumption}
+
+\end{adjustwidth}
+\setlength{\parskip}{0.8em}
+\vspace{0.8em}
+
+
+\begin{remark}[Possible weakening to CATE-only transport]
+Assumption~\ref{ass:transport} may be stronger than needed.
+It could be replaced by the weaker condition that only the conditional log-treatment effect transports across sources:
+\begin{equation}
+\E[\log T(1) - \log T(0) \mid X,\, S = 1] \;=\; \E[\log T(1) - \log T(0) \mid X,\, S = 0].
+\label{eq:cate-transport}
+\end{equation}
+This alleviation may suffice in our setting because the causal estimand is the CATE on the log-time scale.
+\textit{To be verified.}
+\end{remark}
+
+
+Our identification strategy relaxes unconfoundedness in the RWD and retains transportability of the CATE across sources.
+Assumption~\ref{ass:rct-unconf} holds by design in a randomised trial.
+Treatment in the RWD may depend on confounders not contained in $X$.
+The resulting bias is absorbed by the confounding function $c(x)$ introduced in the next section.
+We assume the CATE to be time-invariant by not explicitly letting it depend on time.
+Other approaches that combine evidence from multiple sources take the opposite route: they allow source-specific CATEs but require unconfoundedness within each source \citep{stuart2011propensity, dahabreh2019generalizing, shyr2025multistudy}.
+Such heterogeneity in the CATE arises from varying distributions of unobserved effect modifiers \citep{degtiar2023review}, for example physical activity in breast-cancer treatment \citep{cannioto2021physical}.
+The two relaxations cannot coexist in our setting.
+Without unconfoundedness of the RWD, the CATE and $c(x)$ are not separately identifiable unless the CATE transports across sources.
+We therefore retain Assumption~\ref{ass:transport} as the explicit cost of absorbing RWD confounding into $c(x)$, and acknowledge that CATE heterogeneity across sources falls outside the scope of the current framework.
+
+\subsection{Accelerated failure time decomposition}
+
+The confounding function captures the bias in the RWD that the causal effect $\tau$ alone cannot explain.
+Unconfoundedness fails in the RWD by design.
+The treated-versus-control contrast observed in the RWD therefore differs from the CATE in general.
+We define the \emph{confounding function} $c(x)$ as:
+\begin{equation}
+c(x) \;=\; \E[\log T \mid X = x,\, A = 1,\, S = 0] \,-\, \E[\log T \mid X = x,\, A = 0,\, S = 0] \,-\, \tau(x).
+\label{eq:cf}
+\end{equation}
+The confounding function represents the difference between the RWD treated-versus-control contrast and the true causal effect.
+Under Assumptions~\ref{ass:sutva}--\ref{ass:transport}, the conditional log survival time admits an additive decomposition into a baseline, the causal effect, and the confounding bias.
+\begin{proposition}[Accelerated failure time decomposition]\label{prop:decomp}
+Under Assumptions~\ref{ass:sutva}--\ref{ass:transport}, the conditional log survival time satisfies:
+\begin{equation}
+\E[\log T \mid A,\, X,\, S] \;=\; m_0(X, S) \,+\, \tau(X)\,A \,+\, (1 - S)\,A\,c(X),
+\label{eq:decomp}
+\end{equation}
+where $m_0(X, S) := \E[\log T \mid A = 0,\, X,\, S]$ is the baseline log survival time.
+\end{proposition}
+
+The decomposition separates three pieces.
+The baseline $m_0(X, S)$ is the control-arm log survival time in each source.
+The CATE $\tau(X)$ enters additively whenever an observation is treated, regardless of source.
+The confounding function $c(X)$ contributes only in the treated arm of the RWD, reflecting that the RWD treated-versus-control contrast carries bias on top of the causal effect.
+
+\begin{proposition}[Identification]\label{prop:ident}
+Under Assumptions~\ref{ass:sutva}--\ref{ass:transport}:
+\begin{enumerate}[label=\textup{(\roman*)}]
+\item The CATE is identified from the RCT alone:
+\begin{equation}
+\tau(x) \;=\; \E[\log T \mid X = x,\, A = 1,\, S = 1] \,-\, \E[\log T \mid X = x,\, A = 0,\, S = 1].
+\label{eq:ident-tau}
+\end{equation}
+\item Given $\tau$, the confounding function is identified from the RWD.
+\item Neither $\tau$ nor $c$ is identified from the RWD alone; the RWD identifies only the composite $\tau(x) + c(x)$.
+\end{enumerate}
+\end{proposition}
+
+Proofs of Propositions~\ref{prop:decomp} and~\ref{prop:ident} are in Supplementary Materials~\ref{sm:proofs}.
+The same identification result holds for the acceleration factor $\exp\{\tau(x)\}$ by continuity of the exponential.
+
+We illustrate the confounding function through a structural causal model with an unmeasured confounder $U$ as a special case in Supplementary Materials~\ref{sm:scm}.
+This reading gives $c(x)$ a mechanistic interpretation.
+It decomposes $c(x)$ into a prognostic imbalance between the RWD treatment arms and effect modification by $U$.
+The decomposition motivates the prior placed on $c$.
+
+% Joint estimation across both sources improves the efficiency of estimating $\tau$, even though the CATE is identified from the RCT alone.
+% The decomposition lets the RWD contribute through the shared baseline $m_0(X, S)$ and through the additional treated observations, while the confounding function $c$ absorbs the bias.
+% The efficiency gain is largest when $c$ is small or smoothly varying, so that few degrees of freedom are spent on the bias correction.
+
+We model the log survival time with the accelerated failure time (AFT) specification implied by the decomposition:
+\begin{equation}
+\log T_i \;=\; m_0(X_i, S_i) \,+\, A_i\,\tau(X_i) \,+\, (1 - S_i)\,A_i\,c(X_i) \,+\, \varepsilon_i.
+\label{eq:aft-model}
+\end{equation}
+We model the errors $\varepsilon_i$ as independent with mean zero and a nonparametric distribution.
+The regression functions $m_0$, $\tau$ and $c$ retain the causal meanings established above.
+We assign each a separate Bayesian tree ensemble prior.
+
+
+\subsection{Nonparametric error distribution}
+
+We model the errors $\varepsilon_i$ in \eqref{eq:aft-model} with a hierarchical Dirichlet process mixture of normals (HDPM).
+The prior is source-specific: $\varepsilon_i \mid S_i = s \sim F_s$.
+The model lets $F_0$ and $F_1$ differ flexibly while sharing information about which residual types are present across sources.
+Existing data-fusion methods typically assume $F_0 = F_1$, for example via a single Gaussian likelihood.
+This assumption is unsatisfactory in our setting.
+Randomised trials and real-world data sources typically differ in measurement protocol, follow-up quality, and the prevalence of extreme outcomes.
+These differences plausibly enter the residual distribution rather than the structural mean.
+The two error distributions are unlikely to be entirely unrelated.
+A model that treats them as fully independent forfeits useful pooling, particularly when one source is small.
+
+Conditional on the source indicator $S_i = s$, we model the residual as a location mixture of Gaussians with source-specific scale $\sigma_s > 0$ and mixing measure $G_s$:
+\begin{equation}
+\varepsilon_i \mid S_i = s,\, G_s,\, \sigma_s \;\sim\; \int \frac{1}{\sigma_s}\, \phi\!\left(\frac{w - \theta}{\sigma_s}\right) dG_s(\theta).
+\label{eq:hdp-fs}
+\end{equation}
+Gaussian-mixture priors of this form have been used for AFT residuals in single-source BART models \citep{henderson2020individualized}.
+The mixing measures share latent structure through the hierarchical Dirichlet process of \citet{teh2006hierarchical}, with a top-level random measure $G^*$:
+\begin{equation}
+G^* \;\sim\; \mathrm{DP}(\gamma, H), \qquad G_s^* \mid G^*,\, M_s \;\sim\; \mathrm{DP}(M_s, G^*), \qquad s \in \{0, 1\},
+\label{eq:hdp-prior}
+\end{equation}
+with base distribution $H = \mathcal{N}(0, \sigma_\theta^2)$.
+By Sethuraman's stick-breaking representation \citep{sethuraman1994constructive}, the top-level measure is discrete:
+\begin{equation}
+G^* \;=\; \sum_{k=1}^\infty \omega_k\, \delta_{\theta_k^*}, \qquad \theta_k^* \stackrel{\mathrm{iid}}{\sim} H, \qquad \omega_k = u_k \prod_{l < k}(1 - u_l), \qquad u_k \stackrel{\mathrm{iid}}{\sim} \mathrm{Beta}(1, \gamma).
+\label{eq:hdp-stick}
+\end{equation}
+Each source-specific measure $G_s^*$ is supported on the same atoms $\{\theta_k^*\}$ as $G^*$, with its own weight vector $\bm{\pi}_s = (\pi_{sk})_{k \ge 1}$.
+The shape of each $F_s$ is therefore parameterised by a shared set of residual types and a source-specific weighting over them.
+
+For $m_0$, $\tau$, and $c$ to retain their interpretation as the conditional-mean components defined in \eqref{eq:decomp}, each $F_s$ must have mean zero.
+We follow \citet{yang2010semiparametric} and obtain centred mixing measures by subtracting the source-specific mean of the unconstrained measure:
+\begin{equation}
+\mu_s \;=\; \int \theta\, dG_s^*(\theta) \;=\; \sum_{k=1}^\infty \pi_{sk}\, \theta_k^*, \qquad G_s \;=\; \sum_{k=1}^\infty \pi_{sk}\, \delta_{\theta_k^* - \mu_s}.
+\label{eq:hdp-centring}
+\end{equation}
+By construction $\E[\varepsilon_i \mid S_i = s,\, G_s,\, \sigma_s] = 0$.
+The unconstrained atoms $\theta_k^*$ remain shared across sources, while the centred atoms $\theta_k^* - \mu_s$ are source-specific through the shifts $\mu_0$ and $\mu_1$.
+We place a shared scaled-inverse-$\chi^2$ prior $\sigma_s^2 \sim \nu\lambda / \chi^2_\nu$ on the per-source residual scales, with degrees of freedom $\nu$ and scale $\lambda$.
+We set $\nu = 3$ following the BART default and calibrate $\lambda$ to the empirical residual variance following \citet{chipman2010bart}.
+
+\subsection{Overview of BART}
+
+Bayesian additive regression trees \citep{chipman2010bart} provide a flexible nonparametric prior over an unknown function $f : \mathbb{R}^p \to \mathbb{R}$.
+The prior represents $f$ as a sum of regression trees:
+\begin{equation}
+f(X) \;=\;
+  \sum_{j=1}^{J} g(X;\, \mathcal{T}_j, \mathcal{H}_j),
+\label{eq:bart-revised}
+\end{equation}
+where each $\mathcal{T}_j$ is a binary tree with $b_j$ terminal nodes.
+Each interior splitting rule has the form $\{x_\ell \leq x^*\}$ for some covariate index $\ell$ and splitting value $x^*$.
+We write $\mathcal{H}_j = \{h_{j,1}, \ldots, h_{j,b_j}\}$ for the step heights at those terminal nodes.
+The function $g(X;\, \mathcal{T}_j, \mathcal{H}_j)$ routes $X$ through the splits of $\mathcal{T}_j$ to a terminal node $r$ and returns the step height $h_{j,r}$ at that node.
+
+The prior on $(\mathcal{T}_1, \mathcal{H}_1), \ldots, (\mathcal{T}_J, \mathcal{H}_J)$ is independent across trees.
+It decomposes into a tree-structure prior and a step-height prior given the structure.
+The structure of each $\mathcal{T}_j$ follows the recursive splitting process of \citet{chipman1998bayesian}.
+A node at depth $d$ is non-terminal with probability $\alpha(1+d)^{-\beta}$.
+This generative process is a heterogeneous Galton--Watson branching process, in which the per-generation offspring distribution depends on the depth $d$ \citep{rockova2019theory}.
+The hyperparameters $\alpha$ and $\beta$ regularise tree depth.
+Conditional on the tree, the splitting variable $x_\ell$ at each interior node is drawn uniformly from the available covariates.
+The splitting value $x^*$ is drawn uniformly from its observed values.
+The step heights receive independent conjugate normal priors $h_{j,r} \mid \mathcal{T}_j \sim \mathcal{N}(0,\, \sigma_h^2)$, parameterised as $\sigma_h = k/(2\sqrt{J})$ with $k > 0$ the step-height scale.
+\citet{chipman2010bart} centre and rescale the response, then choose $k$ so that the implied prior on $f$ assigns circa $95\%$ of its mass to the observed response range.
+We denote the BART prior with these hyperparameters by $\mathrm{BART}(J, k, \alpha, \beta)$.
+The four arguments are the number of trees $J$, the step-height scale $k$, and the tree-structure hyperparameters $\alpha$ and $\beta$.
+
+
+\subsection{Prior specification}
+
+We place independent Bayesian tree priors on the components of the decomposition~\eqref{eq:decomp}.
+We tune the regularisation of each component through the tree-structure prior and the ensemble size to match the substantive role of each component.
+
+We allow for heterogeneity in the baseline effect between sources.
+The prognostic function $m_0$ is split into a shared component and a source-specific deviation so that the prior centres on between-source borrowing.
+We write:
+\begin{equation}
+m_0(X, S) \;=\; m_0^{\mathrm{sh}}(X) + (1 - S)\, d(X),
+\label{eq:m0-decomp-prop}
+\end{equation}
+where $m_0^{\mathrm{sh}}$ is shared across sources and $d$ is active only in the RWD.
+The decomposition writes the difference between the two source-specific prognostic functions as $d(X)$.
+The prior on $d$ has mean zero, so the prior centres on equality of the two prognostic functions.
+An alternative would place a single BART on $m_0(X, S)$ with $S$ as an ordinary covariate.
+Such a model does not encode this prior centring.
+The prior on $d$ then provides a direct dial for the strength of borrowing.
+We use the tree-structure hyperparameters $(\alpha_{\mathrm{sh}}, \beta_{\mathrm{sh}}) = (0.95, 2)$ and $J_{\mathrm{sh}} = 200$ trees for $m_0^{\mathrm{sh}}$.
+The large ensemble lets $m_0^{\mathrm{sh}}$ accommodate complex disease-intrinsic structure.
+We use the same hyperparameters $(\alpha_d, \beta_d) = (0.95, 2)$ for $d$ but only $J_d = 50$ trees.
+The smaller ensemble suffices because $d$ only needs to absorb residual differences in protocol and patient population.
+This construction coincides with a heterogeneous meta-analytic-predictive prior on the prognostic function (Supplementary Materials~\ref{sm:map-m0}).
+
+We place a depth-penalised BART prior on the treatment-effect function $\tau$ to discourage higher-order interactions in $X$.
+We set the depth parameter $\beta_\tau = 3$ and $\alpha_\tau = 0.95$.
+The prior mass concentrates on trees of depth one or two.
+The number of trees is reduced relative to the baseline prognosis to $J_\tau = 100$ trees.
+This reflects the expectation that the treatment-effect surface is simpler than the baseline prognosis.
+
+We place a more strongly regularised BART prior on the confounding function $c$.
+We set the base splitting probability $\alpha_c = 0.25$ and the depth parameter $\beta_c = 3$.
+We set the number of trees to $J_c = 50$.
+This discourages splits at the root and deep interactions when splits do occur.
+
+
+\begin{remark}[Multiplicative shrinkage on $c$]
+An alternative representation is $c(x) = \kappa\, g_c(x)$, with $\kappa$ a scalar shrinkage parameter and $g_c \sim \mathrm{BART}$.
+A heavy-tailed prior such as $\kappa \sim \mathcal{C}^+(0, 1)$ concentrates the posterior at small magnitudes while permitting occasional large values.
+A normal prior $\kappa \sim \mathcal{N}(0, \sigma_\kappa^2)$ is a softer alternative.
+Either choice imposes stronger regularisation on $c(x)$ than the sole BART prior, and the posterior of $\kappa$ admits a reading as a level of RWD confounding.
+\end{remark}
+
+We place a shared scaled-inverse-$\chi^2$ prior $\sigma_s^2 \sim \nu\lambda / \chi^2_\nu$ on the per-source residual scales with $\nu$ degrees of freedom and scale $\lambda$.
+We set $\nu = 3$ following the BART default and calibrate $\lambda$ to the empirical residual variance following \citet{chipman2010bart}.
+We standardise the log survival time before fitting by the centring and scaling constants of a preliminary log-normal AFT fit.
+This rescales the response to a unit-variance scale.
+Each forest carries its own prior step-height scale $k_f$ with $f \in \{m_0^{\mathrm{sh}}, d, \tau, c\}$.
+The step-height scales calibrate the prior magnitude of each ensemble to match the scale of the standardised response.
+We recommend $k_f = 1$ for all four forests as a default and allow further tuning via cross-validation.
+
+We summarise the full hierarchical model:
+\begin{align*}
+\log T_i &\;=\; m_0^{\mathrm{sh}}(X_i) + (1 - S_i)\, d(X_i) + A_i\, \tau(X_i) + (1 - S_i)\, A_i\, c(X_i) + \varepsilon_i, \\
+m_0^{\mathrm{sh}} &\;\sim\; \mathrm{BART}(200,\, k_{\mathrm{sh}},\, 0.95,\, 2), \\
+d &\;\sim\; \mathrm{BART}(50,\, k_d,\, 0.95,\, 2), \\
+\tau &\;\sim\; \mathrm{BART}(100,\, k_\tau,\, 0.95,\, 3), \\
+c &\;\sim\; \mathrm{BART}(50,\, k_c,\, 0.25,\, 3), \\
+\varepsilon_i \mid S_i = s,\, G_s,\, \sigma_s &\;\sim\; \int \sigma_s^{-1}\, \phi\!\left(\tfrac{w - \theta}{\sigma_s}\right) dG_s(\theta), \\
+G_s &\;=\; \textstyle\sum_k \pi_{sk}\, \delta_{\theta_k^* - \mu_s}, \quad s \in \{0, 1\}, \\
+G_s^* \mid G^*,\, M_s &\;\sim\; \mathrm{DP}(M_s,\, G^*), \quad s \in \{0, 1\}, \\
+G^* &\;\sim\; \mathrm{DP}(\gamma,\, H), \qquad H = \mathcal{N}(0,\, \sigma_\theta^2), \\
+\sigma_s^2 &\;\sim\; \nu\lambda / \chi^2_\nu, \quad s \in \{0, 1\}.
+\end{align*}
+
+We refer to this combined model as the \emph{Bayesian fusion forest}.
+
+
+
+
+
+
+\subsection{Posterior inference*}
+
+\textit{This section is largely unfinished.
+The paragraphs on average treatment effects and posterior computation are ready.
+The following items are ideas for material that could go in this section.}
+
+\begin{itemize}
+  \item \textbf{Treatment-effect estimands.}
+    Posterior summaries of the CATE $\tau(x)$ and the acceleration factor $\exp\{\tau(x)\}$ at fixed $x$: posterior mean and credible bands.
+    Investigate the impact of covariates on the outcome, e.g. via linear projections or TE-VIMs.
+  \item \textbf{Heterogeneity.}
+    Posterior measures of heterogeneity of the treatment effect.
+  \item \textbf{Borrowing.}
+    Posterior measures of borrowing: behaviour of the deviation forest $d$ relative to the shared baseline $m_0^{\mathrm{sh}}$, magnitude of the borrowing scale $\sigma_d$, posterior mass on $c \equiv 0$ et cetera.
+  \item \textbf{Residual fit.}
+    Was the heavy nonparametric model for the error distribution justified, or would a simpler model suffice?
+    Posterior number of active mixture clusters and between-source comparison of $F_0$ and $F_1$ for example.
+\end{itemize}
+
+
+We compute average treatment effects by marginalising the conditional effect $\tau(\cdot)$ against a target covariate distribution.
+We take the target to be the union of the two source studies, with covariate distribution $F_X = \pi_0 F_X^0 + \pi_1 F_X^1$.
+Here $F_X^s$ is the covariate distribution within source $s \in \{0, 1\}$ and $\pi = (\pi_0, \pi_1)$ lies on the unit simplex.
+The posterior of the marginal effect carries uncertainty from three sources: the posterior over $\tau$, the within-source covariate distributions $F_X^s$, and the mixing fractions $\pi$.
+We propagate all three jointly by a hierarchical Bayesian bootstrap.
+The choice of $\pi$ encodes the analyst's target population.
+Natural deterministic choices include the empirical fractions $\pi_s = n_s / n$ and equal weighting $\pi = (1/2, 1/2)$.
+The source-specific limits $\pi = (1, 0)$ and $\pi = (0, 1)$ target the population of the RWD and RCT respectively.
+We may instead place a Dirichlet prior $\pi \sim \mathrm{Dirichlet}(\alpha)$ on the mixing fractions, with concentration parameter $\alpha = (\alpha_0, \alpha_1)$.
+This propagates uncertainty about the target composition.
+The choice $\alpha = (n_0, n_1)$ centres the prior on the empirical fractions and approximately recovers a pooled Bayesian bootstrap.
+We recommend this as the default.
+The choice $\alpha = (1, 1)$ gives a flat prior on the simplex.
+We draw mixing fractions $\pi^{(b)} \sim \mathrm{Dirichlet}(\alpha)$ for each posterior draw $\tau^{(b)}(\cdot)$ of the conditional effect.
+We draw within-source weights $w^{(s, b)} \sim \mathrm{Dirichlet}(\mathbf{1}_{n_s})$ over the observations of source $s$ independently for $s \in \{0, 1\}$.
+The corresponding draw of the average treatment effect is:
+\begin{equation}
+\bar{\tau}^{(b)} \;=\; \sum_{s \in \{0, 1\}} \pi_s^{(b)} \sum_{i: S_i = s} w_i^{(s, b)}\, \tau^{(b)}(X_i).
+\label{eq:ate-bb}
+\end{equation}
+The within-source weights are the Bayesian bootstrap of \citet{rubin1981} applied to each $F_s$.
+ 
+
+We sample from the posterior via a blocked Gibbs sampler built on an extended Bayesian backfitting approach \citep{hastie2000bayesian}.
+We update the BART forests $m_0^{\mathrm{sh}}$, $d$, $\tau$, and $c$ in turn against the partial residual.
+The partial residual subtracts the other forests and the current draw of the residual mixture from the augmented outcome.
+Each update reduces to a standard BART update on a Gaussian working response \citep{chipman2010bart}.
+We augment the censored observations \citep{tanner1987}.
+The HDPM error block is updated by a separate Gibbs step over its cluster assignments, atoms, mixture weights, and concentration parameters.
+We give the full sampler in the Supplementary Materials.
+
+
+
+

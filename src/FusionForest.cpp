@@ -5,6 +5,8 @@
 Rcpp::List FusionForest_cpp(
   SEXP nSEXP, SEXP p_treatSEXP, SEXP p_controlSEXP, SEXP X_train_treatSEXP,
   SEXP X_train_controlSEXP, SEXP ySEXP, SEXP status_indicatorSEXP, SEXP is_survivalSEXP,
+  SEXP observed_left_timeSEXP, SEXP observed_right_timeSEXP,
+  SEXP interval_censoring_indicatorSEXP,
   SEXP treatment_indicatorSEXP, SEXP source_indicatorSEXP,
   SEXP n_testSEXP, SEXP X_test_controlSEXP, SEXP X_test_treatSEXP, SEXP X_test_deconfSEXP,
   SEXP treatment_indicator_testSEXP, SEXP source_indicator_testSEXP,
@@ -52,6 +54,19 @@ Rcpp::List FusionForest_cpp(
   double* status_indicator = &status_indicator_vector[0];
   std::vector<double> y_observed_vector(y_vector.begin(), y_vector.end());
   double* y_observed = y_observed_vector.data();
+  // Interval-censoring bounds.  When the R wrapper does not supply them,
+  // observed_left_time = observed_right_time = y and
+  // interval_censoring_indicator is all zeros, reproducing the original
+  // right-censored behaviour bit-for-bit (the right-censoring branch of
+  // the interval-overload uses observed_right_time as the lower bound).
+  // Both bounds are passed on the SAME scale as y (the R wrapper applies
+  // the log-and-standardise transform symmetrically).
+  Rcpp::NumericVector observed_left_time_vector(observed_left_timeSEXP);
+  double* observed_left_time = &observed_left_time_vector[0];
+  Rcpp::NumericVector observed_right_time_vector(observed_right_timeSEXP);
+  double* observed_right_time = &observed_right_time_vector[0];
+  Rcpp::NumericVector interval_censoring_indicator_vector(interval_censoring_indicatorSEXP);
+  double* interval_censoring_indicator = &interval_censoring_indicator_vector[0];
   Rcpp::IntegerVector source_indicator_vector(source_indicatorSEXP);
   int* source_indicator = &source_indicator_vector[0];
 
@@ -255,8 +270,9 @@ Rcpp::List FusionForest_cpp(
                     /*lambda_sigma=*/lambda);
   const bool dp_active     = mixture.active();
   const int  dp_groups     = mixture.num_groups();
-  const bool dp_scale_mode = (mixture_mode == MixtureDP::SOURCE_DP_SCALE);
-  const bool dp_hdp_mode   = (mixture_mode == MixtureDP::SOURCE_HDP);
+  const bool dp_hdp_scale_mode = (mixture_mode == MixtureDP::SOURCE_HDP_SCALE);
+  const bool dp_scale_mode = (mixture_mode == MixtureDP::SOURCE_DP_SCALE) || dp_hdp_scale_mode;
+  const bool dp_hdp_mode   = (mixture_mode == MixtureDP::SOURCE_HDP) || dp_hdp_scale_mode;
 
   // DP posterior storage (only allocated when DP is active).
   // For each group g we keep an N_post x K matrix for mix_prop / locations and
@@ -500,7 +516,15 @@ Rcpp::List FusionForest_cpp(
       UpdateSigma(sigma_known, sigma, store_sigma, i, y, n, total_plus_shift, nu, lambda, random);
 
     // -- Augment censored observations --
-    AugmentCensoredObservations(is_survival, y, y_observed, status_indicator,
+    // Interval-censoring overload.  When the wrapper sets
+    // interval_censoring_indicator[i] = 0 the right-censoring branch fires
+    // and uses observed_right_time[i] as the lower bound on the event, so
+    // passing observed_left_time = observed_right_time = y reproduces the
+    // historical right-censored behaviour exactly.
+    AugmentCensoredObservations(is_survival, y,
+                                observed_left_time, status_indicator,
+                                observed_right_time,
+                                interval_censoring_indicator,
                                 total_plus_shift, sigma, n, random);
 
 

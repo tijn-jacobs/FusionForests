@@ -7,6 +7,8 @@
 Rcpp::List FusionForest_cpp(
   SEXP nSEXP, SEXP p_treatSEXP, SEXP p_controlSEXP, SEXP X_train_treatSEXP,
   SEXP X_train_controlSEXP, SEXP ySEXP, SEXP status_indicatorSEXP, SEXP is_survivalSEXP,
+  SEXP observed_left_timeSEXP, SEXP observed_right_timeSEXP,
+  SEXP interval_censoring_indicatorSEXP,
   SEXP treatment_indicatorSEXP, SEXP source_indicatorSEXP,
   SEXP n_testSEXP, SEXP X_test_controlSEXP, SEXP X_test_treatSEXP, SEXP X_test_deconfSEXP,
   SEXP treatment_indicator_testSEXP, SEXP source_indicator_testSEXP,

@@ -1,0 +1,3 @@
+rows: 9
+methods: Fusion,RCT-only,RWD-only
+na_rmse: 0

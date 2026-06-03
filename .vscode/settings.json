@@ -1,0 +1,62 @@
+{
+  // ----------------------------------------------------------------
+  //  LaTeX Workshop build configuration for the manuscript notes.
+  //
+  //  The bibliography is built by BibTeX, which needs the full
+  //  pdflatex -> bibtex -> pdflatex -> pdflatex sequence. Running
+  //  pdflatex alone leaves every \citep showing "?" and prints no
+  //  reference list. latexmk runs that whole sequence automatically,
+  //  so it is the default recipe here.
+  // ----------------------------------------------------------------
+
+  "latex-workshop.latex.recipe.default": "latexmk (runs bibtex)",
+
+  "latex-workshop.latex.recipes": [
+    {
+      "name": "latexmk (runs bibtex)",
+      "tools": ["latexmk"]
+    },
+    {
+      "name": "pdflatex -> bibtex -> pdflatex x2",
+      "tools": ["pdflatex", "bibtex", "pdflatex", "pdflatex"]
+    }
+  ],
+
+  "latex-workshop.latex.tools": [
+    {
+      "name": "latexmk",
+      "command": "latexmk",
+      "args": [
+        "-synctex=1",
+        "-interaction=nonstopmode",
+        "-file-line-error",
+        "-pdf",
+        "-cd",
+        "%DOC%"
+      ],
+      "env": {}
+    },
+    {
+      "name": "pdflatex",
+      "command": "pdflatex",
+      "args": [
+        "-synctex=1",
+        "-interaction=nonstopmode",
+        "-file-line-error",
+        "-cd",
+        "%DOC%"
+      ],
+      "env": {}
+    },
+    {
+      "name": "bibtex",
+      "command": "bibtex",
+      "args": ["%DOCFILE%"],
+      "env": {}
+    }
+  ],
+
+  // Wipe stale aux files after a failed build so a half-written
+  // .aux/.bbl cannot keep producing "?" on the next run.
+  "latex-workshop.latex.autoClean.run": "onFailed"
+}

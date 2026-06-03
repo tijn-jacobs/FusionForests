@@ -27,7 +27,7 @@ MixtureDP::MixtureDP(int mode, size_t n_total, size_t K,
   if (mode_ == SHARED_DP) {
     num_groups_ = 1;
     obs_group_.assign(n_total_, 0);
-  } else { // SOURCE_DP or SOURCE_DP_SCALE
+  } else { // SOURCE_DP, SOURCE_DP_SCALE, SOURCE_HDP, SOURCE_HDP_SCALE
     num_groups_ = 2;
     obs_group_.resize(n_total_);
     for (size_t i = 0; i < n_total_; ++i)
@@ -55,7 +55,7 @@ MixtureDP::MixtureDP(int mode, size_t n_total, size_t K,
   sigma_g_        .assign(num_groups_, sigma_init);
 
   // HDP-only state
-  if (mode_ == SOURCE_HDP) {
+  if (mode_ == SOURCE_HDP || mode_ == SOURCE_HDP_SCALE) {
     locations_shared_.assign(K_, 0.0);
     mu_g_           .assign(num_groups_, 0.0);
     beta_           .assign(K_, 1.0 / static_cast<double>(K_));
@@ -75,11 +75,16 @@ MixtureDP::MixtureDP(int mode, size_t n_total, size_t K,
 void MixtureDP::Update(const double* residuals, double sigma, Random& random) {
   if (mode_ == GAUSSIAN) return;
 
-  if (mode_ == SOURCE_HDP) {
+  if (mode_ == SOURCE_HDP || mode_ == SOURCE_HDP_SCALE) {
     // Stage B: shared atoms theta_k* with per-source weights, sticks, and means.
+    // In SOURCE_HDP_SCALE the label sampler uses per-source sigma_g, the shared-
+    // atom posterior is precision-weighted across sources, and each sigma_g is
+    // refreshed via the IG conjugate step.
+    const bool hdp_scale = (mode_ == SOURCE_HDP_SCALE);
     for (int g = 0; g < num_groups_; ++g) {
       if (group_indices_[g].empty()) continue;
-      updateLabelsGroup(g, residuals, sigma, random);
+      const double sigma_g_eff = hdp_scale ? sigma_g_[g] : sigma;
+      updateLabelsGroup(g, residuals, sigma_g_eff, random);
       tabCountsGroup(g);
     }
     updateBeta(random);
@@ -88,8 +93,18 @@ void MixtureDP::Update(const double* residuals, double sigma, Random& random) {
       updateMixHDP(g, random);
       updateMassHDP(g, random);
     }
-    updateAtomsShared(residuals, sigma, random);
+    if (hdp_scale) {
+      updateAtomsSharedPerSourceSigma(residuals, random);
+    } else {
+      updateAtomsShared(residuals, sigma, random);
+    }
     recomputeCenteredLocations();
+    if (hdp_scale) {
+      for (int g = 0; g < num_groups_; ++g) {
+        if (group_indices_[g].empty()) continue;
+        updateSigmaGroup(g, residuals, random);
+      }
+    }
     updateGamma(random);
     return;
   }
@@ -107,7 +122,7 @@ void MixtureDP::Update(const double* residuals, double sigma, Random& random) {
 }
 
 double MixtureDP::sigma_pooled() const {
-  if (mode_ != SOURCE_DP_SCALE) {
+  if (mode_ != SOURCE_DP_SCALE && mode_ != SOURCE_HDP_SCALE) {
     return sigma_g_.empty() ? 1.0 : sigma_g_.front();
   }
   double ssq = 0.0;
@@ -336,6 +351,35 @@ void MixtureDP::updateAtomsShared(const double* residuals, double sigma,
     double wts       = prior_sigsq / (prior_sigsq * static_cast<double>(n_k) + sigsq);
     double post_mean = wts * clust_sum;
     double post_var  = sigsq * wts;
+    double post_sd   = std::sqrt(post_var);
+    locations_shared_[k] = post_mean + post_sd * random.normal();
+  }
+}
+
+void MixtureDP::updateAtomsSharedPerSourceSigma(const double* residuals,
+                                                 Random& random) {
+  // Per-source-sigma variant of updateAtomsShared.  Each source g contributes
+  // (R_i + mu_g) ~ N(theta_k*, sigma_g^2) when Z_i = k, so the posterior of
+  // theta_k* is precision-weighted across sources.
+  const double prior_prec = 1.0 / prior_atom_variance_;
+
+  for (size_t k = 0; k < K_; ++k) {
+    double prec = prior_prec;
+    double precx = 0.0;
+    for (int g = 0; g < num_groups_; ++g) {
+      const std::vector<size_t>& idx = group_indices_[g];
+      const std::vector<int>&    lbl = labels_[g];
+      const double mu_s              = mu_g_[g];
+      const double inv_sigsq_g       = 1.0 / (sigma_g_[g] * sigma_g_[g]);
+      for (size_t jj = 0; jj < idx.size(); ++jj) {
+        if (lbl[jj] == static_cast<int>(k) + 1) {
+          precx += (residuals[idx[jj]] + mu_s) * inv_sigsq_g;
+          prec  += inv_sigsq_g;
+        }
+      }
+    }
+    double post_mean = precx / prec;
+    double post_var  = 1.0 / prec;
     double post_sd   = std::sqrt(post_var);
     locations_shared_[k] = post_mean + post_sd * random.normal();
   }

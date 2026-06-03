@@ -77,11 +77,11 @@
 ## reimplemented here so the script is self-contained.
 ##
 ## Output:
-##   data/analysis 0/survival_curves.pdf             -- 3-page diagnostic
-##   data/analysis 0/survival_curves_manuscript.pdf  -- 2-page manuscript
-##       version of the combined plot at the full 25-y RWD horizon,
-##       with a ggmagnify inset zooming into the upper-left region
-##       where RCT and RWD follow-up overlap.
+##   data/analysis 0/survival_curves.pdf                       -- 3-page diagnostic
+##   notes/general/figures/survival_curves_manuscript.pdf -- single-page
+##       manuscript version (trial-aligned cohort) of the combined plot at
+##       the full 25-y RWD horizon, with a ggmagnify inset zooming into the
+##       upper-left region where RCT and RWD follow-up overlap.
 ##         page 1: default cohort        (rct, rwd)
 ##         page 2: trial-aligned cohort  (rct_m, rwd_cd4)
 
@@ -347,7 +347,7 @@ log_n(rwd_cd4, "RWD-CD4-band")
 
 attach_arm <- function(d) {
   d$arm <- factor(d$treat, levels = 0:1,
-                  labels = c("Z=0 (ZDV mono)", "Z=1 (combo/ddI)"))
+                  labels = c("ZDV mono", "Combination"))
   d
 }
 
@@ -418,7 +418,7 @@ step_expand <- function(d) {
 }
 
 surv_panel <- function(fit, palette, xmax, title, show_legend = TRUE,
-                       base_size = 11) {
+                       base_size = 11, line_size = 0.7) {
   d <- step_expand(tidy_km(fit))
   pal_named <- setNames(palette, levels(d$arm))
   # Two subtleties for the legend:
@@ -436,7 +436,7 @@ surv_panel <- function(fit, palette, xmax, title, show_legend = TRUE,
   ggplot(d, aes(x = time, y = surv, colour = arm)) +
     geom_ribbon(aes(ymin = lower, ymax = upper, fill = arm),
                 alpha = 0.18, colour = NA, show.legend = FALSE) +
-    geom_line(linewidth = 0.7, show.legend = show_legend) +
+    geom_line(linewidth = line_size, show.legend = show_legend) +
     scale_colour_manual(values = pal_named,
                         guide = if (show_legend) "legend" else "none") +
     scale_fill_manual  (values = pal_named, guide = "none") +
@@ -446,7 +446,7 @@ surv_panel <- function(fit, palette, xmax, title, show_legend = TRUE,
     theme_minimal(base_size = base_size) +
     theme(legend.position = if (show_legend) "bottom" else "none",
           plot.title      = element_text(face = "bold",
-                                         size = base_size * 1.1))
+                                         size = base_size * 1.0))
 }
 
 # Single panels: suppress their own legend so the figure carries
@@ -464,8 +464,8 @@ build_page <- function(rct_df, rwd_df, anchor_label) {
                stratum = paste0("RWD - ", as.character(rwd_df$arm)),
                stringsAsFactors = FALSE))
   all_df$stratum <- factor(all_df$stratum, levels = c(
-    "RCT - Z=0 (ZDV mono)", "RCT - Z=1 (combo/ddI)",
-    "RWD - Z=0 (ZDV mono)", "RWD - Z=1 (combo/ddI)"))
+    "RCT - ZDV mono", "RCT - Combination",
+    "RWD - ZDV mono", "RWD - Combination"))
 
   fit_rct <- survfit(Surv(t_years, status) ~ arm,     data = rct_df)
   fit_rwd <- survfit(Surv(t_years, status) ~ arm,     data = rwd_df)
@@ -573,8 +573,9 @@ cat("\nSaved: ", out_pdf, " (4 pages)\n", sep = "")
 build_manuscript_fig <- function(rct_df, rwd_df,
                                  zoom_y_lo       = 0.5,
                                  inset_to        = NULL,
-                                 right_margin_pt = 600,
-                                 base_size       = 16) {
+                                 right_margin_pt = 185,
+                                 base_size       = 30,
+                                 font_family     = "Times") {
   rct_df <- attach_arm(rct_df)
   rwd_df <- attach_arm(rwd_df)
 
@@ -586,8 +587,8 @@ build_manuscript_fig <- function(rct_df, rwd_df,
                stratum = paste0("RWD - ", as.character(rwd_df$arm)),
                stringsAsFactors = FALSE))
   all_df$stratum <- factor(all_df$stratum, levels = c(
-    "RCT - Z=0 (ZDV mono)", "RCT - Z=1 (combo/ddI)",
-    "RWD - Z=0 (ZDV mono)", "RWD - Z=1 (combo/ddI)"))
+    "RCT - ZDV mono", "RCT - Combination",
+    "RWD - ZDV mono", "RWD - Combination"))
 
   fit_all  <- survfit(Surv(t_years, status) ~ stratum, data = all_df)
   rct_xmax <- max(rct_df$t_years, na.rm = TRUE)
@@ -602,7 +603,7 @@ build_manuscript_fig <- function(rct_df, rwd_df,
   p_full <- surv_panel(
     fit_all, pal_all, rwd_xmax,
     "Kaplan-Meier survival: ACTG175 (RCT) vs MACS (RWD)",
-    base_size = base_size)
+    base_size = base_size, line_size = 1.25)
 
   p_full +
     # Manuscript version: drop the surv_panel title -- the figure
@@ -611,11 +612,28 @@ build_manuscript_fig <- function(rct_df, rwd_df,
     # Override the surv_panel coord so drawing isn't clipped at the
     # panel edge -- the inset and its connector lines need to render
     # outside [0, rwd_xmax].
+    
     coord_cartesian(xlim = c(0, rwd_xmax), ylim = c(0, 1),
                     clip = "off") +
+    # Thicken and lengthen the coloured key glyphs so the four strata
+    # read cleanly at manuscript scale; the in-panel line linewidth
+    # (0.7) is unaffected.
+    guides(colour = guide_legend(
+      override.aes = list(linewidth = 3))) +
     theme(
-      plot.margin  = margin(t = 10, r = right_margin_pt,
-                            b = 10, l = 10),
+      # Times throughout the manuscript figure -- propagates to every
+      # text element (axis labels, tick labels, legend) via the global
+      # `text` slot; individual element_text() overrides below inherit
+      # it. Requires cairo_pdf (used by `out_manuscript`) so the system
+      # Times face is embedded.
+      text            = element_text(family = font_family),
+      plot.margin     = margin(t = 10, r = right_margin_pt,
+                               b = 10, l = 10),
+      legend.text     = element_text(size = base_size,
+                                     family = font_family),
+      legend.key.width  = unit(40, "pt"),
+      legend.key.height = unit(16, "pt"),
+      legend.spacing.x  = unit(8, "pt"),
       # Opaque white panel background -- this is what ggmagnify
       # captures from the source area and replays at the destination,
       # so it acts as the inset's own opaque background and masks the
@@ -648,9 +666,9 @@ build_manuscript_fig <- function(rct_df, rwd_df,
       # inset is a fresh ggplot rendering, fully vector.
       recompute = TRUE,
       # target.linewidth thickens the inset's lines slightly so they
-      # read crisply at the smaller inset scale without affecting the
-      # main panel's linewidth = 0.7.
-      target.linewidth = 1.0,
+      # read crisply at the smaller inset scale; matched to the
+      # bumped main-panel linewidth (1.4).
+      target.linewidth = 1.7,
       shadow   = TRUE,
       axes     = "xy",
       colour   = "grey30",
@@ -666,14 +684,14 @@ manuscript_fig_aligned <- build_manuscript_fig(rct_m, rwd_cd4)
 # native vector instead of rasterizing them as the default pdf device
 # does -- this is the usual cause of the inset looking "blurry" when
 # the inset is small. Wide canvas gives the outside-panel inset room
-# to live without being squeezed. onefile = TRUE writes a multi-page
-# PDF (page 1 = default cohort, page 2 = trial-aligned cohort).
-out_manuscript <- "data/analysis 0/survival_curves_manuscript.pdf"
-cairo_pdf(out_manuscript, width = 22, height = 10, onefile = TRUE)
-print(manuscript_fig)
+# to live without being squeezed.  Manuscript PDF is the trial-aligned
+# cohort only (page 1 in earlier drafts -- the default cohort -- has
+# been removed).
+out_manuscript <- "notes/general/figures/survival_curves_manuscript.pdf"
+cairo_pdf(out_manuscript, width = 18, height = 10)
 print(manuscript_fig_aligned)
 invisible(dev.off())
-cat("Saved: ", out_manuscript, " (2 pages)\n", sep = "")
+cat("Saved: ", out_manuscript, "\n", sep = "")
 
 invisible(list(rct = rct, rct_m = rct_m,
                rwd = rwd, rwd_nu = rwd_nu, rwd_cd4 = rwd_cd4,
@@ -683,3 +701,4 @@ invisible(list(rct = rct, rct_m = rct_m,
                page_aligned   = page_aligned,
                manuscript_fig         = manuscript_fig,
                manuscript_fig_aligned = manuscript_fig_aligned))
+

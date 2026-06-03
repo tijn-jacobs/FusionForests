@@ -1,0 +1,20 @@
+  print.summary.CausalShrinkageForest           FusionForests
+  print.summary.CausalShrinkageForestPrediction FusionForests
+  print.summary.ShrinkageTrees                  FusionForests
+  print.summary.ShrinkageTreesPrediction        FusionForests
+  summary.CausalShrinkageForest                 FusionForests
+  summary.CausalShrinkageForestPrediction       FusionForests
+  summary.ShrinkageTrees                        FusionForests
+  summary.ShrinkageTreesPrediction              FusionForests
+
+Attaching package: ‘ShrinkageTrees’
+
+The following objects are masked from ‘package:FusionForests’:
+
+    CausalHorseForest, CausalShrinkageForest, HorseTrees,
+    ShrinkageTrees, SurvivalBART, SurvivalBCF, SurvivalDART,
+    SurvivalShrinkageBCF
+
+Loading required package: foreach
+Loading required package: iterators
+Loading required package: parallel

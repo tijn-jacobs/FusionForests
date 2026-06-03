@@ -106,7 +106,7 @@ fit_one <- function(dat, error_dist) {
     treatment_indicator_train = dat$A_train,
     source_indicator_train    = dat$S_train,
     outcome_type              = "continuous",
-    decomposition             = "three-forest",
+    decomposition             = "four-forest",
     error_dist                = error_dist,
     error_truncation_K        = 50L,
     error_atom_scale          = 0.5,

@@ -91,10 +91,12 @@ n_trees_treat  <- 100   # treatment-effect forest (tau)
 n_trees_deconf <- 200   # deconfounding forest (c)
 n_trees_dev    <- 50    # deviation forest (g, four-forest only)
 
-# Leaf-prior scale k for the deviation forest.
-# Larger k_g => stronger shrinkage of g toward zero (more borrowing).
-# The control/treat/deconf forests use the package default (k = 1).
-k_g <- 2
+# Leaf-prior scale k for the deviation forest.  omega_g = k_g / sqrt(m_g);
+# smaller k_g => stronger shrinkage of g toward zero (more borrowing).
+# The control/treat/deconf forests use the package default k = 0.5.
+# (k_g = 0.25 is half of that, encoding the MAP-prior preference for
+# borrowing across sources.)
+k_g <- 0.25
 
 # MCMC
 N_post <- 3000
@@ -131,7 +133,7 @@ fit_rct <- FusionForest(
   treatment_indicator_test   = trt_all,
   source_indicator_test      = rep(1L, n_all),
   outcome_type              = "continuous",
-  decomposition             = "three-forest",
+  decomposition             = "four-forest",
   treatment_coding          = "centered",
   number_of_trees_control   = n_trees_prog,
   number_of_trees_treat     = n_trees_treat,
@@ -174,7 +176,7 @@ fit_rwd <- FusionForest(
   treatment_indicator_test   = trt_all,
   source_indicator_test      = rep(1L, n_all),
   outcome_type              = "continuous",
-  decomposition             = "three-forest",
+  decomposition             = "four-forest",
   treatment_coding          = "centered",
   number_of_trees_control   = n_trees_prog,
   number_of_trees_treat     = n_trees_treat,
@@ -209,7 +211,7 @@ fit_three <- FusionForest(
   treatment_indicator_test   = trt_all,
   source_indicator_test      = source_all,
   outcome_type              = "continuous",
-  decomposition             = "three-forest",
+  decomposition             = "four-forest",
   treatment_coding          = "centered",
   number_of_trees_control   = n_trees_prog,
   number_of_trees_treat     = n_trees_treat,

@@ -1,13 +1,70 @@
 \documentclass[11pt]{article}
 
-\usepackage[margin=1in]{geometry}
-\usepackage{amsmath, amssymb}
-\usepackage{natbib}
-\usepackage{hyperref}
+%% Page geometry
+\usepackage[a4paper, margin=1in]{geometry}
+
+%% Core math + fonts
+\usepackage{amsthm,amsmath,amsfonts,amssymb}
+\usepackage{microtype}
+
+%% Citations
+\usepackage[authoryear, round]{natbib}
+
+%% Hyperlinks
+\usepackage[colorlinks, citecolor=blue, urlcolor=blue, linkcolor=blue]{hyperref}
+\usepackage{xurl}
+
+%% Graphics & figures
+\usepackage{graphicx}
+\graphicspath{{./images/}}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{booktabs}
+
+%% Algorithms
+\usepackage[linesnumbered, ruled, vlined]{algorithm2e}
+
+%% TikZ for diagrams
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,fit,calc,positioning}
+\tikzset{box/.style={draw, diamond, thick, text centered, minimum height=0.5cm, minimum width=1cm}}
+\tikzset{line/.style={draw, thick, -latex'}}
+
+%% Misc
+\usepackage{comment}
+\usepackage{dsfont}
+
+%% Theorem environments
+\theoremstyle{plain}
+\newtheorem{axiom}{Axiom}
+\newtheorem{claim}[axiom]{Claim}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem*{example}{Example}
+\newtheorem*{fact}{Fact}
+
+\theoremstyle{remark}
+\newtheorem{case}{Case}
+
+%% Custom math commands
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\1}{\mathds{1}}
+\newcommand{\p}{\mathbb{P}}
+\renewcommand{\H}{\mathcal{H}}
+\newcommand{\T}{\mathcal{T}}
+\newcommand{\ind}{\perp\!\!\!\perp}
+
 
 \title{Clinical background}
 \author{Tijn Jacobs}
 \date{\today}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.8em}
+
 
 \begin{document}
 \maketitle
@@ -240,6 +297,6 @@ over a shared atom pool---and it reduces to a single DP when homogeneity holds.
 
 
 \bibliographystyle{apalike}
-\bibliography{../references}
+\bibliography{../general/references}
 
 \end{document}
