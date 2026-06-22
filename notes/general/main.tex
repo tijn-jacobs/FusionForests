@@ -22,6 +22,16 @@
 \usepackage{subcaption}
 \usepackage{booktabs}
 
+%% Float placement: allow fuller pages and float pages, so figures and
+%% tables sit near their text instead of spilling past the bibliography.
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.8}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.75}
+\setcounter{topnumber}{3}
+\setcounter{totalnumber}{4}
+\usepackage[section]{placeins}  % keep floats within their section
+
 %% Algorithms
 \usepackage[linesnumbered, ruled, vlined]{algorithm2e}
 
@@ -70,8 +80,7 @@
 \newcommand{\expit}{\operatorname{expit}}
 
 
-\title{Bayesian nonparametric fusion of randomised and real-world
-  survival data for heterogeneous treatment effects}
+\title{Bayesian tree ensembles for heterogeneous treatment effects on survival from randomised and real-world data}
 
 
 
@@ -88,21 +97,34 @@
 
 
 \begin{document}
+
+%% --- Numbers of supplement (SM) objects, hardcoded so the main file is
+%% self-contained (no sm.aux / xr-hyper). Update if the SM numbering changes.
+\makeatletter
+\@namedef{r@sm:proofs}{{S.1}{}{}{}{}}
+\@namedef{r@sm:map-m0}{{S.2}{}{}{}{}}
+\@namedef{r@sm:posterior-computation}{{S.3}{}{}{}{}}
+\@namedef{r@sm:sim-additional}{{S.4}{}{}{}{}}
+\@namedef{r@sm:analysis-additional}{{S.5}{}{}{}{}}
+\makeatother
+
 \maketitle
 
 
 
 \begin{abstract}
-We develop a Bayesian nonparametric framework to estimate heterogeneous treatment effects on survival outcomes from a randomised controlled trial and real-world data.
+We develop a Bayesian nonparametric framework to estimate heterogeneous treatment effects on survival outcomes by combining a randomised controlled trial and real-world data.
 We relax the unconfoundedness assumption on the real-world data.
 We model the survival time with an accelerated failure time decomposition into a baseline prognosis, a treatment effect, and a confounding function.
-The confounding function absorbs the bias in the real-world treated arm.
+The confounding function absorbs the confounding bias in the real-world data.
 Each component receives a Bayesian tree ensemble prior.
 We share the baseline prognosis across the two sources while allowing for between-source heterogeneity.
 We model the error distribution nonparametrically with a hierarchical Dirichlet process mixture.
-We allow for  both right- and interval-censored data.
+We allow for both right- and interval-censored data.
 A simulation study shows efficiency gains over a trial-only analysis across varying levels of confounding and between-source heterogeneity.
-We combine the ACTG~175 trial with the Multicenter AIDS Cohort Study to study the effect of antiretroviral therapy for HIV.
+The Bayesian fusion forest also improves on a flexible black-box competitor in both accuracy and calibration.
+We combine the ACTG~175 trial with the Multicenter AIDS Cohort Study to study the effect of combination antiretroviral therapy for HIV.
+The fusion identifies a benefit for nearly every patient where the trial alone is inconclusive.
 
 \medskip
 \noindent\textbf{Keywords:} Heterogeneous treatment effects; data fusion; real-world evidence; unmeasured confounding; Bayesian additive regression trees; survival analysis.
@@ -128,8 +150,6 @@ We combine the ACTG~175 trial with the Multicenter AIDS Cohort Study to study th
 
 \input{DISCUSSION}
 
-
-\newpage
 \bibliographystyle{apalike}
 \bibliography{references}
 

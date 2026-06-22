@@ -1,0 +1,141 @@
+\documentclass[11pt]{article}
+
+%% Page geometry
+\usepackage[a4paper, margin=1in]{geometry}
+
+%% Core math + fonts
+\usepackage{amsthm,amsmath,amsfonts,amssymb}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+%% Citations
+\usepackage[authoryear, round]{natbib}
+
+%% Main-article cross-references (assumptions, propositions, equations)
+%% are hardcoded just after \begin{document} via \newlabel, so this
+%% supplement is self-contained and needs no main.aux / xr-hyper.
+
+%% Hyperlinks
+\usepackage[colorlinks, citecolor=blue, urlcolor=blue, linkcolor=blue]{hyperref}
+\usepackage{xurl}
+
+%% Graphics & figures
+\usepackage{graphicx}
+\graphicspath{{figures/}{./figures/}}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{rotating}
+
+%% Algorithms
+\usepackage[linesnumbered, ruled, vlined]{algorithm2e}
+
+%% TikZ for diagrams
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,fit,calc,positioning}
+\tikzset{box/.style={draw, diamond, thick, text centered, minimum height=0.5cm, minimum width=1cm}}
+\tikzset{line/.style={draw, thick, -latex'}}
+
+%% Misc
+\usepackage{comment}
+\usepackage{dsfont}
+\usepackage{enumitem}
+\usepackage{changepage}
+\usepackage{bm}
+
+%% Theorem environments
+\theoremstyle{plain}
+\newtheorem{axiom}{Axiom}
+\newtheorem{claim}[axiom]{Claim}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{assumption}{Assumption}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem*{example}{Example}
+\newtheorem*{fact}{Fact}
+
+\theoremstyle{remark}
+\newtheorem{case}{Case}
+\newtheorem{remark}{Remark}
+
+%% Custom math commands
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\1}{\mathds{1}}
+\newcommand{\p}{\mathbb{P}}
+\renewcommand{\H}{\mathcal{H}}
+\newcommand{\T}{\mathcal{T}}
+\newcommand{\ind}{\perp\!\!\!\perp}
+\newcommand{\RCT}{\mathrm{RCT}}
+\newcommand{\RWD}{\mathrm{RWD}}
+\newcommand{\AF}{\mathrm{AF}}
+\newcommand{\expit}{\operatorname{expit}}
+
+%% Supplementary-materials numbering: everything carries an "S" prefix
+%% so that, e.g., \ref{sm:proofs} reads as "S1" in the main article.
+\renewcommand{\thesection}{S.\arabic{section}}
+\renewcommand{\thesubsection}{\thesection.\arabic{subsection}}
+\renewcommand{\theequation}{S\arabic{equation}}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\thetable}{S\arabic{table}}
+\renewcommand{\theproposition}{S\arabic{proposition}}
+\renewcommand{\thecorollary}{S\arabic{corollary}}
+\renewcommand{\thealgocf}{S\arabic{algocf}}
+
+
+\title{Bayesian nonparametric fusion of randomised and real-world
+  survival data for heterogeneous treatment effects\\[0.4em]
+   Supplementary Materials}
+
+
+
+\author{
+  Tijn Jacobs\thanks{Department of Mathematics, Vrije Universiteit Amsterdam. \texttt{t.jacobs@vu.nl}} \and
+  Wessel N.\ van Wieringen\thanks{Department of Epidemiology and Data Science, Amsterdam University Medical Centre. \texttt{w.n.van.wieringen@vu.nl}} \and
+  St\'ephanie L.\ van der Pas\thanks{Department of Mathematics, Vrije Universiteit Amsterdam. \texttt{s.l.vander.pas@vu.nl}}
+}
+
+\date{\today}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.8em}
+
+
+\begin{document}
+
+%% --- Numbers of main-article objects, hardcoded for a self-contained SM. ---
+%% Update these if the main-text numbering changes.
+\makeatletter
+\@namedef{r@ass:sutva}{{1}{}{}{}{}}
+\@namedef{r@ass:rct-unconf}{{2}{}{}{}{}}
+\@namedef{r@ass:positivity-both}{{3}{}{}{}{}}
+\@namedef{r@ass:transport}{{4}{}{}{}{}}
+\@namedef{r@ass:censoring}{{5}{}{}{}{}}
+\@namedef{r@prop:decomp}{{1}{}{}{}{}}
+\@namedef{r@prop:ident}{{2}{}{}{}{}}
+\@namedef{r@eq:cf}{{3}{}{}{}{}}
+\@namedef{r@eq:aft-model}{{6}{}{}{}{}}
+\@namedef{r@eq:m0-decomp-prop}{{12}{}{}{}{}}
+\@namedef{r@fig:sim-lambda-u}{{1}{}{}{}{}}
+\@namedef{r@fig:cate}{{5}{}{}{}{}}
+\makeatother
+
+\maketitle
+
+\input{../methodology/METHODOLOGY_SM}
+
+% \input{../introduction/INTRODUCTION_SM}
+
+\input{../simulation/SIMULATION_SM}
+
+\input{../data_analysis/ANALYSIS_SM}
+
+
+\newpage
+\bibliographystyle{apalike}
+\bibliography{references}
+
+\end{document}

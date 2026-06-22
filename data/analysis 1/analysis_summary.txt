@@ -12,6 +12,26 @@ Acceleration-factor scale  (exp; 1.0 => no effect):
   M1 (RCT only)           mean = +1.703, median = +1.699, 95% CrI = [+1.510, +1.918]
   M2 (Fusion)             mean = +1.649, median = +1.645, 95% CrI = [+1.425, +1.898]
 
+Average 95% CrI width of subject-level CATE (log-time, combined cohort):
+  M1 (RCT only)           = 1.569
+  M2 (Fusion)             = 0.718
+  width reduction (M2 vs M1)  = 54.3%
+
+Average 95% CrI width of subject-level CATE (AF scale, combined cohort):
+  M1 (RCT only)           = 3.155
+  M2 (Fusion)             = 1.208
+  width reduction (M2 vs M1)  = 61.7%
+
+Average posterior variance of subject-level CATE (log-time, combined cohort):
+  M1 (RCT only)           = 0.1628
+  M2 (Fusion)             = 0.0341
+  variance reduction (M2 vs M1)  = 79.1%
+
+Average posterior variance of subject-level CATE (AF scale, combined cohort):
+  M1 (RCT only)           = 0.8084
+  M2 (Fusion)             = 0.0976
+  variance reduction (M2 vs M1)  = 87.9%
+
 Cohort: RCT n = 1771  (Z=0: 432, Z=1: 1339; events 447)
         MACS n = 373  (Z=0: 138, Z=1: 235; events 227)
 

@@ -146,21 +146,38 @@
   number  = {453},
   pages   = {161--173}
 }
-
-% CHECK secondary -- verify
-@unpublished{jacobs2026framework,
-  author = {Jacobs, Tijn},
-  title  = {Framework for combining randomized and observational data under unmeasured confounding},
-  year   = {2026},
-  note   = {Working paper}
+@misc{jacobs_software,
+  author        = {Jacobs, Tijn},
+  title         = {{ShrinkageTrees: An R Package for Bayesian Tree Ensembles for Survival Analysis and Causal Inference}},
+  year          = {2026},
+  eprint        = {2606.12317},
+  archivePrefix = {arXiv},
+  primaryClass  = {stat.ME},
+  doi           = {10.48550/arXiv.2606.12317},
+  url           = {https://doi.org/10.48550/arXiv.2606.12317}
 }
 
-% CHECK main -- verify
-@unpublished{jacobs_software,
-  author = {Jacobs, Tijn},
-  title  = {{ShrinkageTrees: An R Package for Bayesian Tree Ensembles for Survival Analysis and Causal Inference}},
-  year   = {2026},
-  note   = {To be submitted to arXiv}
+@misc{jacobs2025horseshoe,
+  author        = {Jacobs, Tijn and van Wieringen, Wessel N. and van der Pas, St{\'e}phanie L.},
+  title         = {Horseshoe Forests for High-Dimensional Causal Survival Analysis},
+  year          = {2025},
+  eprint        = {2507.22004},
+  archivePrefix = {arXiv},
+  primaryClass  = {stat.ME},
+  doi           = {10.48550/arXiv.2507.22004},
+  url           = {https://doi.org/10.48550/arXiv.2507.22004},
+  note          = {Accepted for publication in Bayesian Analysis}
+}
+
+@article{kapelner2016bartmachine,
+  author  = {Kapelner, Adam and Bleich, Justin},
+  title   = {{bartMachine}: Machine Learning with {Bayesian} Additive Regression Trees},
+  journal = {Journal of Statistical Software},
+  year    = {2016},
+  volume  = {70},
+  number  = {4},
+  pages   = {1--40},
+  doi     = {10.18637/jss.v070.i04}
 }
 
 @Manual{speff2trial,
@@ -801,6 +818,17 @@ series = {NIPS'18}
   publisher = {PMLR}
 }
 
+@article{rockova2020posterior,
+  author  = {Ro{\v{c}}kov{\'a}, Veronika and van der Pas, St{\'e}phanie},
+  title   = {Posterior concentration for {Bayesian} regression trees and forests},
+  journal = {The Annals of Statistics},
+  year    = {2020},
+  volume  = {48},
+  number  = {4},
+  pages   = {2108--2131},
+  doi     = {10.1214/19-AOS1879}
+}
+
 @article{rubin1974,
   author  = {Rubin, Donald B.},
   title   = {Estimating causal effects of treatments in randomized and nonrandomized studies},
@@ -882,7 +910,7 @@ series = {NIPS'18}
   primaryClass  = {stat.ME}
 }
 
-@article{cannioto2021physical
+@article{cannioto2021physical,
     author = {Cannioto, Rikki A and Hutson, Alan and Dighe, Shruti and McCann, William and McCann, Susan E and Zirpoli, Gary R and Barlow, William and Kelly, Kara M and DeNysschen, Carol A and Hershman, Dawn L and Unger, Joseph M and Moore, Halle C F and Stewart, James A and Isaacs, Claudine and Hobday, Timothy J and Salim, Muhammad and Hortobagyi, Gabriel N and Gralow, Julie R and Albain, Kathy S and Budd, G Thomas and Ambrosone, Christine B},
     title = {Physical Activity Before, During, and After Chemotherapy for High-Risk Breast Cancer: Relationships With Survival},
     journal = {JNCI: Journal of the National Cancer Institute},
@@ -1023,6 +1051,30 @@ series = {NIPS'18}
   publisher = {Springer},
   address   = {New York},
   doi       = {10.1007/0-387-37119-2}
+}
+
+@article{oller2004,
+  author  = {Oller, Ramon and G\'omez, Guadalupe and Calle, M. Luz},
+  title   = {Interval Censoring: Model Characterizations for the Validity
+             of the Simplified Likelihood},
+  journal = {The Canadian Journal of Statistics},
+  volume  = {32},
+  number  = {3},
+  pages   = {315--325},
+  year    = {2004},
+  doi     = {10.2307/3316080}
+}
+
+@article{gomez2009tutorial,
+  author  = {G\'omez, Guadalupe and Calle, M. Luz and Oller, Ramon and Langohr, Klaus},
+  title   = {Tutorial on Methods for Interval-Censored Data and Their
+             Implementation in {R}},
+  journal = {Statistical Modelling},
+  volume  = {9},
+  number  = {4},
+  pages   = {259--297},
+  year    = {2009},
+  doi     = {10.1177/1471082X0900900402}
 }
 
 @article{pocock1976,
@@ -1295,4 +1347,107 @@ series = {NIPS'18}
   year      = {1984},
   doi = {10.1201/9781315139470}
 }
-% --- end of audit pass (2026-06-02) ---
+
+@article{norman2024deepaft,
+  author  = {Norman, Patrick A. and Li, Wanlu and Jiang, Wenyu and Chen, Bingshu E.},
+  title   = {{deepAFT}: A nonlinear accelerated failure time model with artificial neural network},
+  journal = {Statistics in Medicine},
+  volume  = {43},
+  number  = {19},
+  pages   = {3689--3701},
+  year    = {2024},
+  doi     = {10.1002/sim.10152}
+}
+@article{kunzel2019metalearners,
+  author  = {K{\"u}nzel, S{\"o}ren R. and Sekhon, Jasjeet S. and Bickel, Peter J. and Yu, Bin},
+  title   = {Metalearners for estimating heterogeneous treatment effects using machine learning},
+  journal = {Proceedings of the National Academy of Sciences},
+  volume  = {116},
+  number  = {10},
+  pages   = {4156--4165},
+  year    = {2019},
+  doi     = {10.1073/pnas.1804597116}
+}
+@article{kennedy2023,
+  author  = {Kennedy, Edward H. and Balakrishnan, Sivaraman and Wasserman, Larry A.},
+  title   = {Semiparametric Counterfactual Density Estimation},
+  journal = {Biometrika},
+  year    = {2023},
+  volume  = {110},
+  number  = {4},
+  pages   = {875--896},
+  doi     = {10.1093/biomet/asad017}
+}
+
+% --- end of audit pass (2026-06-16) ---
+
+% CHECK main -- verify
+@article{lee2024transport,
+  author  = {Lee, Dasom and Gao, Chenyin and Ghosh, Sujit K. and Yang, Shu},
+  title   = {Transporting Survival of an {HIV} Clinical Trial to the External
+             Target Populations},
+  journal = {Journal of Biopharmaceutical Statistics},
+  year    = {2024},
+  volume  = {34},
+  number  = {6},
+  pages   = {922--943},
+  doi     = {10.1080/10543406.2024.2330216}
+}
+
+% CHECK main -- verify
+@article{lee2026bjboost,
+  author  = {Lee, Jeongjin and Kim, Jong-Min},
+  title   = {Counterfactual Survival {Q}-learning via {Buckley--James} Boosting,
+             with Applications to {ACTG} 175 and {CALGB} 8923},
+  journal = {Journal of the Royal Statistical Society Series C: Applied Statistics},
+  year    = {2026},
+  note    = {Advance access}
+}
+
+@article{dorie2019,
+  author  = {Dorie, Vincent and Hill, Jennifer and Shalit, Uri and
+             Scott, Marc and Cervone, Dan},
+  title   = {Automated versus do-it-yourself methods for causal inference:
+             Lessons learned from a data analysis competition},
+  journal = {Statistical Science},
+  year    = {2019},
+  volume  = {34},
+  number  = {1},
+  pages   = {43--68},
+  doi     = {10.1214/18-STS667}
+}
+
+@article{thal2023,
+  author  = {Thal, Dan R. C. and Finucane, Mariel M.},
+  title   = {Causal Methods Madness: Lessons Learned from the 2022 {ACIC}
+             Competition to Estimate Health Policy Impacts},
+  journal = {Observational Studies},
+  year    = {2023},
+  volume  = {9},
+  number  = {3},
+  pages   = {3--27},
+  doi     = {10.1353/obs.2023.0023}
+}
+
+@article{kabata2026,
+  author  = {Kabata, Daijiro and Henderson, Nicholas C. and Varadhan, Ravi},
+  title   = {Quantifying uncertainty of individualized treatment effects in
+             right-censored survival data: A comparison of {Bayesian} additive
+             regression trees and causal survival forest},
+  journal = {Health Services and Outcomes Research Methodology},
+  year    = {2026},
+  volume  = {26},
+  pages   = {87--107},
+  doi     = {10.1007/s10742-025-00362-9}
+}
+
+@article{efron2020prediction,
+  author  = {Efron, Bradley},
+  title   = {Prediction, Estimation, and Attribution},
+  journal = {Journal of the American Statistical Association},
+  year    = {2020},
+  volume  = {115},
+  number  = {530},
+  pages   = {636--655},
+  doi     = {10.1080/01621459.2020.1762613}
+}

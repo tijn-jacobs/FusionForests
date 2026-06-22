@@ -82,3 +82,6 @@ tests/testthat/_snaps/
 **/MACS PDS/
 **/WIHS PDS/
 **/MWCCS PDS/
+
+# Backups
+**/backups/

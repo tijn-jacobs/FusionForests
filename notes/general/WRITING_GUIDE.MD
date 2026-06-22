@@ -5,7 +5,7 @@ subsequent drafts.
 
 ## Rules
 
-1. **Short, active sentences.** Prefer two short sentences over one long one.
+1. **Active sentences.** Prefer two active sentences over one long one.
 2. **Few subordinate clauses, few commas.** A sentence needing more than one comma probably needs splitting.
 3. **No em-dashes (`--`) unless really appropriate.** Use periods, commas, or restructuring instead.
 4. **Do not start sentences with `-ing` verbs.** Avoid openings like _Considering..._, _Using..._, _Building on..._, _Including..._.

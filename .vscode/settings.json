@@ -17,6 +17,10 @@
       "tools": ["latexmk"]
     },
     {
+      "name": "SM (main first, then sm)",
+      "tools": ["latexmk_main_sibling", "latexmk"]
+    },
+    {
       "name": "pdflatex -> bibtex -> pdflatex x2",
       "tools": ["pdflatex", "bibtex", "pdflatex", "pdflatex"]
     }
@@ -33,6 +37,22 @@
         "-pdf",
         "-cd",
         "%DOC%"
+      ],
+      "env": {}
+    },
+    {
+      // Build main.tex sitting next to the current root document.
+      // Used as a prerequisite step for sm.tex so xr-hyper can resolve
+      // \ref{prop:decomp} etc. against a fresh main.aux.
+      "name": "latexmk_main_sibling",
+      "command": "latexmk",
+      "args": [
+        "-synctex=1",
+        "-interaction=nonstopmode",
+        "-file-line-error",
+        "-pdf",
+        "-cd",
+        "%DIR%/main.tex"
       ],
       "env": {}
     },

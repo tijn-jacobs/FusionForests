@@ -1,61 +1,62 @@
 % !TEX root = ../general/main.tex
 \section{Introduction}
 
-We estimate heterogeneous treatment effects (HTE) in survival outcomes from randomised and observational data.
-Precision medicine uses this heterogeneity to guide treatment decisions \citep{hamburg2010path, kent2018personalized}.
-Randomised controlled trials (RCTs) are the gold standard for causal effect estimation, but they are underpowered for subgroup effects \citep{rothwell2005subgroup} and often have limited follow-up.
-Observational or real-world data (RWD) from registries and cohorts are larger and often follow patients for longer.
-Regulators increasingly accept them as evidence \citep{sherman2016realworld, fda2018framework}.
+Precision medicine uses heterogeneous treatment effects (HTE) to guide clinical decisions.
+Researchers estimate the HTE from either a randomised controlled trial (RCT) or observational real-world data (RWD).
+Randomised trials are the gold standard for causal effect estimation, but they are underpowered for subgroup effects and often have limited follow-up.
+Real-world data from registries and cohorts are larger and often follow patients for longer.
+Regulators increasingly accept them as evidence.
 Unmeasured confounding can bias treatment effect estimates from observational data.
-We identify the effect from the trial and gain power and extended follow-up from the real-world data.
+We combine the two data sources. We identify the effect from the trial and borrow power and longer follow-up from the real-world data.
 Our motivating example is HIV antiretroviral therapy.
-The treatment effect varies with baseline CD4 count, viral load, and age \citep{egger2002prognosis}.
+The treatment effect varies with baseline CD4 count, viral load, and age.
 We fuse the ACTG~175 trial \citep{hammer1996} with the Multicenter AIDS Cohort Study \citep{kaslow1987}.
 The cohort followed participants over more than 25 years with biannual visits.
 
 The fusion of a trial with real-world data raises three challenges for survival outcomes.
 The first is unmeasured confounding in the real-world data.
 Treatment is not randomised, and assignment depends on factors the measured covariates do not fully capture.
-The no-unmeasured-confounders assumption is untestable and often violated in practice \citep{rosenbaum2002observational,vanderweele2017evalue}.
+The no-unmeasured-confounders assumption is untestable and often violated in practice \citep{vanderweele2017evalue}.
 The second is heterogeneity between the two data sources.
 Even when the treatment effect transports across sources, the baseline prognosis often does not.
-The trial and observational populations typically differ in eligibility, follow-up, and case mix \citep{stuart2011propensity,degtiar2023review}.
+The trial and observational populations typically differ in eligibility, follow-up, and case mix.
 A naive analysis confounds this baseline difference with the treatment effect.
+This heterogeneity is not confined to the mean: differences in measurement protocol and follow-up quality also reshape the error distribution across sources.
 The third is the survival outcome.
 Right censoring arises when the event has not occurred by the end of follow-up, so the survival time is known only to exceed the censoring time.
 The real-world data may also be interval-censored, with events recorded only at periodic visits.
-The choice of estimand on the time scale also requires care.
-The hazard ratio is the conventional target, but it is difficult to interpret as a causal effect \citep{hernan2010}.
-We adopt the acceleration factor instead, a causally interpretable alternative \citep{Brathovde2024}.
 
-The confounding function measures the bias from unmeasured confounding in observational data.
-Early uses cast it as a sensitivity-analysis device within a single study \citep{robins2000sensitivity, yang2018sensitivity, kasza2017assessing}.
-\citet{Kallus2018} turn it into an estimation target: they learn the confounding function using the RCT and debias the observational estimate of the treatment effect.
-\citet{YangLiuZengWang2025} place this on a semiparametric-efficient footing.
-They jointly estimate the treatment effect and the confounding function, and add a test for unmeasured confounding.
+Unmeasured confounding can be addressed through a confounding function.
+The confounding function measures the confounding bias in the real-world data.
+It was introduced as a sensitivity-analysis device within a single study \citep{robins2000sensitivity}.
+The confounding function can be estimated by combining a randomised and an observational study.
+\citet{Kallus2018} learn the confounding function from the RCT and debias the observational treatment effect.
+\citet{YangLiuZengWang2025} develop a semiparametric-efficient estimator that jointly estimates the treatment effect and the confounding function, and derive a test for unmeasured confounding.
 The elastic integrative estimator of \citet{yang2023elastic} uses that test to decide whether to borrow from the real-world data, and discards it when confounding is detected.
-An R-learner variant \citep{wu2022integrative} and an extension to incomplete real-world data \citep{Yao2024} build on the same approach.
-In the survival setting, \citet{Ye2025} work under an accelerated failure time model with right censoring and high-dimensional covariates.
-They treat the confounding function as a sparse component selected jointly with the treatment effect.
+Two frequentist methods extend the approach to survival outcomes.
+\citet{Ye2025} work under an accelerated failure time model with right censoring and high-dimensional covariates, and treat the confounding function as a sparse component selected jointly with the treatment effect.
 \citet{mao2025statistical} target the conditional restricted mean survival time under right censoring.
 
 
 Bayesian methods combine data sources by borrowing information through the prior.
 The power prior of \citet{ibrahim2000power} raises the external likelihood to a fractional power that controls the borrowing.
-The meta-analytic-predictive (MAP) prior of \citet{neuenschwander2010} makes the borrowing hierarchical and adaptive to between-source heterogeneity.
-Later variants refine the idea: robust mixtures guard against prior-data conflict \citep{schmidli2014robust}, commensurate priors tie the borrowing to the between-source discrepancy \citep{hobbs2011, hobbs2012commensurate}, and semiparametric versions replace the Gaussian heterogeneity distribution with a Dirichlet-process mixture \citep{hupf2021bayesian}.
-\citet{alt2025control} extend this borrowing to survival data through hierarchical proportional-hazards models.
-These methods target a marginal or control-arm effect, not the heterogeneous treatment effect.
-A more recent literature targets heterogeneous effects directly. 
+The meta-analytic-predictive prior of \citet{neuenschwander2010} makes the borrowing hierarchical and adaptive to between-source heterogeneity.
+Later variants tie the borrowing to the between-source discrepancy through commensurate priors \citep{hobbs2012commensurate}.
+These methods all target a marginal or control-arm effect.
+More recent literature targets heterogeneous effects directly.
 \citet{zhou2021incorporating} pool trial and external outcome surfaces with Bayesian additive regression trees, but do not allow for unmeasured confounding in the external source.
 \citet{dimitriou2025causal} develop a multi-task Gaussian process with a data-adaptive borrowing parameter.
-None of these Bayesian methods targets HTE estimation for survival outcomes under unmeasured confounding.
+None of these Bayesian methods targets heterogeneous treatment effects on survival outcomes under unmeasured confounding.
 
+Bayesian additive regression trees \citep{chipman2010bart} are a popular method for causal machine learning \citep{hill2011bayesian}.
+They are supported by theoretical guarantees \citep{rockova2020posterior} and have strong empirical performance in both estimation accuracy and uncertainty quantification \citep{dorie2019, thal2023, kabata2026}.
+The uncertainty quantification is intrinsic to the model and follows directly from the posterior distribution.
+Black-box predictors such as (deep) neural networks are flexible alternatives, but do not provide intrinsic uncertainty quantification and do not separate the causal effect from confounding bias.
+We will show that a structured approach tailored to the problem at hand and its statistical constraints outperforms a generic black-box competitor in both accuracy and calibration.
 
-We develop a Bayesian nonparametric framework for heterogeneous treatment effects on survival outcomes.
-It fuses a randomised trial with real-world data without assuming the observational source is unconfounded.
-A confounding function absorbs the bias from unmeasured confounding in the real-world treated arm.
-We estimate this function rather than assume it, and we keep the real-world data rather than discarding it when confounding is present.
-A hierarchical prior handles between-source heterogeneity by borrowing the baseline prognosis across sources and letting it differ between them.
-The model accommodates right- and interval-censored data, and exploits the longer follow-up of the real-world source for robustness.
-A hierarchical Dirichlet process mixture imposes no parametric form on the error distribution and lets it vary across sources.
+We develop a Bayesian nonparametric framework to estimate heterogeneous treatment effects on survival outcomes.
+We target the acceleration factor, a causally interpretable estimand on the survival-time scale.
+We fuse a randomised trial with real-world data without assuming the observational source is unconfounded.
+A confounding function absorbs the bias from unmeasured confounding in the real-world data.
+We accommodate right- and interval-censored data, and exploit the longer follow-up of the real-world source for robustness.
+A hierarchical Dirichlet process mixture models the error distribution nonparametrically and lets it vary across sources.

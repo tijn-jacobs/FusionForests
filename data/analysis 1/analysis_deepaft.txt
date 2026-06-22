@@ -1,0 +1,12 @@
+deepAFT competitor (S- and T-learner) vs BART (combined RCT + MACS cohort)
+Architecture 8-6-1 ReLU/idu; 10-fold CV tuning; B = 100 bootstrap.
+MACS interval-censored deaths approximated by the right-censored
+last-lab-year encoding (see ANALYSIS_SM.tex).
+
+              method af_ci_width pct_benefit
+       deepAFT-RCT-S       0.576       77.47
+       deepAFT-RCT-T       1.793       25.84
+    deepAFT-Pooled-S       0.875       96.64
+    deepAFT-Pooled-T       2.342        7.84
+   FusionForest (M2)       1.208       96.36
+ Trial-only CSF (M1)       3.155       36.85

@@ -1,34 +1,27 @@
 % !TEX root = main.tex
 \section{Discussion}
 
-We develop a Bayesian nonparametric framework that combines randomised and observational survival data to estimate heterogeneous treatment effects on survival outcomes.
-We relax the common assumption of unconfoundedness in the observational source.
-The confounding function absorbs the observational bias.
-A hierarchical prior borrows the prognostic baseline across sources while allowing it to differ between them.
-The Bayesian fusion forest improves CATE estimation accuracy over a trial-only analysis in simulation studies.
-It is robust to the strength of confounding and to between-source heterogeneity.
-Posterior inference delivers finite-sample uncertainty quantification at the patient and population levels.
-We illustrate the framework on the ACTG~175 trial augmented with the MACS cohort.
-The interval-censored cohort extends follow-up well beyond the trial.
+We combined a randomised trial with real-world data to estimate heterogeneous treatment effects on survival outcomes, without assuming the real-world source is unconfounded.
+The simulation study and the HIV application demonstrate its advantages over a single-source analysis.
+The Bayesian fusion forest remains unbiased under varying levels of unmeasured confounding.
+It reduces the posterior variance of a trial-only analysis.
+In the application, we recovered a benefit of combination therapy that the survival curves of the real-world data alone did not reveal.
+We established benefit for nearly every patient where the trial alone was inconclusive.
 
-Our framework implicitly assumes the acceleration factor $\exp\{\tau(X)\}$ is time-invariant: treatment rescales the survival time by a factor that depends on the covariates but not on time.
+Our framework implicitly assumes the acceleration factor $\exp(\tau(X))$ is time-invariant: treatment rescales the survival time by a factor that depends on the covariates but not on time.
 This assumption may be inappropriate when treatment effects unfold over time, such as delayed-onset benefits or waning effects.
-Flexible parametric AFT models relax this assumption by letting the acceleration factor vary with time \citep{pang2021flexible, Crowther2023, akynkozhayev2025flexible}.
+Flexible parametric AFT models relax this assumption by letting the acceleration factor vary with time \citep{Crowther2023}.
 The causal interpretation of time-dependent acceleration factors has been formalised \citep{Brathovde2024}.
-A natural extension replaces $\tau(X)$ with a generalised Bayesian tree ensemble $\tau(X, t)$ \citep{linero2025generalized}.
+A natural extension replaces $\tau(X)$ with a generalised Bayesian tree ensemble $\tau(X, t)$.
 
-\section*{Acknowledgement}
-Tijn Jacobs and Stéphanie van der Pas were funded by the European Union. 
-Views and opinions expressed are however those of the author(s) only and do not necessarily reflect those of the European Union or the European Research Council Executive Agency. 
-Neither the European Union nor the granting authority can be held responsible for them. 
-This work is supported by ERC grant BayCause, nr. 101074802.
+\section*{Funding}
+This work was supported by the European Research Council [grant number 101074802]; and the SURF Cooperative [grant number EINF-18803].
 
-This work used the Dutch national e-infrastructure with the support of the
-SURF Cooperative using grant no. EINF-18803.
 
+\section*{Conflict of interest}
+None declared. 
 
 \section*{Data availability}
-
 \sloppy
 The software implementation is available on GitHub at \url{https://github.com/tijn-jacobs/FusionForests}.
 \textit{CRAN release will follow soon}.

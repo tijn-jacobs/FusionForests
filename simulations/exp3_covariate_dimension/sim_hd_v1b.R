@@ -3,7 +3,6 @@ library(ShrinkageTrees)
 library(doParallel)
 library(foreach)
 library(evd)
-library(MASS)
 
 # Local copies of FusionForest / CausalShrinkageForest with the internal outcome
 # scaling removed.  The DGP below pre-standardises the latent log-survival to
@@ -1155,21 +1154,50 @@ environment(CausalShrinkageForest_temp) <- asNamespace("ShrinkageTrees")
 environment(FusionForest_temp)           <- asNamespace("FusionForests")
 
 # ── DGP ───────────────────────────────────────────────────────────────────────
-p_total     <- 10L               # observed covariates
+# High-dimensional experiment (sim_hd_v1): hold the signal fixed and grow the
+# number of observed covariates p.  The active functions below touch only the
+# first `p_active` columns, so appending columns adds pure noise covariates --
+# the outcome distribution, SNR, censoring rates, and the standardisation scale
+# are all invariant to p.  The only thing that changes is the number of
+# irrelevant split candidates each forest must search.
+p_active <- 5L                                # signal lives in X[, 1:5]
+p_grid   <- unique(round(10 ^ seq(log10(5), log10(500), length.out = 20)))[8:13]
+# swept covariate dimension:
+# 10 log-spaced points, 5 -> 250
 
-# Cross design: sweep one lambda over `lambda_vals` while holding the other at 1.
-lambda_vals    <- c(0.0, 0.5, 1.0, 1.5, 2.0)  # swept values for each axis
-lambda_d_fixed <- 1.0                          # held when sweeping lambda_u
-lambda_u_fixed <- 1.0                          # held when sweeping lambda_d
+# Nuisances held at their worst-case value while p is swept.
+lambda_d_fixed <- 1.0
+lambda_u_fixed <- 1.0
 sigma_rct   <- 0.75              # RCT residual SD
 target_cens <- 0.35              # target right-censoring fraction per source
 visit_probs <- seq(0.1, 0.8, 0.1) # RWD inspection visits: deciles q10..q80
 
 
-# Covariates: multivariate normal with AR(1) dependence, Sigma_ij = rho^|i-j|.
-rho_X    <- 0.3
-Sigma_X  <- rho_X ^ abs(outer(seq_len(p_total), seq_len(p_total), "-"))
-draw_X   <- function(n) MASS::mvrnorm(n, mu = rep(0, p_total), Sigma = Sigma_X)
+# Covariates: BLOCK-dependent standard normals.  Sigma is block-diagonal with
+# blocks of size `block_size`; within a block the correlation is AR(1) with
+# parameter rho_X, and covariates in different blocks are independent.  The
+# signal lives in X[, 1:5], so the active covariates are correlated with each
+# other and with the rest of the first block.  Because each block is at most
+# block_size x block_size, the per-block Cholesky factor stays small as p grows
+# -- the draw never builds a full p x p Cholesky, which keeps it cheap at high p.
+# Marginals remain standard normal (diag(Sigma) = 1), so SNR, censoring
+# calibration, and the standardisation scale are unchanged from the independent
+# run; only the dependence structure differs.
+rho_X      <- 0.3
+block_size <- 10L
+make_Sigma <- function(p) rho_X ^ abs(outer(seq_len(p), seq_len(p), "-"))  # full AR(1); unused
+make_block <- function(b) rho_X ^ abs(outer(seq_len(b), seq_len(b), "-"))  # one AR(1) block
+chol_full  <- chol(make_block(block_size))   # reused for every full-size block
+
+draw_X <- function(n, p) {
+  X <- matrix(rnorm(n * p), n, p)            # iid N(0,1) start
+  for (s in seq.int(1L, p, by = block_size)) {
+    idx <- s:min(s + block_size - 1L, p)
+    L   <- if (length(idx) == block_size) chol_full else chol(make_block(length(idx)))
+    X[, idx] <- X[, idx, drop = FALSE] %*% L # rows now N(0, block Sigma)
+  }
+  X
+}
 
 m0   <- function(X)  (2 * X[, 1] - X[, 2] * X[, 3] + 0.5 * X[, 4]^2)
 dev  <- function(X, ld) ld * (X[, 4] - 0.5 * X[, 5])  # RWD baseline deviation
@@ -1177,17 +1205,17 @@ tau  <- function(X)  (1/2 + X[, 1] - 0.5 * X[, 2]^2)         # true CATE
 conf <- function(U, lu) lu * (U)               # confounding via unobs. U
 
 # Latent log-survival generators (no censoring), one per source.
-latent_rct <- function(n) {
-  X <- draw_X(n)
+latent_rct <- function(n, p) {
+  X <- draw_X(n, p)
   A <- rbinom(n, 1L, 0.5)                              # randomised
   list(X = X, A = A,
        logT = m0(X) + A * tau(X) + rnorm(n, 0, sigma_rct))
 }
-latent_rwd <- function(n, ld, lu) {
+latent_rwd <- function(n, p, ld, lu) {
   gamma_em   <- 0.5772156649
   beta_scale <- sqrt(6) / pi
   mu_loc     <- -beta_scale * gamma_em
-  X <- draw_X(n)
+  X <- draw_X(n, p)
   U <- runif(n)                                        # RWD-only, unobserved
   e <- plogis(X[, 1] + U)                              # true propensity score
   A <- rbinom(n, 1L, e)                                # selection on X1, U
@@ -1206,18 +1234,18 @@ solve_cens_rate <- function(logT, target = target_cens) {
 # Per-cell calibration, fixed once on a large pre-simulation:
 #   rate_rct -- RCT exponential censoring rate.
 #   visits   -- RWD inspection times (time scale) at the deciles q10..q80.
-calibrate <- function(ld, lu, n_cal = 2e5) {
-  rate_rct <- solve_cens_rate(latent_rct(n_cal)$logT)
-  visits   <- as.numeric(quantile(exp(latent_rwd(n_cal, ld, lu)$logT),
+calibrate <- function(ld, lu, p, n_cal = 2e5) {
+  rate_rct <- solve_cens_rate(latent_rct(n_cal, p)$logT)
+  visits   <- as.numeric(quantile(exp(latent_rwd(n_cal, p, ld, lu)$logT),
                                   probs = visit_probs))
   list(rate_rct = rate_rct, visits = visits)
 }
 
 # Simulate one full dataset (RCT right-censored, RWD interval-censored).
 # All time bounds are returned on the LOG scale (timescale = "log").
-make_data <- function(n_rct, n_rwd, ld, lu, rate_rct, visits) {
-  r <- latent_rct(n_rct)
-  w <- latent_rwd(n_rwd, ld, lu)
+make_data <- function(n_rct, n_rwd, p, ld, lu, rate_rct, visits) {
+  r <- latent_rct(n_rct, p)
+  w <- latent_rwd(n_rwd, p, ld, lu)
   # Standardise the true (latent) log-survival of the pooled sources to mean 0,
   # unit variance.  The same affine map `std` is applied to every log-time bound
   # constructed below, so all fits operate on a common scale.  Predicted CATEs
@@ -1253,7 +1281,7 @@ make_data <- function(n_rct, n_rwd, ld, lu, rate_rct, visits) {
   right_rwd[beyond] <- log(last_visit)
   icc_rwd[beyond]   <- 0L
   y_rwd <- right_rwd                        # placeholder; bounds carry the info
-
+  
   # --- standardise all log-time bounds to the common scale ---
   y_rct     <- std(y_rct)
   left_rct  <- std(left_rct)
@@ -1261,7 +1289,7 @@ make_data <- function(n_rct, n_rwd, ld, lu, rate_rct, visits) {
   left_rwd  <- std(left_rwd)
   right_rwd <- std(right_rwd)
   y_rwd     <- std(y_rwd)
-
+  
   list(
     X_rct = r$X, X_rwd = w$X,
     A_rct = r$A, A_rwd = w$A,
@@ -1291,22 +1319,26 @@ make_data <- function(n_rct, n_rwd, ld, lu, rate_rct, visits) {
 }
 
 # ── Fits (all via FusionForest, log-time, with interval-censoring args) ───────
-fit_fusion <- function(d, N_post, N_burn) {
+# `cols` selects which covariate columns to hand to every forest.  cols = NULL
+# uses all p; cols = 1:p_active gives the active-only oracle (the floor that
+# removes the dimensionality penalty).
+fit_fusion <- function(d, N_post, N_burn, cols = NULL) {
+  Xf <- if (is.null(cols)) d$X else d$X[, cols, drop = FALSE]
   FusionForest_temp(
     y                            = d$y,
     status                       = d$status,
     observed_left_time           = d$left,
     observed_right_time          = d$right,
     interval_censoring_indicator = d$icc,
-    X_train_control           = d$X,
-    X_train_treat             = d$X,
+    X_train_control           = Xf,
+    X_train_treat             = Xf,
     treatment_indicator_train = d$A,
     source_indicator_train    = d$S,
-    X_test_control            = d$X,
-    X_test_treat              = d$X,
-    X_test_deconf             = d$X,
-    treatment_indicator_test  = rep(1L, nrow(d$X)),
-    source_indicator_test     = rep(1L, nrow(d$X)),
+    X_test_control            = Xf,
+    X_test_treat              = Xf,
+    X_test_deconf             = Xf,
+    treatment_indicator_test  = rep(1L, nrow(Xf)),
+    source_indicator_test     = rep(1L, nrow(Xf)),
     outcome_type              = "right-censored",
     timescale                 = "log",
     error_dist                = "source_hdp_scale",
@@ -1428,11 +1460,11 @@ make_rows <- function(method, point, samp, truth, n_rct, n_all) {
   }))
 }
 
-# ── One replication: all three estimators on one dataset ─────────────────────
-run_one_sim <- function(seed, n_rct, n_rwd, N_post, N_burn, ld, lu,
+# ── One replication: all estimators on one dataset ───────────────────────────
+run_one_sim <- function(seed, n_rct, n_rwd, p, N_post, N_burn, ld, lu,
                         rate_rct, visits) {
   set.seed(seed)
-  d     <- make_data(n_rct, n_rwd, ld, lu, rate_rct, visits)
+  d     <- make_data(n_rct, n_rwd, p, ld, lu, rate_rct, visits)
   truth <- tau(d$X)
   n_all <- n_rct + n_rwd
   safe  <- function(expr) tryCatch(expr, error = function(e) NULL)
@@ -1444,21 +1476,26 @@ run_one_sim <- function(seed, n_rct, n_rwd, N_post, N_burn, ld, lu,
   rt_rwd[d$icc_rwd == 0] <- Inf
   
   ff  <- safe(fit_fusion(d, N_post, N_burn))
+  # Active-only oracle: fusion handed just the p_active signal covariates.  This
+  # removes the dimensionality penalty and traces the achievable floor at each p.
+  ffo <- safe(fit_fusion(d, N_post, N_burn, cols = seq_len(p_active)))
   rct <- safe(fit_single_rc(d$y_rct, d$st_rct, d$X_rct, d$A_rct, d$X,
                             N_post, N_burn))
   rwd <- safe(fit_single_ic(lt_rwd, rt_rwd, d$X_rwd, d$A_rwd, d$X,
                             d$e_rwd, d$e_all, N_post, N_burn))
-
+  
   # The fits run on the standardised log scale, so their treatment-effect
   # predictions are tau(X) / scale_sd.  Multiply back by scale_sd to recover the
   # log-time CATE before comparing with the true tau(X).
   s <- d$scale_sd
   res <- rbind(
-    make_rows("Fusion",   if (!is.null(ff))  ff$test_predictions_treat * s,
+    make_rows("Fusion",        if (!is.null(ff))  ff$test_predictions_treat * s,
               if (!is.null(ff))  ff$test_predictions_sample_treat * s,  truth, n_rct, n_all),
-    make_rows("RCT-only", if (!is.null(rct)) rct$test_predictions_treat * s,
+    make_rows("Fusion-oracle", if (!is.null(ffo)) ffo$test_predictions_treat * s,
+              if (!is.null(ffo)) ffo$test_predictions_sample_treat * s, truth, n_rct, n_all),
+    make_rows("RCT-only",      if (!is.null(rct)) rct$test_predictions_treat * s,
               if (!is.null(rct)) rct$test_predictions_sample_treat * s, truth, n_rct, n_all),
-    make_rows("RWD-only", if (!is.null(rwd)) rwd$test_predictions_treat * s,
+    make_rows("RWD-only",      if (!is.null(rwd)) rwd$test_predictions_treat * s,
               if (!is.null(rwd)) rwd$test_predictions_sample_treat * s, truth, n_rct, n_all)
   )
   # realised censoring sanity-checks
@@ -1469,18 +1506,19 @@ run_one_sim <- function(seed, n_rct, n_rwd, N_post, N_burn, ld, lu,
 }
 
 # ── Parallel runner over replications (one grid cell) ────────────────────────
-run_simulation_tidy <- function(n_rep, n_rct, n_rwd, N_post, N_burn,
+run_simulation_tidy <- function(n_rep, n_rct, n_rwd, p, N_post, N_burn,
                                 ld, lu, seed_offset = 1000L) {
-  cal <- calibrate(ld, lu)        # per-cell RCT rate + RWD decile visits (fixed)
+  cal <- calibrate(ld, lu, p)     # per-cell RCT rate + RWD decile visits (fixed)
   cat(sprintf("  RCT cens rate = %.4g | RWD visits (q10..q80) = %s\n",
               cal$rate_rct, paste(round(cal$visits, 2), collapse = ", ")))
   foreach(
     i = seq_len(n_rep),
     .combine = "rbind",
-    .packages = c("FusionForests", "ShrinkageTrees", "evd", "MASS")
+    .packages = c("FusionForests", "ShrinkageTrees", "evd")
   ) %dopar% {
-    res <- run_one_sim(seed_offset + i, n_rct, n_rwd, N_post, N_burn, ld, lu,
+    res <- run_one_sim(seed_offset + i, n_rct, n_rwd, p, N_post, N_burn, ld, lu,
                        cal$rate_rct, cal$visits)
+    res$p        <- p
     res$lambda_d <- ld
     res$lambda_u <- lu
     res$Iter     <- i
@@ -1497,177 +1535,291 @@ if (length(args) > 0) {
 }
 registerDoParallel(cores = num_cores)
 cat("Number of cores being used (1 free):", num_cores, "\n")
-cat("SIMULATION: FusionForest vs RCT-only vs RWD-only (SURVIVAL v12: v10 DGP/settings, k_treat = 0.25) -- HPC\n")
+cat("SIMULATION: high-dimensional sweep (sim_hd_v1): Fusion vs Fusion-oracle vs RCT-only vs RWD-only -- HPC\n")
+cat("Grow covariate dimension p at fixed n; lambda_d = lambda_u = 1.\n")
 cat("RWD interval-censored at deciles q10..q80; RCT right-censored ~35%.\n")
-cat("Covariates: MVN AR(1), rho =", rho_X, "\n")
+cat(sprintf("Covariates: MVN, AR(1) rho = %g within independent blocks of %d; signal in X[, 1:%d].\n",
+            rho_X, block_size, p_active))
 
 # Simulation settings.
-M       <- 1000 #num_cores * 2L        # replications per grid cell
-n_rct   <- 150                   # v10 settings
-n_rwd   <- 350L                  # v10 settings
-N_post  <- 3000L                 # v10 settings
-N_burn  <- 2000L                 # v10 settings
+M       <- 1000                  # replications per grid cell
+n_rct   <- 150
+n_rwd   <- 350L
+N_post  <- 5000L
+N_burn  <- 5000L
 cat(sprintf("M = %d reps/cell, n_rct = %d, n_rwd = %d, N_post = %d, N_burn = %d\n",
             M, n_rct, n_rwd, N_post, N_burn))
 
-# Cross grid: vary lambda_u (at lambda_d = 1) and vary lambda_d (at lambda_u = 1).
-# The shared cell (lambda_d = 1, lambda_u = 1) appears in both slices; run once.
-grid <- unique(rbind(
-  data.frame(lambda_d = lambda_d_fixed, lambda_u = lambda_vals),   # vary u
-  data.frame(lambda_d = lambda_vals,    lambda_u = lambda_u_fixed) # vary d
-))
+# Dimension grid: sweep p at the worst-case nuisance setting (lambda_d = lambda_u = 1).
+grid <- data.frame(p = p_grid, lambda_d = lambda_d_fixed, lambda_u = lambda_u_fixed)
 rownames(grid) <- NULL
-cat(sprintf("Grid: %d (lambda_d, lambda_u) cells\n", nrow(grid)))
+cat(sprintf("Grid: %d p cells (%s)\n", nrow(grid), paste(p_grid, collapse = ", ")))
 
 all_cells <- vector("list", nrow(grid))
 for (g in seq_len(nrow(grid))) {
-  ld <- grid$lambda_d[g]; lu <- grid$lambda_u[g]
-  cat(sprintf("\nCell %d/%d: lambda_d = %.1f, lambda_u = %.1f\n",
-              g, nrow(grid), ld, lu))
+  pg <- grid$p[g]; ld <- grid$lambda_d[g]; lu <- grid$lambda_u[g]
+  cat(sprintf("\nCell %d/%d: p = %d, lambda_d = %.1f, lambda_u = %.1f\n",
+              g, nrow(grid), pg, ld, lu))
   all_cells[[g]] <- run_simulation_tidy(
-    n_rep = M, n_rct = n_rct, n_rwd = n_rwd,
+    n_rep = M, n_rct = n_rct, n_rwd = n_rwd, p = pg,
     N_post = N_post, N_burn = N_burn,
     ld = ld, lu = lu, seed_offset = 1000L * g)
 }
 final_flat_df <- do.call(rbind, all_cells)
 
 # Output file path (! NAME MUST BE FILENAME_output.rds !).
-output_file <- file.path(Sys.getenv("TMPDIR"), "sim_surv_v12_output.rds")
+output_file <- file.path(Sys.getenv("TMPDIR"), "sim_hd_v1b_output.rds")
 cat("\nSaving all results to:", output_file, "\n")
 saveRDS(final_flat_df, file = output_file)
 cat("All results successfully saved in one file.\n")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# LOCAL POST-PROCESSING (uncomment after downloading the .rds from the HPC).
-# Place this script and sim_surv_v12_output.rds in the same folder and run from the repo
-# root.  Prints, per (lambda_d, lambda_u, method, population):
+# LOCAL POST-PROCESSING (run after downloading the .rds from the HPC).
+# Place this script and sim_hd_v1b_output.rds at the paths below and run from the
+# repo root.  Prints, per (p, method, population):
 #   rmse     -- mean pointwise CATE RMSE over replications
 #   bias     -- mean integrated (averaged-over-points) signed bias
 #   variance -- across-replication variance of the integrated CATE, var(bias_r)
 #   sd       -- sqrt(variance)
 #   coverage, width, postvar -- as recorded
+# Then draws (a) each metric vs p, one line per method, and (b) the Fusion /
+# RCT-only efficiency ratios vs p.
 # ──────────────────────────────────────────────────────────────────────────────
-res <- readRDS("simulations/main/sim_surv_v12_output.rds")
-
-grp <- cbind(rmse, bias, coverage, width, postvar) ~
-  lambda_d + lambda_u + method + population
-mean_tbl <- aggregate(grp, data = res,
-                      FUN = function(x) mean(x, na.rm = TRUE), na.action = na.pass)
-var_tbl  <- aggregate(bias ~ lambda_d + lambda_u + method + population,
-                      data = res, FUN = function(x) var(x, na.rm = TRUE), na.action = na.pass)
-names(var_tbl)[ncol(var_tbl)] <- "variance"
-summary_tbl <- merge(mean_tbl, var_tbl)
-summary_tbl$sd <- sqrt(summary_tbl$variance)
-
-summary_tbl$method     <- factor(summary_tbl$method,
-                                 levels = c("Fusion", "RCT-only", "RWD-only"))
-summary_tbl$population  <- factor(summary_tbl$population,
-                                  levels = c("RCT", "RWD", "All"))
-ord <- order(summary_tbl$lambda_d, summary_tbl$lambda_u,
-             summary_tbl$population, summary_tbl$method)
-
-cat("\n=== CATE metrics (mean over replications) ===\n")
-print(summary_tbl[ord, c("lambda_d", "lambda_u", "population", "method",
-                         "rmse", "bias", "variance", "sd", "coverage", "width",
-                         "postvar")],
-      row.names = FALSE, digits = 3)
-
-# Realised censoring fractions per cell:
-# cens_tbl <- aggregate(cbind(cens_rct, ic_rwd, rc_rwd_tail) ~ lambda_d + lambda_u,
-#   data = res, FUN = function(x) mean(x, na.rm = TRUE))
-# print(cens_tbl, row.names = FALSE, digits = 3)
-
-# Boxplots over replications (combined "All" population).  Each call draws a
-# 2x2 grid of metrics; within a panel the boxes are grouped by the swept lambda
-# from small to high, with the three estimators side by side per group, and one
-# shared legend beneath.  We make two such plots: one sweeping lambda_u (at
-# lambda_d = 1) and one sweeping lambda_d (at lambda_u = 1).
-a <- res[res$population == "All", ]
-meth <- c("Fusion", "RCT-only", "RWD-only")
-# Estimator colours: darker green (Fusion), orange (RCT-only), teal (RWD-only).
-cols <- c("goldenrod1", "olivedrab", "firebrick3")
-a$method <- factor(a$method, levels = meth)
-metrics  <- c("rmse", "bias", "coverage", "postvar")
-# Pretty y-axis labels for each metric.
-metric_labs <- c(rmse = "RMSE", bias = "Bias", coverage = "Coverage",
-                 width = "CI width", postvar = "Posterior variance")
-
-fig_dir <- "notes/general/figures"
-dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
-# Draws the 2x2 metric grid to the active device (so it shows in the RStudio
-# plot pane) and, when `file` is given, also writes the same figure to PDF.
-plot_panel_grid <- function(dat, group, group_lab, file = NULL, ylims = NULL) {
-  dat[[group]] <- factor(dat[[group]], levels = sort(unique(dat[[group]])))
-  render <- function() {
-    op <- par(mfrow = c(2, 2),
-              family = "serif",         # serif font (Times / Computer Modern)
-              oma = c(5, 0, 0, 0),       # outer bottom margin for shared legend
-              mar = c(6.5, 7.5, 2, 2),   # per-panel margins (space between panels)
-              mgp = c(4.3, 1.3, 0),      # axis-title / label / line positions
-              # Font sizes ~10% above the manuscript KM figure: axis titles
-              # ~33 pt (cex 2.75) and tick labels ~26 pt (cex 2.2) on the
-              # default 12 pt device.
-              cex.lab = 2.75, cex.axis = 2.2)
-    nb  <- length(meth)               # estimators per group
-    ng  <- nlevels(dat[[group]])      # number of swept-lambda levels
-    gap <- 1.5                       # extra horizontal space between groups
-    at      <- as.vector(outer(seq_len(nb), (seq_len(ng) - 1) * (nb + gap), "+"))
-    centers <- (seq_len(ng) - 1) * (nb + gap) + (nb + 1) / 2
-    seps    <- centers[-ng] + diff(centers) / 2
-    for (metric in metrics) {
-      # Shared y-axis across the two figures when `ylims` is supplied; else
-      # fall back to this panel's own whisker range (outliers are hidden).
-      ylim_m <- if (is.null(ylims))
-        range(boxplot(dat[[metric]] ~ dat$method + dat[[group]],
-                      plot = FALSE)$stats, na.rm = TRUE)
-      else ylims[[metric]]
-      boxplot(dat[[metric]] ~ dat$method + dat[[group]], col = cols, xaxt = "n",
-              at = at, xlim = range(at) + c(-0.5, 0.5), ylim = ylim_m,
-              outline = FALSE,
-              main = "", ylab = metric_labs[metric], xlab = group_lab, sep = " ")
-      axis(1, at = centers, labels = levels(dat[[group]]))
-      abline(v = seps, lty = 3, col = "grey")
-      if (metric == "coverage") abline(h = 0.95, lty = 2)
-      if (metric == "bias")     abline(h = 0,    lty = 2)
-    }
-    par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0),
-        family = "serif", new = TRUE)
-    plot.new()
-    legend("bottom", legend = meth, fill = cols, horiz = TRUE, bty = "n",
-           xpd = TRUE, cex = 2.75)
-    par(op)
-  }
-  render()                                   # 1) draw to the active device
-  if (!is.null(file)) {                       # 2) also write the PDF
-    pdf(file, width = 18, height = 10, family = "Times")  # match survival_curves_manuscript.pdf
-    render()
-    dev.off()
-  }
-}
-
-# Shared per-metric y-limits so the matching panels across the two figures
-# (vary lambda_u vs vary lambda_d) use an identical y-axis and are directly
-# comparable.  Based on the boxplot whisker extents (outliers are hidden via
-# outline = FALSE), extended to include each panel's reference line (0 for
-# bias, 0.95 for coverage) and padded 4%.
-d_u <- a[a$lambda_d == 1, ]   # figure 1 data (sweep lambda_u)
-d_d <- a[a$lambda_u == 1, ]   # figure 2 data (sweep lambda_d)
-ylims <- setNames(lapply(metrics, function(m) {
-  s_u <- boxplot(d_u[[m]] ~ d_u$method + d_u$lambda_u, plot = FALSE)$stats
-  s_d <- boxplot(d_d[[m]] ~ d_d$method + d_d$lambda_d, plot = FALSE)$stats
-  vals <- c(s_u, s_d)
-  if (m == "bias")     vals <- c(vals, 0)
-  if (m == "coverage") vals <- c(vals, 0.95)
-  rng <- range(vals, na.rm = TRUE)
-  rng + c(-1, 1) * 0.04 * diff(rng)
-}), metrics)
-
-# Plot 1: vary lambda_u, holding lambda_d = 1.  Shown in-session and saved.
-# File names match the \includegraphics calls in notes/simulation/SIMULATION.tex.
-plot_panel_grid(a[a$lambda_d == 1, ], "lambda_u", expression(lambda[u]),
-                file = file.path(fig_dir, "sim_vary_lambda_u.pdf"), ylims = ylims)
-# Plot 2: vary lambda_d, holding lambda_u = 1.  Shown in-session and saved.
-plot_panel_grid(a[a$lambda_u == 1, ], "lambda_d", expression(lambda[d]),
-                file = file.path(fig_dir, "sim_vary_lambda_d.pdf"), ylims = ylims)
-
+# res <- readRDS("simulations/exp3_covariate_dimension/sim_hd_v1b_output.rds")
+# 
+# metrics_all <- c("rmse", "bias", "coverage", "width", "postvar")
+# grp <- as.formula(paste0("cbind(", paste(metrics_all, collapse = ", "),
+#                          ") ~ p + method + population"))
+# mean_tbl <- aggregate(grp, data = res,
+#                       FUN = function(x) mean(x, na.rm = TRUE), na.action = na.pass)
+# # Across-replication standard error of each mean, for the 95% CI bands.
+# se_of_mean <- function(x) { x <- x[is.finite(x)]
+#   if (length(x) < 2L) NA_real_ else sd(x) / sqrt(length(x)) }
+# se_tbl <- aggregate(grp, data = res, FUN = se_of_mean, na.action = na.pass)
+# names(se_tbl)[match(metrics_all, names(se_tbl))] <- paste0(metrics_all, "_se")
+# var_tbl  <- aggregate(bias ~ p + method + population,
+#                       data = res, FUN = function(x) var(x, na.rm = TRUE), na.action = na.pass)
+# names(var_tbl)[ncol(var_tbl)] <- "variance"
+# summary_tbl <- merge(merge(mean_tbl, se_tbl), var_tbl)
+# summary_tbl$sd <- sqrt(summary_tbl$variance)
+# 
+# meth_levels <- c("Fusion", "Fusion-oracle", "RCT-only", "RWD-only")
+# summary_tbl$method     <- factor(summary_tbl$method, levels = meth_levels)
+# summary_tbl$population  <- factor(summary_tbl$population,
+#                                   levels = c("RCT", "RWD", "All"))
+# ord <- order(summary_tbl$p, summary_tbl$population, summary_tbl$method)
+# 
+# cat("\n=== CATE metrics vs p (mean over replications) ===\n")
+# print(summary_tbl[ord, c("p", "population", "method",
+#                          "rmse", "bias", "variance", "sd", "coverage", "width",
+#                          "postvar")],
+#       row.names = FALSE, digits = 3)
+# 
+# # Realised censoring fractions per cell (p-invariant by construction):
+# # cens_tbl <- aggregate(cbind(cens_rct, ic_rwd, rc_rwd_tail) ~ p,
+# #   data = res, FUN = function(x) mean(x, na.rm = TRUE))
+# # print(cens_tbl, row.names = FALSE, digits = 3)
+# 
+# # Figures are exploratory (not manuscript figures yet), so they go in a local
+# # sub-folder rather than notes/general/figures.
+# fig_dir <- "simulations/exp3_covariate_dimension/figures"
+# dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
+# 
+# meth        <- c("Fusion", "Fusion-oracle", "RCT-only", "RWD-only")
+# # Fusion (olive), oracle floor (dark green, dashed), RCT-only (gold), RWD (red).
+# cols        <- c("olivedrab", "darkgreen", "goldenrod1", "firebrick3")
+# ltys        <- c(1, 2, 1, 1)
+# pchs        <- c(16, 17, 15, 18)
+# metrics     <- c("rmse", "bias", "coverage", "postvar")
+# metric_labs <- c(rmse = "RMSE", bias = "Bias", coverage = "Coverage",
+#                  width = "CI width", postvar = "Posterior variance")
+# 
+# # Each metric vs p (log-x), one solid line per method, for a chosen population.
+# # Mean curves are smoothed by a least-squares polynomial of degree `sm_degree`
+# # in log(p) -- a trend fit that does NOT interpolate every point, so it is much
+# # less wiggly than a spline (raise sm_degree for more flexibility, lower it for
+# # a smoother curve).  The shaded band is the 95% Monte Carlo CI of the mean
+# # across replications (mean +/- z * SE), smoothed the same way.  Small markers
+# # show the observed mean at each p.
+# plot_vs_p <- function(stbl, pop = "All", file = NULL, z = 1.96, sm_degree = 2) {
+#   dat <- stbl[stbl$population == pop, ]
+#   pv  <- sort(unique(dat$p))
+#   xticks <- c(5, 50, 500)                      # fixed x-axis ticks
+#   xlim_p <- range(c(xticks, pv))
+#   # Smooth y over log(p) by a degree-min(sm_degree, #pts - 1) LS polynomial:
+#   # a straight line for 2 points, a smooth (non-interpolating) trend once there
+#   # are more points than the polynomial order.
+#   smooth_xy <- function(x, y, nout = 200) {
+#     ok <- is.finite(x) & is.finite(y); x <- x[ok]; y <- y[ok]
+#     o <- order(x); x <- x[o]; y <- y[o]
+#     nu <- length(unique(x))
+#     if (nu < 2) return(list(x = x, y = y))
+#     lx  <- log(x)
+#     deg <- min(sm_degree, nu - 1)
+#     fit <- lm(y ~ poly(lx, deg, raw = TRUE))
+#     gx  <- seq(min(lx), max(lx), length.out = nout)
+#     list(x = exp(gx), y = as.numeric(predict(fit, data.frame(lx = gx))))
+#   }
+#   render <- function() {
+#     op <- par(mfrow = c(2, 2), family = "serif",
+#               oma = c(5, 0, 2, 0), mar = c(6.5, 7.5, 2, 2),
+#               mgp = c(4.3, 1.3, 0), cex.lab = 2.4, cex.axis = 2.0)
+#     for (metric in metrics) {
+#       se_col <- paste0(metric, "_se")
+#       lo_all <- dat[[metric]] - z * dat[[se_col]]
+#       hi_all <- dat[[metric]] + z * dat[[se_col]]
+#       # Per-metric y-limits (per the figure spec).
+#       yl <-
+#         if (metric == "rmse")
+#           c(0.4,  max(c(hi_all, dat$rmse), na.rm = TRUE))
+#         else if (metric == "bias")     c(-0.35, 0.35)
+#         else if (metric == "coverage")
+#           c(0.80, max(c(hi_all, dat$coverage, 0.95), na.rm = TRUE))
+#         else if (metric == "postvar")
+#           c(0,    max(c(hi_all, dat$postvar), na.rm = TRUE))
+#         else range(c(dat[[metric]], lo_all, hi_all), na.rm = TRUE)
+#       plot(NA, xlim = xlim_p, ylim = yl, log = "x", xaxt = "n",
+#            xlab = expression(italic(p)), ylab = metric_labs[metric])
+#       axis(1, at = xticks, labels = xticks)
+#       for (mi in seq_along(meth)) {
+#         dm <- dat[dat$method == meth[mi], ]; dm <- dm[order(dm$p), ]
+#         lo <- dm[[metric]] - z * dm[[se_col]]
+#         hi <- dm[[metric]] + z * dm[[se_col]]
+#         if (any(is.finite(c(lo, hi)))) {           # 95% CI band
+#           sl <- smooth_xy(dm$p, lo); sh <- smooth_xy(dm$p, hi)
+#           polygon(c(sl$x, rev(sh$x)), c(sl$y, rev(sh$y)),
+#                   col = adjustcolor(cols[mi], alpha.f = 0.18), border = NA)
+#         }
+#         sm <- smooth_xy(dm$p, dm[[metric]])        # smoothed mean (solid)
+#         lines(sm$x, sm$y, col = cols[mi], lty = 1, lwd = 4)
+#         points(dm$p, dm[[metric]], col = cols[mi], pch = 16, cex = 1.1)
+#       }
+#       if (metric == "coverage") abline(h = 0.95, lty = 3, col = "grey40")
+#       if (metric == "bias")     abline(h = 0,    lty = 3, col = "grey40")
+#     }
+#     par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0),
+#         family = "serif", new = TRUE)
+#     plot.new()
+#     legend("bottom", legend = meth, col = cols, lty = 1, pch = 16,
+#            lwd = 4, pt.cex = 1.3, horiz = TRUE, bty = "n", xpd = TRUE, cex = 2.0)
+#     par(op)
+#   }
+#   render()
+#   if (!is.null(file)) {
+#     pdf(file, width = 18, height = 10, family = "Times")
+#     render(); dev.off()
+#   }
+# }
+# 
+# # Efficiency of Fusion relative to the RCT-only baseline it is meant to improve
+# # on: ratio < 1 means Fusion wins.  This is the headline -- does the advantage
+# # hold, grow, or cross over as p increases?  We also overlay the active-only
+# # oracle ratio to separate the irreducible gain from the dimensionality cost.
+# ratio_vs_p <- function(stbl, raw, pop = "All", file = NULL, z = 1.96,
+#                        sm_degree = 2) {
+#   pv <- sort(unique(stbl$p[stbl$population == pop]))
+#   xticks <- c(5, 50, 500); xlim_p <- range(c(xticks, pv))
+#   smooth_xy <- function(x, y, nout = 200) {
+#     ok <- is.finite(x) & is.finite(y); x <- x[ok]; y <- y[ok]
+#     o <- order(x); x <- x[o]; y <- y[o]; nu <- length(unique(x))
+#     if (nu < 2) return(list(x = x, y = y))
+#     lx <- log(x); deg <- min(sm_degree, nu - 1)
+#     fit <- lm(y ~ poly(lx, deg, raw = TRUE))
+#     gx  <- seq(min(lx), max(lx), length.out = nout)
+#     list(x = exp(gx), y = as.numeric(predict(fit, data.frame(lx = gx))))
+#   }
+#   # Per-replication ratio of `metric` to the RCT-only baseline, matched within
+#   # each dataset by Iter; then mean and 95% MC SE across replications at each p.
+#   ratio_summary <- function(metric, num_method) {
+#     d <- raw[raw$population == pop, ]
+#     do.call(rbind, lapply(pv, function(p) {
+#       dp <- d[d$p == p, ]
+#       m  <- merge(dp[dp$method == num_method, c("Iter", metric)],
+#                   dp[dp$method == "RCT-only", c("Iter", metric)],
+#                   by = "Iter", suffixes = c(".n", ".d"))
+#       r  <- m[[paste0(metric, ".n")]] / m[[paste0(metric, ".d")]]
+#       r  <- r[is.finite(r)]
+#       data.frame(p = p, mean = if (length(r)) mean(r) else NA_real_,
+#                  se = if (length(r) < 2) NA_real_ else sd(r) / sqrt(length(r)))
+#     }))
+#   }
+#   series <- list(
+#     list(num = "Fusion",        col = "olivedrab", lab = "Fusion / RCT-only"),
+#     list(num = "Fusion-oracle", col = "darkgreen", lab = "Fusion-oracle / RCT-only"))
+#   panels <- c(rmse    = "RMSE ratio (vs RCT-only)",
+#               postvar = "Posterior-variance ratio (vs RCT-only)")
+#   summ <- list()
+#   for (m in names(panels)) for (s in series)
+#     summ[[paste(m, s$num)]] <- ratio_summary(m, s$num)
+#   render <- function() {
+#     op <- par(mfrow = c(1, 2), family = "serif",
+#               oma = c(5, 0, 2, 0), mar = c(6.5, 8.5, 2, 2),
+#               mgp = c(4.8, 1.3, 0), cex.lab = 2.2, cex.axis = 1.9)
+#     for (m in names(panels)) {
+#       ss <- lapply(series, function(s) summ[[paste(m, s$num)]])
+#       yl <- range(c(1, unlist(lapply(ss, function(d)
+#               c(d$mean - z * d$se, d$mean + z * d$se, d$mean)))), na.rm = TRUE)
+#       plot(NA, xlim = xlim_p, ylim = yl, log = "x", xaxt = "n",
+#            xlab = expression(italic(p)), ylab = panels[[m]])
+#       axis(1, at = xticks, labels = xticks)
+#       abline(h = 1, lty = 3, col = "grey40")
+#       for (k in seq_along(series)) {
+#         s <- series[[k]]; d <- ss[[k]][order(ss[[k]]$p), ]
+#         lo <- d$mean - z * d$se; hi <- d$mean + z * d$se
+#         if (any(is.finite(c(lo, hi)))) {           # 95% CI band
+#           sl <- smooth_xy(d$p, lo); sh <- smooth_xy(d$p, hi)
+#           polygon(c(sl$x, rev(sh$x)), c(sl$y, rev(sh$y)),
+#                   col = adjustcolor(s$col, alpha.f = 0.18), border = NA)
+#         }
+#         sm <- smooth_xy(d$p, d$mean)               # smoothed mean (solid)
+#         lines(sm$x, sm$y, col = s$col, lty = 1, lwd = 4)
+#         points(d$p, d$mean, col = s$col, pch = 16, cex = 1.1)
+#       }
+#     }
+#     par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0),
+#         family = "serif", new = TRUE)
+#     plot.new()
+#     legend("bottom", legend = vapply(series, `[[`, "", "lab"),
+#            col = vapply(series, `[[`, "", "col"), lty = 1, pch = 16,
+#            lwd = 4, pt.cex = 1.3, horiz = TRUE, bty = "n", xpd = TRUE, cex = 1.9)
+#     par(op)
+#   }
+#   render()
+#   if (!is.null(file)) {
+#     pdf(file, width = 18, height = 8, family = "Times")
+#     render(); dev.off()
+#   }
+#   data.frame(p = pv,
+#              rmse_ratio  = summ[["rmse Fusion"]]$mean,
+#              rmse_oracle = summ[["rmse Fusion-oracle"]]$mean,
+#              var_ratio   = summ[["postvar Fusion"]]$mean,
+#              var_oracle  = summ[["postvar Fusion-oracle"]]$mean)
+# }
+# 
+# # Plot 1: each metric vs p (combined "All" population).
+# plot_vs_p(summary_tbl, pop = "All",
+#           file = file.path(fig_dir, "sim_hd_metrics_vs_p.pdf"))
+# # Plot 2: Fusion / RCT-only efficiency ratios vs p.
+# ratio_tbl <- ratio_vs_p(summary_tbl, raw = res, pop = "All",
+#                         file = file.path(fig_dir, "sim_hd_ratio_vs_p.pdf"))
+# cat("\n=== Fusion / RCT-only efficiency ratios (All population) ===\n")
+# print(ratio_tbl, row.names = FALSE, digits = 3)
+# 
+# # --- Fusion / RCT-only ratio, p = 10 to p = 500 -----------------------------
+# # How the fusion advantage over the trial-only baseline moves across the
+# # dimension range of interest (RMSE and posterior-variance ratios; < 1 favours
+# # fusion).  Prints the per-p table over 10 <= p <= 500, and -- when both ends
+# # are on the grid -- the change from p = 10 to p = 500.
+# rr_rng <- ratio_tbl[ratio_tbl$p >= 10 & ratio_tbl$p <= 500,
+#                     c("p", "rmse_ratio", "var_ratio")]
+# cat("\n=== Fusion / RCT-only ratio (p = 10 to 500) ===\n")
+# print(rr_rng, row.names = FALSE, digits = 3)
+# if (all(c(10, 500) %in% rr_rng$p)) {
+#   a <- rr_rng[rr_rng$p == 10, ]; b <- rr_rng[rr_rng$p == 500, ]
+#   cat(sprintf("RMSE ratio: %.3f at p=10  ->  %.3f at p=500  (x%.2f)\n",
+#               a$rmse_ratio, b$rmse_ratio, b$rmse_ratio / a$rmse_ratio))
+#   cat(sprintf("Var  ratio: %.3f at p=10  ->  %.3f at p=500  (x%.2f)\n",
+#               a$var_ratio,  b$var_ratio,  b$var_ratio  / a$var_ratio))
+# }
+# 

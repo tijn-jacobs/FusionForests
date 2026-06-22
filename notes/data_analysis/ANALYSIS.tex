@@ -4,71 +4,53 @@
 We study the effect of a combination antiretroviral therapy versus zidovudine (ZDV) monotherapy on event-free survival in HIV.
 We combine the AIDS Clinical Trials Group Protocol~175 (ACTG~175) \citep{hammer1996} with the Multicenter AIDS Cohort Study (MACS) \citep{kaslow1987}.
 Treatment in ACTG~175 is randomised.
-MACS is an observational cohort with unmeasured confounding \citep{hernan2000marginal}.
 We pool the three combination regimens in ACTG~175 into one comparator and contrast it with ZDV monotherapy.
 We restrict both sources to a common population: men with baseline CD4 count of 200 to 500 cells/mm$^3$.
-This alignment makes the fusion credible, since the two sources then approximate one population \citep{pocock1976}.
+This alignment makes the fusion credible, since the two sources then approximate one population.
 We adjust for six baseline covariates: age, CD4, CD8, calendar year, race, and years of prior antiretroviral therapy.
-Table~\ref{tab:cohort} summarises the aligned cohort: 1771 trial patients and 373 cohort patients.
-The trial follows patients for a maximum of about three years: too short to reach median event-free survival.
-The cohort follows them for about twenty-five years and reaches a median event-free survival of five to six years.
+We summarise the aligned cohort in Supplementary Materials~\ref{sm:analysis-additional}.
+The aligned cohort contains 1771 trial patients and 373 real-world data patients.
+The trial follows patients for a maximum of circa three years: too short to reach median event-free survival.
+The MACS study follows them for circa 25 years and reaches a median event-free survival of five to six years.
 This longer follow-up adds robustness for the late treatment effect where the trial is uninformative.
-MACS records outcomes at biannual visits. 
+MACS records outcomes at biannual visits.
 The data give event times only to the calendar year, so the events are interval-censored at annual resolution.
 Figure~\ref{fig:km-curves} shows the Kaplan--Meier survival curves.
 
-\begin{table}[b]
-  \centering
-  \begin{tabular}{@{}lcc@{}}
-    \toprule
-                                    & ACTG~175 (RCT)  & MACS (RWD)        \\
-    \midrule
-    Age, y                          & 34 [29, 41]     & 39 [34, 44]      \\
-    CD4, cells/mm$^3$               & 337 [263, 422]  & 263 [178, 365]   \\
-    CD8, cells/mm$^3$               & 918 [670, 1246] & 849 [659, 1153]  \\
-    Calendar year                   & 1992            & 1991 [1991, 1992]\\
-    Prior ART, y                    & 0.4 [0, 2.1]    & 1.0 [0, 1]       \\
-    Non-white, $n$ (\%)             & 404 (23)        & 78 (21)          \\
-    \bottomrule
-  \end{tabular}
-  \caption{Characteristics of the trial-aligned analysis cohort of
-    $2{,}144$ patients, by data source. Continuous variables are reported
-    as median [IQR], categorical variables as $n$ (\%). }
-  \label{tab:cohort}
-\end{table}
 
 
-
-\begin{figure}[tb]
+\begin{figure}[!t]
   \centering
   \includegraphics[width=0.8\linewidth]{survival_curves_manuscript.pdf}
   \caption{Kaplan--Meier curves of event-free survival, by data source
     (RCT, RWD) and treatment group (ZDV monotherapy and combination).
-    The main panel spans the full cohort follow-up of about 25 years;
-    the inset zooms to the shorter trial window. The cohort curves are
+    The main panel spans the full cohort follow-up of circa 25 years;
+    the inset zooms to the shorter trial window. The real-world data curves are
     approximate due to interval censoring.}
   \label{fig:km-curves}
 \end{figure}
 
 
-We fit a Bayesian fusion forest to the combined data with default settings.
+We fit a Bayesian fusion forest to the combined data with default parameter settings.
 We compare it with an AFT Bayesian causal forest fitted to the trial alone.
 We compute the average effect with a source-specific Bayesian bootstrap.
 The source weights follow a Dirichlet prior proportional to the sample sizes.
 The fusion estimate of the average acceleration factor is $1.65$ (95\% CrI: $1.43$ to $1.90$).
 The trial-only baseline is close at $1.70$ (95\% CrI: $1.51$ to $1.92$).
-Combination therapy stretches the event-free survival time scale by a factor of $1.65$ relative to monotherapy. 
+Combination therapy stretches the event-free survival time scale by a factor of $1.65$ relative to monotherapy.
 Equivalently, the median event-free survival time under combination therapy is $1.65$ times the median under monotherapy.
 
 
-The treatment effect varies across patients.
+The Bayesian fusion forest estimates each patient's effect far more precisely than the trial alone.
 Figure~\ref{fig:cate} shows the subject-level acceleration factor for every patient, ordered by posterior mean.
 The estimates lie above one, so combination helps almost everyone.
 The size of the gain differs across patients.
-The fusion intervals are far narrower than the trial-only intervals, which we report in the appendix.
-The cohort therefore sharpens the individual estimates, not only the average.
+The fusion intervals are far narrower than the trial-only intervals.
+The average 95\% credible-interval width falls from $3.16$ to $1.21$ on the acceleration-factor scale, a reduction of $62\%$ (Supplementary Materials~\ref{sm:analysis-additional}).
+The fusion sharpens the individual estimates.
+This contrasts with the average effects presented above: the fusion interval there is slightly wider, because the Bayesian bootstrap propagates uncertainty about the target population's covariate distribution.
 
-\begin{figure}[tb]
+\begin{figure}[!t]
   \centering
   \includegraphics[width=0.8\linewidth]{cate_caterpillar_manuscript.pdf}
   \caption{Subject-level acceleration factor for every
@@ -79,27 +61,65 @@ The cohort therefore sharpens the individual estimates, not only the average.
   \label{fig:cate}
 \end{figure}
 
-We investigate how the treatment effect varies across patients. 
-We use the two-stage idea behind the Virtual Twins method \citep{foster2011subgroup}.
-The first stage estimates a per-patient effect, and the second fits a simple model to these estimates to locate where the effect varies.
-We adapt the idea to the fusion forest as a posterior summary.
-We fit the second-stage model to the posterior-mean effect and read its uncertainty from the full posterior.
+We compare the fusion estimates with a flexible deep-learning competitor on the cohort.
+We fit a deep accelerated failure time network as an S- and a T-learner, on the trial alone and on a naive pool of both sources (Supplementary Materials~\ref{sm:analysis-additional}).
+We report in Table~\ref{tab:dnn-compare} the only two quantities a point predictor yields on the causal scale: the mean width of the per-patient interval and the share of patients at least $95\%$ certain to benefit.
+Supplementary Materials~\ref{sm:analysis-additional} plot the per-patient acceleration factor and its uncertainty for each method.
+The deep neural network reaches a different conclusion for each combination of learner and pooling.
+The share certain to benefit ranges from $7.8\%$ under the pooled T-learner to $96.6\%$ under the pooled S-learner, and the interval width ranges just as widely.
+No principled rule selects among these configurations.
+The pooled S-learner nearly matches the fusion ($96.6\%$ against $96.4\%$), but the equally defensible pooled T-learner reverses it.
+Its probability of benefit is in any case a bootstrap proportion, not a posterior probability.
+The S-learners give the narrowest intervals of all.
+The simulation showed such intervals undercover, so their narrowness reflects overconfidence rather than precision.
+The Bayesian fusion forest instead gives a single coherent answer, with calibrated intervals and a posterior probability of benefit for every patient.
 
-We summarise the treatment effect with a regression tree (CART; \citealp{breiman1984cart}).
+
+\begin{table}[!t]
+  \centering
+  \small
+  \begin{tabular}{@{}lrr@{}}
+    \toprule
+    Method                        & Mean 95\% width & $\geq 95\%$ certain \\
+                                  & (AF scale)      & of benefit (\%)     \\
+    \midrule
+    Bayesian fusion forest        & $1.21$ & $96.4$ \\
+    Trial-only causal forest      & $3.16$ & $36.8$ \\
+    \addlinespace
+    Deep network, trial-only, S   & $0.58$ & $77.5$ \\
+    Deep network, trial-only, T   & $1.79$ & $25.8$ \\
+    Deep network, pooled, S       & $0.88$ & $96.6$ \\
+    Deep network, pooled, T       & $2.34$ & $7.8$  \\
+    \bottomrule
+  \end{tabular}
+  \caption{Comparison with a deep-learning competitor over the combined
+    RCT + MACS cohort ($n = 2144$). ``Mean 95\% width'' is the average width of
+    the per-patient interval on the acceleration-factor scale. The last column
+    is the percentage of patients at least $95\%$ certain to benefit, that is
+    with $\p(\tau(x) > 0 \mid \text{data}) \geq 0.95$; for the deep network this
+    probability is a bootstrap proportion rather than a posterior. The deep
+    network is fitted as an S- or T-learner on the trial alone or on a naive
+    pool of both sources; the setup and the subject-level estimates are in
+    Supplementary Materials~\ref{sm:analysis-additional}.}
+  \label{tab:dnn-compare}
+\end{table}
+
+We investigate which patient characteristics drive the variation in benefit.
+We summarise the treatment-effect forest $\tau$ by the posterior projection, with a single regression tree as the second-stage model (CART; \citealp{breiman1984cart}).
 Figure~\ref{fig:fit-the-fit} shows a depth-three tree on the six covariates.
 It splits on CD8 count and race.
 The other covariates do not enter.
-The acceleration factor rises with CD8, from about $1.5$ in the lowest group to about $1.8$ in the highest.
+The acceleration factor rises with CD8, from circa $1.5$ in the lowest group to circa $1.8$ in the highest.
 White patients gain slightly more than non-white within each CD8 band.
 Every leaf exceeds $1.4$, so all subgroups benefit.
-The benefit is largest at high CD8.
+The treatment benefit is largest at high CD8.
 
 % Fit-the-fit summary of the FusionForest CATE.  TikZ-drawn so the
 % manuscript controls the typography.  Numbers below are read off
 % notes/general/figures/fit_the_fit_manuscript.pdf and matched to
 % data/analysis 1/analysis_fit_the_fit.txt.
 \definecolor{splitfill}{RGB}{230,244,250}
-\begin{figure}[b]
+\begin{figure}[!b]
   \centering
   % First arg of \resizebox is the target width -- change this fraction
   % to scale the whole figure uniformly (height auto-follows via !).
@@ -150,7 +170,7 @@ The benefit is largest at high CD8.
     \draw[edgeln] (raceC) -- (L7) node[elabel] {white};
   \end{tikzpicture}}
   \caption{Regression-tree summary of the acceleration factor
-    $\exp\{\tau(x)\}$ from the fusion forest. We fit the tree to the
+    $\exp(\tau(x))$ from the fusion forest. We fit the tree to the
     posterior-mean log-time CATE on the six baseline covariates. Each leaf
     gives the within-leaf average acceleration factor, as a posterior mean
     and 95\% credible interval.}
@@ -160,37 +180,38 @@ The benefit is largest at high CD8.
 We inspect the posterior probability of treatment benefit $ \p(\tau(x_i) > 0 \mid \text{data})$ for each patient \citep{henderson2020individualized}.
 We bin the patients by posterior probability of benefit and report the fraction in each bin.
 We compute it over the trial population, under the fusion and trial-only fits, so the columns are comparable (Table~\ref{tab:hte-summary}).
-We find strong evidence of benefit for almost every patient: $77\%$ have $\pi_i > 0.99$ and $97\%$ exceed $0.95$.
+We find strong evidence of benefit for almost every patient.
 The trial alone is far less certain, with only $38\%$ above $0.95$ and a quarter of patients inconclusive.
-The Bayesian fusion forest gains this certainty even though its average effect is slightly smaller ($1.65$ versus $1.70$).
+The Bayesian fusion forest gains this certainty at the conditional level even though its average effect is slightly smaller.
 
-We also summarise the between-source heterogeneity in baseline prognosis.
-We fit a best-linear projection to the deviation forest  \citep{Woody2020}.
-The deviation forest $d(x)$ measures how the baseline prognosis differs between the trial and the cohort.
-We project $d(\cdot)$ onto the covariates by least squares.
-We present the results in Table~\ref{tab:projection}.
+We investigate the between-source heterogeneity in baseline prognosis.
+We summarise the deviation forest $d(x)$ by a projection on a linear model.
+The deviation forest measures how the baseline prognosis differs between the trial and the real-world data.
+We project $d(\cdot)$ onto the covariates by least squares and present the results in Table~\ref{tab:projection}.
 The gap is dominated by a constant shift.
-The intercept is $1.70$ (95\% CrI: $1.31$ to $2.10$), so the cohort baseline sits well above the trial.
+The intercept is $1.70$ (95\% CrI: $1.31$ to $2.10$), so the observational baseline sits well above the trial.
 Among the covariates, only prior antiretroviral years moves the gap, by $0.27$ (95\% CrI: $-0.01$ to $0.55$).
 Age, CD4, CD8, calendar year, and race have coefficients near zero, with intervals covering zero.
 The baseline prognosis therefore differs mainly through a large average shift.
-This shift likely reflects population and measurement differences the six covariates do not capture.
+This shift likely reflects population and measurement differences which the six covariates do not capture.
 
 
-Combination therapy prolongs event-free survival by a factor of about $1.65$.
-The cohort's Kaplan--Meier curves do not reveal this benefit.
-The Bayesian fusion forest recovers the effect.
-The combined analysis also sharpens the individual estimates.
+Combination therapy prolongs event-free survival by a factor of circa $1.65$.
 We identify benefit for nearly every patient, far more than the trial alone.
-The treatment effect varies with CD8 count and race.
-The baseline prognosis differs between the sources, through a gradient in prior antiretroviral exposure and a large average shift.
+This near-universal advantage echoes earlier ACTG~175 analyses.
+The original trial \citep{hammer1996} and later re-analyses on survival-type endpoints \citep{lee2026bjboost} all favour combination therapy over monotherapy.
+The Buckley--James Q-learner \citep{lee2026bjboost} likewise recommends it for over $96\%$ of participants.
+We found that the treatment effect varies with CD8 count and race.
+This agrees with evidence that the benefit of combination therapy varies with baseline risk \citep{kennedy2023}.
+The baseline prognosis differs between the sources, mainly through a large average shift and in part through its dependence on prior antiretroviral exposure.
+The fusion delivers this certainty with calibrated uncertainty that a black-box predictor does not provide.
 
-\begin{table}[tb]
+\begin{table}[!t]
   \centering
   \begin{minipage}[t]{0.46\textwidth}
     \centering
     \small
-    \begin{tabular}{@{}lcc@{}}
+    \begin{tabular}{@{}lrr@{}}
       \toprule
       $\p(\tau(x_i) > 0 \mid \text{data})$        & Fusion & Trial-only \\
       \midrule
@@ -210,7 +231,7 @@ The baseline prognosis differs between the sources, through a gradient in prior 
   \begin{minipage}[t]{0.50\textwidth}
     \centering
     \small
-    \begin{tabular}{@{}lcc@{}}
+    \begin{tabular}{@{}lrr@{}}
       \toprule
       Term          & Coefficient & 95\% CrI \\
       \midrule
@@ -224,7 +245,7 @@ The baseline prognosis differs between the sources, through a gradient in prior 
       Prior ART, y  & $0.269$  & $(-0.008, 0.550)$ \\
       \bottomrule
     \end{tabular}
-    \captionof{table}{Best linear projection of the deviation forest
+    \captionof{table}{Linear projection of the deviation forest
       $d(x)$ onto the covariates: posterior mean coefficient and 95\%
       credible interval on the log-transformed time scale.}
     \label{tab:projection}

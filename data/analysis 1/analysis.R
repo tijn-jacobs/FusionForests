@@ -305,6 +305,36 @@ ate_M1 <- rowSums(W_M1 * M1_rct_samples)
 ## with pi ~ Dirichlet(n_0, n_1).
 ate_M2 <- hbb_ate(M2_combined_samples, src_M2)
 
+## --- Average width of the subject-level 95% CrI for the CATE ------------
+## For each subject the CATE 95% credible interval is the 2.5%-97.5%
+## posterior-quantile range of the log-time treatment effect; we report
+## the mean width across subjects.  Both fits are evaluated on the full
+## combined RCT + MACS cohort: M1's MACS predictions come from passing
+## MACS as the test set (M1_combined_samples), M2's are the train-set
+## predictions over d_fuse (M2_combined_samples).
+## Reported on two scales: the log-time CATE itself, and the
+## acceleration factor exp{tau(x)} (same exp() transform used in the
+## caterpillar and projection sections).
+cate_ci_width <- function(samples) {
+  q <- apply(samples, 2, quantile, c(0.025, 0.975))
+  q[2, ] - q[1, ]
+}
+mean_ci_M1_combined <- mean(cate_ci_width(M1_combined_samples))
+mean_ci_M2_combined <- mean(cate_ci_width(M2_combined_samples))
+
+mean_ci_M1_combined_af <- mean(cate_ci_width(exp(M1_combined_samples)))
+mean_ci_M2_combined_af <- mean(cate_ci_width(exp(M2_combined_samples)))
+
+## Posterior variance of the CATE: per-subject variance across posterior
+## draws, averaged over the combined cohort.  Same two scales as the CrI
+## widths.
+cate_post_var <- function(samples) apply(samples, 2, var)
+mean_var_M1_combined <- mean(cate_post_var(M1_combined_samples))
+mean_var_M2_combined <- mean(cate_post_var(M2_combined_samples))
+
+mean_var_M1_combined_af <- mean(cate_post_var(exp(M1_combined_samples)))
+mean_var_M2_combined_af <- mean(cate_post_var(exp(M2_combined_samples)))
+
 summarise_post <- function(x, label, scale = "log") {
   q <- quantile(x, c(0.025, 0.5, 0.975))
   sprintf("  %-22s  mean = %+.3f, median = %+.3f, 95%% CrI = [%+.3f, %+.3f]",
@@ -325,6 +355,30 @@ summary_lines <- c(
   "Acceleration-factor scale  (exp; 1.0 => no effect):",
   summarise_post(exp(ate_M1), "M1 (RCT only)"),
   summarise_post(exp(ate_M2), "M2 (Fusion)"),
+  "",
+  "Average 95% CrI width of subject-level CATE (log-time, combined cohort):",
+  sprintf("  %-22s  = %.3f", "M1 (RCT only)", mean_ci_M1_combined),
+  sprintf("  %-22s  = %.3f", "M2 (Fusion)",   mean_ci_M2_combined),
+  sprintf("  %-22s  = %.1f%%", "width reduction (M2 vs M1)",
+          100 * (1 - mean_ci_M2_combined / mean_ci_M1_combined)),
+  "",
+  "Average 95% CrI width of subject-level CATE (AF scale, combined cohort):",
+  sprintf("  %-22s  = %.3f", "M1 (RCT only)", mean_ci_M1_combined_af),
+  sprintf("  %-22s  = %.3f", "M2 (Fusion)",   mean_ci_M2_combined_af),
+  sprintf("  %-22s  = %.1f%%", "width reduction (M2 vs M1)",
+          100 * (1 - mean_ci_M2_combined_af / mean_ci_M1_combined_af)),
+  "",
+  "Average posterior variance of subject-level CATE (log-time, combined cohort):",
+  sprintf("  %-22s  = %.4f", "M1 (RCT only)", mean_var_M1_combined),
+  sprintf("  %-22s  = %.4f", "M2 (Fusion)",   mean_var_M2_combined),
+  sprintf("  %-22s  = %.1f%%", "variance reduction (M2 vs M1)",
+          100 * (1 - mean_var_M2_combined / mean_var_M1_combined)),
+  "",
+  "Average posterior variance of subject-level CATE (AF scale, combined cohort):",
+  sprintf("  %-22s  = %.4f", "M1 (RCT only)", mean_var_M1_combined_af),
+  sprintf("  %-22s  = %.4f", "M2 (Fusion)",   mean_var_M2_combined_af),
+  sprintf("  %-22s  = %.1f%%", "variance reduction (M2 vs M1)",
+          100 * (1 - mean_var_M2_combined_af / mean_var_M1_combined_af)),
   "",
   sprintf("Cohort: RCT n = %d  (Z=0: %d, Z=1: %d; events %d)",
           nrow(rct),  sum(rct$treat  == 0), sum(rct$treat  == 1), sum(rct$status  == 1)),
@@ -643,7 +697,7 @@ src_cols <- c(RCT = "#1f78b4", RWD = "#e31a1c")
 ## scale; `src` is the length-n source indicator (1 = RCT, 0 = RWD)
 ## aligned with the columns of `samples`.
 make_caterpillar <- function(samples, src, out_path,
-                             width = 14, height = 8) {
+                             width = 14, height = 8, xlim = NULL) {
   af      <- exp(samples)
   mean_af <- colMeans(af)
   lo_af   <- apply(af, 2, quantile, 0.025)
@@ -663,6 +717,7 @@ make_caterpillar <- function(samples, src, out_path,
     geom_vline(xintercept = 1, linetype = "dashed", colour = "grey40",
                linewidth = 0.6) +
     scale_colour_manual(values = src_cols) +
+    coord_cartesian(xlim = xlim) +   # NULL = automatic; c(lo, hi) to fix the AF axis
     scale_y_continuous(breaks = NULL) +
     labs(y      = "Patients (ordered by posterior mean)",
          x      = expression("Acceleration factor"),
@@ -693,7 +748,8 @@ dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
 ## with the columns of M2_combined_samples.
 make_caterpillar(
   M2_combined_samples, src_M2,
-  file.path(fig_dir, "cate_caterpillar_manuscript.pdf"))
+  file.path(fig_dir, "cate_caterpillar_manuscript.pdf"),
+  xlim = NULL)   # e.g. xlim = c(0.8, 3) to fix the AF axis
 
 ## M1 (RCT-only): caterpillar over the same combined cohort.  M1_combined
 ## is the column-bind of train (RCT) and test (MACS) predictions, so the
@@ -704,7 +760,8 @@ src_M1 <- c(rep(1L, ncol(fit_M1$train_predictions_sample_treat)),
             rep(0L, ncol(fit_M1$test_predictions_sample_treat)))
 make_caterpillar(
   M1_combined_samples, src_M1,
-  file.path(fig_dir, "cate_caterpillar_M1_manuscript.pdf"))
+  file.path(fig_dir, "cate_caterpillar_M1_manuscript.pdf"),
+  xlim = NULL)   # e.g. xlim = c(0.8, 3) to fix the AF axis
 
 ################################################################################
 ## 10. Linear projections of the CATE / acceleration factor
@@ -1200,3 +1257,261 @@ writeLines(
     "LaTeX rows:",
     latex_lines),
   file.path(out_dir, "analysis_pi_benefit.txt"))
+
+
+################################################################################
+## 13. Deep-learning competitor (deepAFT) -- black-box benchmark
+##
+## Black-box foil for the "structured statistical ML vs generic black-box"
+## framing.  A deep accelerated failure time network (deepAFT, `dnn`
+## package) is fitted to the same ACTG175 + MACS cohort as an S-learner on
+##   (a) the RCT only          -- the trial-only analogue of M1, and
+##   (b) the RCT + MACS pool    -- the fusion analogue of M2,
+## with a source indicator S (1 = RCT, 0 = MACS) and the CATE evaluated at
+## S = 1 (the transported / trial estimand).
+##
+## The architecture and the tuning protocol are IDENTICAL to the
+## simulation competitor (simulations/main/competitors/sim_surv_v12_deepaft.R):
+## a two-hidden-layer 8-6-1 net, ReLU on the hidden layers and identity
+## ("idu") on the real-valued log-time output, with the learning rate,
+## momentum (alpha) and L2 penalty (lambda) tuned by 10-fold cross-
+## validation on the C-index (hyperTuning); the 8-6-1 architecture is held
+## fixed (node = FALSE).
+##
+## deepAFT consumes only right-censored data, so the interval-censored MACS
+## deaths are approximated by the right-censored last-lab-year encoding
+## already held in `log_time` / `status` (the same encoding M1 sees).  This
+## approximation is stated as a limitation in ANALYSIS_SM.tex.  The point
+## estimate is the log-time score difference mu(x, 1) - mu(x, 0) = tau(x);
+## intervals come from a stratified nonparametric bootstrap (deepAFT has no
+## posterior), the frequentist analogue of the BART credible interval.
+## Every subject of the combined cohort is evaluated, in the rct-then-macs
+## order of M1_combined_samples / M2_combined_samples.
+################################################################################
+
+if (!requireNamespace("dnn", quietly = TRUE)) {
+  message("Package 'dnn' not installed; skipping the deepAFT competitor. ",
+          "Install with install.packages('dnn') to run this section.")
+} else {
+  library(dnn)
+  library(survival)
+
+  ## --- Settings (match the simulation competitor) ------------------------
+  ddB <- 100L   # bootstrap refits per estimator (deepAFT is slow; lower to
+                # speed up at the cost of noisier intervals)
+  ddK <- 10L    # cross-validation folds for hyperparameter tuning
+  ddR <- 20L    # random-search draws in hyperTuning
+
+  ## --- deepAFT helpers (verbatim from the simulation competitor) ---------
+  ## predict.deepAFT$predictors is the AFT log-time score mu (larger =>
+  ## longer survival); differencing over A gives the CATE on the log-time
+  ## scale, i.e. the log acceleration factor.
+  dd_lp <- function(pr)
+    if (is.list(pr) && !is.null(pr$predictors)) as.numeric(pr$predictors)
+    else as.numeric(pr)
+  ## Two hidden layers (8, 6) ReLU; identity ("idu") output.  Matches the
+  ## deepAFT paper's application and the simulation competitor exactly.
+  dd_model <- function(p)
+    dNNmodel(units = c(8L, 6L, 1L),
+             activation = c("relu", "relu", "idu"), input_shape = p)
+
+  ## S-learner: one net with A as an input; CATE = mu(x, 1) - mu(x, 0).
+  dd_cate_S <- function(des, control) {
+    Z   <- cbind(des$X, A = des$A)
+    fit <- deepAFT(as.matrix(Z), Surv(des$time, des$status),
+                   model = dd_model(ncol(Z)), control = control)
+    p1  <- dd_lp(predict(fit, newdata = cbind(des$Xev, A = 1)))
+    p0  <- dd_lp(predict(fit, newdata = cbind(des$Xev, A = 0)))
+    p1 - p0
+  }
+
+  ## T-learner: a separate net per arm (no A input); CATE = mu_1(x) - mu_0(x).
+  dd_mu <- function(time, status, X, newX, control) {
+    fit <- deepAFT(as.matrix(X), Surv(time, status),
+                   model = dd_model(ncol(X)), control = control)
+    dd_lp(predict(fit, newdata = as.matrix(newX)))
+  }
+  dd_cate_T <- function(des, control) {
+    i1 <- des$A == 1; i0 <- des$A == 0
+    mu1 <- dd_mu(des$time[i1], des$status[i1], des$X[i1, , drop = FALSE],
+                 des$Xev, control)
+    mu0 <- dd_mu(des$time[i0], des$status[i0], des$X[i0, , drop = FALSE],
+                 des$Xev, control)
+    mu1 - mu0
+  }
+
+  ## 10-fold CV tuning of lr / alpha / lambda; architecture fixed.  Bounds
+  ## are identical to the simulation competitor.
+  dd_tune <- function(x, time, status, K = ddK, R = ddR)
+    hyperTuning(
+      as.matrix(x), Surv(time, status), dd_model(ncol(x)),
+      ER = "cindex", method = "BuckleyJames", node = FALSE, K = K, R = R,
+      lower = dnnControl(epochs = 300, batch_size = 64, epsilon = 1e-2,
+                         lr_rate = 1e-4, alpha = 0.5, lambda = 0),
+      upper = dnnControl(lr_rate = 3e-3, alpha = 0.97, lambda = 10))$control
+
+  ## --- Standardise inputs (deepAFT diverges on raw covariate scales) ------
+  ## The simulation competitor fed ~N(0,1) covariates and a standardised
+  ## log-time response, so the net trained fine.  The raw HIV covariates
+  ## (anchor_year ~ 1991, cd8 ~ 1000, cd4 ~ 300, ...) blow up the gradients
+  ## (NaN cost, C-index 0.50).  We z-score the covariates and the log-time
+  ## response on the combined cohort, fit on that scale, and rescale the
+  ## CATE back by the response SD (the centring cancels in the treated-minus-
+  ## control contrast).  Scaling constants are fixed on the full cohort so
+  ## they stay identical across the bootstrap refits.
+  dd_cov_mu <- colMeans(as.matrix(d_fuse[, harmCovars]))
+  dd_cov_sd <- apply(as.matrix(d_fuse[, harmCovars]), 2, sd)
+  dd_cov_sd[dd_cov_sd == 0] <- 1
+  dd_y_mu   <- mean(d_fuse$log_time)
+  dd_y_sd   <- sd(d_fuse$log_time)
+  dd_Z    <- function(df) scale(as.matrix(df[, harmCovars]),
+                                center = dd_cov_mu, scale = dd_cov_sd)
+  dd_time <- function(df) exp((df$log_time - dd_y_mu) / dd_y_sd)
+
+  ## --- Designs on the real cohort (right-censored log_time / status) ------
+  dd_Xev <- dd_Z(d_fuse)                       # combined cohort, rct then macs
+  des_rct <- function(rdf) list(
+    time = dd_time(rdf), status = rdf$status,
+    X = dd_Z(rdf), A = rdf$treat, Xev = dd_Xev)
+  des_pool <- function(fdf, src) list(
+    time = dd_time(fdf), status = fdf$status,
+    X = cbind(dd_Z(fdf), S = src), A = fdf$treat,
+    Xev = cbind(dd_Xev, S = 1L))
+
+  ## --- Tune once per design, reuse for the fit and the bootstrap ---------
+  set.seed(seed)
+  cat("\n", strrep("=", 70),
+      "\n  deepAFT competitor: 10-fold CV tuning (hyperTuning)\n",
+      strrep("=", 70), "\n", sep = "")
+  dd_ctrl_rct  <- dd_tune(cbind(dd_Z(rct), A = rct$treat),
+                          dd_time(rct), rct$status)
+  dd_ctrl_pool <- dd_tune(cbind(dd_Z(d_fuse), S = src_M2, A = d_fuse$treat),
+                          dd_time(d_fuse), d_fuse$status)
+  cat(sprintf("  RCT-only : lr = %.2g, alpha = %.2g, lambda = %.2g\n",
+              dd_ctrl_rct$lr_rate, dd_ctrl_rct$alpha, dd_ctrl_rct$lambda))
+  cat(sprintf("  Pooled   : lr = %.2g, alpha = %.2g, lambda = %.2g\n",
+              dd_ctrl_pool$lr_rate, dd_ctrl_pool$alpha, dd_ctrl_pool$lambda))
+
+  ## --- Build a design for an estimator, with optional bootstrap resample --
+  ## RCT design resamples the RCT rows; the pooled design resamples RCT and
+  ## MACS rows separately (sizes fixed).  The evaluation set is held fixed.
+  dd_n_rct <- nrow(rct); dd_n_macs <- nrow(macs)
+  dd_make_des <- function(type, boot = FALSE) {
+    if (type == "rct") {
+      rdf <- if (boot) rct[sample.int(dd_n_rct, dd_n_rct, TRUE), ] else rct
+      des_rct(rdf)
+    } else {
+      if (!boot) return(des_pool(d_fuse, src_M2))
+      i_r <- sample.int(dd_n_rct,  dd_n_rct,  TRUE)
+      i_m <- sample.int(dd_n_macs, dd_n_macs, TRUE)
+      des_pool(rbind(rct[i_r, ], macs[i_m, ]),
+               c(rep(1L, dd_n_rct), rep(0L, dd_n_macs)))
+    }
+  }
+
+  ## Four estimators: RCT / Pooled design x S- / T-learner, matching the
+  ## simulation competitor.  Each reuses its design's tuned control.
+  dd_estimators <- list(
+    list(name = "deepAFT-RCT-S",    type = "rct",  learner = dd_cate_S, ctrl = dd_ctrl_rct),
+    list(name = "deepAFT-RCT-T",    type = "rct",  learner = dd_cate_T, ctrl = dd_ctrl_rct),
+    list(name = "deepAFT-Pooled-S", type = "pool", learner = dd_cate_S, ctrl = dd_ctrl_pool),
+    list(name = "deepAFT-Pooled-T", type = "pool", learner = dd_cate_T, ctrl = dd_ctrl_pool))
+
+  ## --- Point estimate + stratified bootstrap per estimator ---------------
+  ## Point estimate from the full fit; intervals from B refits on resampled
+  ## training rows.  CATEs are returned on the standardised scale and
+  ## rescaled to log-time by dd_y_sd (failed refits dropped).
+  dd_safe <- function(expr) tryCatch(expr, error = function(e) {
+    message("    deepAFT fit failed: ", conditionMessage(e)); NULL })
+  dd_scl  <- function(z) if (is.null(z)) NULL else z * dd_y_sd
+  set.seed(seed)
+  cat("\n  deepAFT point + bootstrap (B =", ddB,
+      ") for four estimators (RCT/Pooled x S/T) ...\n")
+  dd_fits <- lapply(dd_estimators, function(est) {
+    cat("    ", est$name, "\n", sep = "")
+    point <- dd_scl(dd_safe(est$learner(dd_make_des(est$type), est$ctrl)))
+    draws <- do.call(cbind, Filter(Negate(is.null),
+      lapply(seq_len(ddB), function(b)
+        dd_safe(est$learner(dd_make_des(est$type, TRUE), est$ctrl)))))
+    draws <- if (is.matrix(draws)) draws * dd_y_sd else NULL
+    list(name = est$name, point = point, draws = draws)
+  })
+  names(dd_fits) <- vapply(dd_estimators, `[[`, "", "name")
+
+  ## --- Summaries on the acceleration-factor scale ------------------------
+  ## Two columns: (1) mean width of the per-subject 95% interval (AF scale),
+  ## and (2) the percentage of patients at least 95% certain of benefit, i.e.
+  ## P(tau > 0) >= 0.95 (at least 95% of the posterior / bootstrap mass to the
+  ## right of AF = 1).  For the deepAFT competitor column (2) is a bootstrap
+  ## proportion, not a posterior probability.  BART samples are stored as
+  ## (draws x subjects); the deepAFT draws as (subjects x bootstrap).
+  dd_af_width <- function(draws) {
+    if (is.null(draws) || !is.matrix(draws)) return(NA_real_)
+    q <- apply(exp(draws), 1, quantile, c(0.025, 0.975), na.rm = TRUE)
+    mean(q[2, ] - q[1, ])
+  }
+  pct_benefit <- function(cate, margin) {   # margin = subject axis (1 row, 2 col)
+    if (is.null(cate) || !is.matrix(cate)) return(NA_real_)
+    p <- apply(cate, margin, function(z) mean(z > 0, na.rm = TRUE))
+    100 * mean(p >= 0.95)
+  }
+
+  dd_summary <- rbind(
+    data.frame(
+      method      = vapply(dd_fits, `[[`, "", "name"),
+      af_ci_width = vapply(dd_fits, function(f) dd_af_width(f$draws), 0),
+      pct_benefit = vapply(dd_fits, function(f) pct_benefit(f$draws, 1), 0),
+      stringsAsFactors = FALSE),
+    data.frame(
+      method      = c("FusionForest (M2)", "Trial-only CSF (M1)"),
+      af_ci_width = c(mean_ci_M2_combined_af, mean_ci_M1_combined_af),
+      pct_benefit = c(pct_benefit(M2_combined_samples, 2),
+                      pct_benefit(M1_combined_samples, 2)),
+      stringsAsFactors = FALSE))
+  rownames(dd_summary) <- NULL
+
+  cat("\n=== deepAFT (S/T-learner) vs BART on the combined cohort (AF scale) ===\n")
+  print(dd_summary, row.names = FALSE, digits = 3)
+
+  ## --- Persist for the manuscript exhibit (ANALYSIS / ANALYSIS_SM) -------
+  saveRDS(
+    list(summary  = dd_summary,
+         tuned    = list(rct = dd_ctrl_rct, pool = dd_ctrl_pool),
+         fits     = dd_fits,   # per-estimator point + bootstrap draws
+         settings = list(B = ddB, K = ddK, R = ddR, units = c(8L, 6L, 1L))),
+    file = file.path(out_dir, "analysis_deepaft.rds"))
+  writeLines(
+    c("deepAFT competitor (S- and T-learner) vs BART (combined RCT + MACS cohort)",
+      "Architecture 8-6-1 ReLU/idu; 10-fold CV tuning; B = 100 bootstrap.",
+      "MACS interval-censored deaths approximated by the right-censored",
+      "last-lab-year encoding (see ANALYSIS_SM.tex).",
+      "",
+      capture.output(print(dd_summary, row.names = FALSE, digits = 3))),
+    file.path(out_dir, "analysis_deepaft.txt"))
+  cat("Wrote ", file.path(out_dir, "analysis_deepaft.rds"),
+      " and analysis_deepaft.txt\n", sep = "")
+
+  ## --- Caterpillar plots for the SM (one per estimator) ------------------
+  ## Subject-level acceleration factor from each deepAFT estimator over the
+  ## combined cohort, in the same style as the fusion caterpillar (Section 9).
+  ## Bars are the bootstrap 95% interval; the dot is the bootstrap mean.
+  ## make_caterpillar() expects a (draws x subjects) matrix on the log-time
+  ## scale, so we transpose the (subjects x bootstrap) draws.  The src_M2
+  ## indicator aligns with the rows of d_fuse (= the columns after transpose).
+  ## Filenames match the \includegraphics calls in ANALYSIS_SM.tex.
+  ## Per-plot x-axis limits on the acceleration-factor scale.  Set an entry
+  ## to c(lo, hi) to fix that caterpillar's axis; NULL (or missing) = automatic.
+  dd_xlims <- list(
+    deepaft_rct_s    = c(0.5,2.5),
+    deepaft_rct_t    = c(0, 10),
+    deepaft_pooled_s = c(0.5,2.5),
+    deepaft_pooled_t = c(0,10))
+  for (f in dd_fits) {
+    if (is.null(f$draws) || !is.matrix(f$draws)) next
+    tag <- gsub("[^a-z0-9]+", "_", tolower(f$name))      # e.g. deepaft_pooled_t
+    make_caterpillar(
+      t(f$draws), src_M2,
+      file.path(fig_dir, paste0("cate_caterpillar_", tag, ".pdf")),
+      xlim = dd_xlims[[tag]])
+  }
+}

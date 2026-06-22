@@ -1,79 +1,109 @@
-% !TEX root = ../general/main.tex
-\section{Overview}
+% !TEX root = ../general/sm.tex
 
-This section is a working scaffold. It records the planned structure of the
-data-analysis section and the facts to keep fixed while we draft. We write the
-section one paragraph at a time, then fold this overview in or remove it at the
-end.
+\newpage
+\section{Additional results for the data analysis}\label{sm:analysis-additional}
 
-We answer one question. What is the effect of zidovudine (ZDV) monotherapy
-versus the pooled combination regimens on event-free survival, and how does it
-vary across patients? We fuse the ACTG~175 trial with the MACS cohort using
-FusionForest. The trial identifies the treatment effect. The cohort extends
-follow-up and reflects treatment in routine care. The confounding function
-shields the effect from the cohort's confounding by indication.
+We collect here the cohort description, the trial-only comparison, and the setup of the deep-learning competitor.
+Table~\ref{tab:cohort} characterises the trial-aligned analysis cohort.
+Figure~\ref{fig:cate-rct} gives the subject-level acceleration factor from the trial-only analysis, the comparator for the fusion estimates in the main text.
+Table~\ref{tab:precision} compares the precision of the subject-level estimates between the trial-only and fusion analyses.
 
-\subsection*{Planned structure}
+\begin{table}[h]
+  \centering
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+                                    & ACTG~175 (RCT)  & MACS (RWD)        \\
+    \midrule
+    Age, y                          & 34 [29, 41]     & 39 [34, 44]      \\
+    CD4, cells/mm$^3$               & 337 [263, 422]  & 263 [178, 365]   \\
+    CD8, cells/mm$^3$               & 918 [670, 1246] & 849 [659, 1153]  \\
+    Calendar year                   & 1992            & 1991 [1991, 1992]\\
+    Prior ART, y                    & 0.4 [0, 2.1]    & 1.0 [0, 1]       \\
+    Non-white, $n$ (\%)             & 404 (23)        & 78 (21)          \\
+    \bottomrule
+  \end{tabular}
+  \caption{Characteristics of the trial-aligned analysis cohort of
+    $2144$ patients, by data source. Continuous variables are reported
+    as median [IQR], categorical variables as $n$ (\%). }
+  \label{tab:cohort}
+\end{table}
 
-\begin{enumerate}
-  \item \textbf{Lead paragraph.} The question and the fusion strategy in a few
-        sentences.
-  \item \textbf{Data and cohort} (Table~1). The two sources, the binary
-        treatment contrast, the EFS endpoint, the trial-aligned cohort, the
-        covariates, and the follow-up horizons.
-  \item \textbf{Survival curves} (Figure~1). Kaplan--Meier by arm and source.
-        The trial shows combination therapy ahead. The cohort shows the
-        reverse, which motivates the confounding function.
-  \item \textbf{Model and estimands.} The four-forest AFT decomposition, the
-        source-specific error, and the reported estimands: CATE $\tau(x)$, the
-        acceleration factor $\exp\{\tau(x)\}$, and the ATE. The RCT-only
-        comparator.
-  \item \textbf{Results.}
-        \begin{itemize}
-          \item ATE, fusion versus RCT-only (Table~2, Figure~2).
-          \item Heterogeneity in $\tau(x)$ (Figure~3).
-          \item Confounding function, source deviation, and source-specific
-                error (Figure~4).
-        \end{itemize}
-  \item \textbf{Interpretation.} Tie the results back to the goals set in the
-        introduction.
-\end{enumerate}
+\begin{figure}[!tb]
+  \centering
+  \includegraphics[width=0.8\linewidth]{cate_caterpillar_M1_manuscript.pdf}
+  \caption{Subject-level acceleration factor for every patient in the
+    trial-aligned cohort, from the trial-only analysis, ordered by
+    posterior mean. Vertical bars are pointwise 95\% credible intervals;
+    the dashed line at $1$ marks no effect. The intervals are wider than
+    those of the fusion forest in Figure~\ref{fig:cate} of the main text. }
+  \label{fig:cate-rct}
+\end{figure}
 
-\subsection*{Notes to remember}
+\begin{table}[h]
+  \centering
+  \begin{tabular}{@{}lrrr@{}}
+    \toprule
+                                & Trial-only & Fusion & Reduction \\
+    \midrule
+    Average 95\% CrI width      & $3.16$  & $1.21$  & $62\%$ \\
+    Average posterior variance  & $0.808$ & $0.098$ & $88\%$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Precision of the subject-level acceleration factor over the
+    combined cohort, under the trial-only and fusion analyses. Both
+    quantities are averaged across patients on the acceleration-factor
+    scale.}
+  \label{tab:precision}
+\end{table}
 
-\begin{itemize}
-  \item \textbf{Endpoint.} Call it EFS throughout. Do not foreground that the
-        current RWD side is overall survival. The numbers are provisional.
-  \item \textbf{Style} (\texttt{general/WRITING\_GUIDE.MD}). Short active
-        sentences. Topic sentence first. \texttt{We \dots} openings. Few signal
-        words. No em-dashes. Report a point estimate with a 95\% credible
-        interval, never a $p$-value. \texttt{booktabs} tables.
-  \item \textbf{Cohort.} RCT (ACTG~175, male) $n = 1771$: $Z{=}0$ (ZDV mono)
-        $432$, $Z{=}1$ (combination) $1339$, with $447$ events. RWD (MACS,
-        baseline CD4 $200$--$500$) $n = 373$: $Z{=}0$ $138$, $Z{=}1$ $235$, with
-        $227$ events. Combined $n = 2144$. RCT horizon ${\approx}\,3.4$~y, MACS
-        ${\approx}\,25$~y.
-  \item \textbf{Covariates.} Age, baseline CD4, baseline CD8, calendar (anchor)
-        year, race, prior antiretroviral years. Prior ARV exposure is the
-        flagged effect modifier.
-  \item \textbf{Numbers} (\texttt{analysis 1/analysis\_summary.txt}). ATE on the
-        log scale: RCT-only $0.559$ $[0.440, 0.679]$, fusion $0.508$
-        $[0.358, 0.670]$. Acceleration factor: RCT-only $1.75$ $[1.55, 1.97]$,
-        fusion $1.67$ $[1.43, 1.95]$. $\mathrm{AF} > 1$ means ZDV monotherapy is
-        inferior.
-  \item \textbf{Figures.} Figure~1 is page~2 of
-        \texttt{analysis 0/survival\_curves\_manuscript.pdf}. Figures~2--4 are
-        pages~1--4 of \texttt{analysis 1/analysis\_figures\_050.pdf}. Copy the
-        needed pages into \texttt{images/} with space-free names.
-  \item \textbf{Reuse, do not duplicate.} \texttt{clinical\_background.tex}
-        (sources, error argument) and \texttt{endpoints.tex} (endpoint and
-        cohort construction). Citation keys already in
-        \texttt{../general/references.bib}: \texttt{hammer1996},
-        \texttt{kaslow1987}, \texttt{delta1996}, \texttt{larder1989},
-        \texttt{concorde1994}, \texttt{hernan2010}.
-  \item \textbf{Caveats.} The ATE numbers are from the provisional (v5) run.
-        The heterogeneity and confounding prose is figure-driven. Specific
-        subgroup and $c(x)$ values stay qualitative or placeholder until read
-        off the final figures.
-\end{itemize}
+\subsection{Comparison with a deep-learning competitor}
 
+We benchmark the fusion against a deep accelerated failure time network \citep{norman2024deepaft}, the same black-box competitor used in the simulation study.
+We fit the network as an S-learner and a T-learner \citep{kunzel2019metalearners}, on the trial alone and on a naive pool of both sources with a source indicator.
+The architecture matches the simulation: two hidden layers of eight and six units with rectified-linear activations and a linear output.
+We tune the learning rate, the momentum, and the weight decay by ten-fold cross-validation on the concordance index.
+We obtain intervals from $100$ stratified bootstrap resamples, since the network has no posterior.
+The network requires right-censored data.
+We therefore approximate the interval-censored MACS deaths by their right-censored last-observation encoding, the same encoding used by the trial-only forest.
+This approximation discards the interval information and is, if anything, favourable to the competitor.
+The main text reports the headline comparison.
+Figure~\ref{fig:cate-deepaft} shows the subject-level acceleration factor from each network.
+
+\begin{figure}[!tb]
+  \centering
+  \begin{subfigure}{0.49\textwidth}\centering
+    \includegraphics[width=\linewidth]{cate_caterpillar_deepaft_rct_s.pdf}
+    \caption{Trial-only, S-learner}
+  \end{subfigure}\hfill
+  \begin{subfigure}{0.49\textwidth}\centering
+    \includegraphics[width=\linewidth]{cate_caterpillar_deepaft_rct_t.pdf}
+    \caption{Trial-only, T-learner}
+  \end{subfigure}
+
+  \vspace{0.6em}
+  \begin{subfigure}{0.49\textwidth}\centering
+    \includegraphics[width=\linewidth]{cate_caterpillar_deepaft_pooled_s.pdf}
+    \caption{Pooled, S-learner}
+  \end{subfigure}\hfill
+  \begin{subfigure}{0.49\textwidth}\centering
+    \includegraphics[width=\linewidth]{cate_caterpillar_deepaft_pooled_t.pdf}
+    \caption{Pooled, T-learner}
+  \end{subfigure}
+  \caption{Subject-level acceleration factor from the deep-learning competitor
+    over the combined RCT + MACS cohort, by learner (S, T) and training design
+    (trial-only, pooled), ordered by the bootstrap mean. Bars are the $95\%$
+    bootstrap interval; colour indicates the data source. The estimates and
+    their intervals vary markedly across configurations, in contrast to the
+    single calibrated fusion caterpillar (Figure~\ref{fig:cate}) of the main
+    text.}
+  \label{fig:cate-deepaft}
+\end{figure}
+
+The two learners in Figure~\ref{fig:cate-deepaft} fail in opposite ways.
+The S-learner uses a single network with the treatment as one input among the covariates.
+It learns a near-additive treatment effect, so the acceleration factor is nearly constant and exceeds one for every patient \citep{kunzel2019metalearners}.
+The estimates therefore lie in a narrow band above one.
+This orderly picture reflects regularisation toward a homogeneous effect rather than calibrated certainty, and the simulation shows that the S-learner intervals undercover.
+The T-learner instead fits a separate network per arm and differences the two fits.
+These fits are noisy on the smaller per-arm samples, so the estimates range from well below one to above three.
+Neither competitor recovers the calibrated subject-level effect of the fusion.
