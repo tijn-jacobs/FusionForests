@@ -50,8 +50,8 @@ $T(a) \,\ind\, A \mid X,\, S = 1$ for each $a\in\{0, 1\}$.
 $0 < \p(A = 1 \mid X = x,\, S = s) < 1$ for each $s \in \{0, 1\}$ and all $x$ in the support of $X \mid S = s$.
 \end{assumption}
 
-\begin{assumption}[Cross-source exchangeability]\label{ass:transport}
-$T(a) \mid X,\, S = 1 \;\overset{d}{=}\; T(a) \mid X,\, S = 0$, for each $a \in \{0, 1\}$.
+\begin{assumption}[Cross-source transportability]\label{ass:transport}
+$\E[\log T(1) - \log T(0) \mid X,\, S = 1] \;=\; \E[\log T(1) - \log T(0) \mid X,\, S = 0]$.
 \end{assumption}
 
 \begin{assumption}[Conditionally non-informative censoring]\label{ass:censoring}
@@ -61,18 +61,6 @@ $T(a) \,\ind\, \mathcal{C}(a) \mid X,\, A,\, S$ for each $a\in\{0, 1\}$.
 \end{adjustwidth}
 \setlength{\parskip}{0.8em}
 \vspace{0.8em}
-
-
-\begin{remark}[Possible weakening to CATE-only transport]
-Assumption~\ref{ass:transport} may be stronger than needed.
-It could be replaced by the weaker condition that only the conditional log-treatment effect transports across sources:
-\begin{equation}
-\E[\log T(1) - \log T(0) \mid X,\, S = 1] \;=\; \E[\log T(1) - \log T(0) \mid X,\, S = 0].
-\label{eq:cate-transport}
-\end{equation}
-This alleviation may suffice in our setting because the causal estimand is the CATE on the log-time scale.
-\textit{To be verified.}
-\end{remark}
 
 
 Our identification strategy relaxes unconfoundedness in the RWD and retains transportability of the CATE across sources.
@@ -108,7 +96,7 @@ where $m_0(X, S) := \E[\log T \mid A = 0,\, X,\, S]$ is the baseline log surviva
 \end{proposition}
 
 The baseline prognosis $m_0(X, S)$ is the survival a patient would have without treatment, which can differ between the two sources.
-The confounding term carries the factor $(1 - S)$, so it  acts only in the real-world data.
+The confounding term carries the factor $(1 - S)$, so it acts only in the real-world data.
 
 \begin{proposition}[Identification]\label{prop:ident}
 Under Assumptions~\ref{ass:sutva}--\ref{ass:transport}:

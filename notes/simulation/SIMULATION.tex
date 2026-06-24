@@ -46,7 +46,7 @@ We investigate the performance of the Bayesian fusion forest in three separate s
   \item \textbf{Comparison with a black-box competitor.}
     We investigate how the fusion forest compares with a flexible deep-learning method.
     We compare it with a deep neural network for the accelerated failure time model \citep{norman2024deepaft}, tuned by 10-fold cross-validation.
-    We estimate a causal effect using a S- and T-learner \citep{kunzel2019metalearners}, each fitted on the trial alone and on a naive pool of both sources.
+    We estimate a causal effect using an S- and T-learner \citep{kunzel2019metalearners}, each fitted on the trial alone and on a naive pool of both sources.
     We obtain confidence intervals from 100 bootstrap resamples.
     We fix $\lambda_d = \lambda_u = 1$.
     The deep-learning competitor cannot handle interval censoring, so for this experiment we right-censor the real-world data at circa $35\%$.
@@ -93,7 +93,7 @@ RMSE and posterior variance are stable across $\lambda_d$.
 We compare the deep neural network competitors at $\lambda_d = \lambda_u = 1$ in Figure~\ref{fig:sim-deepaft}.
 The Bayesian fusion forest attains the lowest RMSE of all methods.
 The S-learners show undercoverage, a consequence of their narrow bootstrap intervals.
-The pooled T-learner shows overcoverage, together with a large posterior variance.
+The pooled T-learner shows overcoverage, together with a large variance.
 The fusion forest attains near-nominal coverage.
 We give the full results across the $(\lambda_d, \lambda_u)$ grid in Supplementary Materials~\ref{sm:sim-additional}.
 

@@ -42,9 +42,8 @@ The first term equals $m_0(X, 1)$ by \eqref{eq:po-step} at $a = 0$:
 \E[\log T(0) \mid X,\, S = 1] \;=\; \E[\log T \mid A = 0,\, X,\, S = 1] \;=\; m_0(X, 1).
 \end{equation}
 The second term equals $\tau(X)$.
-By cross-source exchangeability (Assumption~\ref{ass:transport}), $T(a) \mid X,\, S = 1 \;\overset{d}{=}\; T(a) \mid X,\, S = 0$ for each $a$.
-The conditional distribution of $T(a)$ given $X$ does not depend on $S$.
-The contrast on the right of \eqref{eq:po-split} equals the marginal CATE $\tau(X) = \E[\log T(1) - \log T(0) \mid X]$ defined in the manuscript:
+By cross-source transportability (Assumption~\ref{ass:transport}), the conditional log-treatment effect does not depend on $S$.
+The contrast on the right of \eqref{eq:po-split} therefore equals the population CATE $\tau(X) = \E[\log T(1) - \log T(0) \mid X]$ defined in the manuscript:
 \begin{equation}
 \E[\log T(1) - \log T(0) \mid X,\, S = 1] \;=\; \E[\log T(1) - \log T(0) \mid X] \;=\; \tau(X).
 \end{equation}
@@ -90,7 +89,7 @@ This identifies $\tau$ from the RCT alone.
 
 The identification rests on two assumptions.
 By RCT unconfoundedness (Assumption~\ref{ass:rct-unconf} of the manuscript), the observed RCT contrast at $X = x$ equals the conditional treatment effect within the RCT population.
-By cross-source exchangeability (Assumption~\ref{ass:transport} of the manuscript), this RCT-population effect coincides with the population CATE.
+By cross-source transportability (Assumption~\ref{ass:transport} of the manuscript), this RCT-population effect coincides with the population CATE.
 Neither the RWD data nor the confounding function $c$ enters \eqref{eq:ident-tau-pf}.
 
 \emph{Part (ii): identification of $c$ from the RWD, given $\tau$.}
@@ -524,8 +523,8 @@ bias.
 \section{The hierarchical $m_0$ prior as a meta-analytic-predictive prior}\label{sm:map-m0}
 
 The meta-analytic-predictive (MAP) prior of \citet{neuenschwander2010} is a hierarchical Bayesian construction for borrowing strength between studies.
-We show that the main-text specification \eqref{eq:m0-decomp-prop} of $m_0(X, S)$ is a function-valued, heterogeneous MAP prior.
-The symmetric form of this prior is the genuine MAP construction.
+We argue that the main-text specification \eqref{eq:m0-decomp-prop} of $m_0(X, S)$ is a function-valued, heterogeneous MAP prior.
+The symmetric form of this prior is the canonical MAP construction.
 The main text uses its two-study instance, anchored at the RCT, which we derive below.
 
 The MAP prior assumes a Gaussian hierarchical structure across $K$ studies with study-specific parameters $\theta_1, \ldots, \theta_K$:

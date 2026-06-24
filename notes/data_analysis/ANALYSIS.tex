@@ -13,7 +13,7 @@ The aligned cohort contains 1771 trial patients and 373 real-world data patients
 The trial follows patients for a maximum of circa three years: too short to reach median event-free survival.
 The MACS study follows them for circa 25 years and reaches a median event-free survival of five to six years.
 This longer follow-up adds robustness for the late treatment effect where the trial is uninformative.
-MACS records outcomes at biannual visits.
+MACS records outcomes at annual visits.
 The data give event times only to the calendar year, so the events are interval-censored at annual resolution.
 Figure~\ref{fig:km-curves} shows the Kaplan--Meier survival curves.
 
@@ -114,10 +114,6 @@ White patients gain slightly more than non-white within each CD8 band.
 Every leaf exceeds $1.4$, so all subgroups benefit.
 The treatment benefit is largest at high CD8.
 
-% Fit-the-fit summary of the FusionForest CATE.  TikZ-drawn so the
-% manuscript controls the typography.  Numbers below are read off
-% notes/general/figures/fit_the_fit_manuscript.pdf and matched to
-% data/analysis 1/analysis_fit_the_fit.txt.
 \definecolor{splitfill}{RGB}{230,244,250}
 \begin{figure}[!b]
   \centering
@@ -177,7 +173,7 @@ The treatment benefit is largest at high CD8.
   \label{fig:fit-the-fit}
 \end{figure}
 
-We inspect the posterior probability of treatment benefit $ \p(\tau(x_i) > 0 \mid \text{data})$ for each patient \citep{henderson2020individualized}.
+We inspect the posterior probability of treatment benefit $\p(\tau(x_i) > 0 \mid \text{data})$ for each patient \citep{henderson2020individualized}.
 We bin the patients by posterior probability of benefit and report the fraction in each bin.
 We compute it over the trial population, under the fusion and trial-only fits, so the columns are comparable (Table~\ref{tab:hte-summary}).
 We find strong evidence of benefit for almost every patient.
