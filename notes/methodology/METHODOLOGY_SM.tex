@@ -23,7 +23,7 @@ Together, the two arguments yield, for each $a \in \{0, 1\}$:
 \end{equation}
 
 \emph{Case $A = 0$, $S \in \{0, 1\}$.}
-The two treated-arm terms in \eqref{eq:sm-decomp} vanish.
+The two treated-arm terms in \eqref{eq:sm-decomp}, $\tau(X)\,A$ and $(1 - S)\,A\,c(X)$, vanish.
 The right-hand side reduces to $m_0(X, S)$.
 The left-hand side equals $m_0(X, S)$ by the definition $m_0(X, S) := \E[\log T \mid A = 0, X, S]$.
 
@@ -41,7 +41,6 @@ The first term equals $m_0(X, 1)$ by \eqref{eq:po-step} at $a = 0$:
 \begin{equation}
 \E[\log T(0) \mid X,\, S = 1] \;=\; \E[\log T \mid A = 0,\, X,\, S = 1] \;=\; m_0(X, 1).
 \end{equation}
-The second term equals $\tau(X)$.
 By cross-source transportability (Assumption~\ref{ass:transport}), the conditional log-treatment effect does not depend on $S$.
 The contrast on the right of \eqref{eq:po-split} therefore equals the population CATE $\tau(X) = \E[\log T(1) - \log T(0) \mid X]$ defined in the manuscript:
 \begin{equation}
@@ -84,7 +83,6 @@ The difference of the two conditional means cancels $m_0(X, 1)$ and leaves $\tau
 \label{eq:ident-tau-pf}
 \end{equation}
 Both conditional means on the right are functionals of the joint distribution of the observed outcomes $(\log T, A, X) \mid S = 1$.
-The RCT observes this distribution.
 This identifies $\tau$ from the RCT alone.
 
 The identification rests on two assumptions.
@@ -93,21 +91,15 @@ By cross-source transportability (Assumption~\ref{ass:transport} of the manuscri
 Neither the RWD data nor the confounding function $c$ enters \eqref{eq:ident-tau-pf}.
 
 \emph{Part (ii): identification of $c$ from the RWD, given $\tau$.}
-We now evaluate \eqref{eq:sm-decomp} at the two values of $A$ within the RWD slice $\{S = 0\}$:
-\begin{align}
-\E[\log T \mid A = 1,\, X,\, S = 0] &\;=\; m_0(X, 0) + \tau(X) + c(X),\\
-\E[\log T \mid A = 0,\, X,\, S = 0] &\;=\; m_0(X, 0).
-\end{align}
-The difference cancels $m_0(X, 0)$.
-We rearrange the result for $c$:
+The confounding function is defined in \eqref{eq:sm-cf} as:
 \begin{equation}
 c(X) \;=\; \E[\log T \mid A = 1,\, X,\, S = 0] \,-\, \E[\log T \mid A = 0,\, X,\, S = 0] \,-\, \tau(X).
 \label{eq:ident-c-pf}
 \end{equation}
-The right-hand side is the defining equation \eqref{eq:sm-cf} of the confounding function.
 The first two terms are functionals of the RWD data distribution.
 If $\tau$ is already identified, then \eqref{eq:ident-c-pf} identifies $c$.
 Part (i) supplies such a $\tau$ from the RCT.
+This is the identification strategy underlying the confounding-function approach to combining randomised and observational data \citep{Kallus2018, YangLiuZengWang2025}.
 
 \emph{Part (iii): the RWD alone does not identify $\tau$ and $c$ separately.}
 We show that distinct parameter pairs $(\tau, c)$ produce the same RWD distribution.
@@ -541,13 +533,13 @@ Large $\sigma_d$ allows the $\theta_k$ to drift apart, i.e.\ weak borrowing.
 The hierarchical structure lets the data determine the degree of borrowing through the posterior of $\sigma_d$.
 
 We restrict the MAP prior to two studies before extending it to functions.
-Write $\theta_s = \theta^* + d_s$ with $d_s \sim N(0, \sigma_d^2)$ for the RWD ($s = 0$) and the RCT ($s = 1$).
+Write $\theta_s = \theta^* + d_s$ with $d_s \sim \mathcal{N}(0, \sigma_d^2)$ for the RWD ($s = 0$) and the RCT ($s = 1$).
 The model carries three latent quantities, $\theta^*$, $d_0$, and $d_1$, but the two studies determine only the two parameters $\theta_0$ and $\theta_1$.
 The overall level of $\theta^*$ is therefore not separately identified from the study-specific deviations.
 We resolve this by anchoring at the RCT.
-Take a vague prior on the shared mean, $\theta^* \sim N(0, \kappa^2)$ with $\kappa^2 \to \infty$.
+Take a vague prior on the shared mean, $\theta^* \sim \mathcal{N}(0, \kappa^2)$ with $\kappa^2 \to \infty$.
 The pair $(\theta_0, \theta_1)$ is then jointly Gaussian with $\mathrm{Var}(\theta_s) = \kappa^2 + \sigma_d^2$ and $\mathrm{Cov}(\theta_0, \theta_1) = \kappa^2$.
-The contrast satisfies $\theta_0 - \theta_1 = d_0 - d_1 \sim N(0,\, 2\sigma_d^2)$.
+The contrast satisfies $\theta_0 - \theta_1 = d_0 - d_1 \sim \mathcal{N}(0,\, 2\sigma_d^2)$.
 We condition on the RCT parameter $\theta_1$ and let $\kappa^2 \to \infty$.
 The regression coefficient then tends to one and the conditional variance tends to $2\sigma_d^2$:
 \begin{equation}
@@ -649,13 +641,14 @@ c &\;\sim\; \mathrm{BART}(J_c, k_c, \alpha_c, \beta_c),\\
 Z_i \mid \bm{\pi}_{s_i} &\;\sim\; \mathrm{Categorical}(\bm{\pi}_{s_i}),\\
 \bm{\pi}_s \mid \bm{\beta},\, M_s &\;\sim\; \mathrm{Dirichlet}(M_s \beta_1, \ldots, M_s \beta_K), \qquad s \in \{0, 1\},\\
 \bm{\beta} \mid \gamma &\;\sim\; \mathrm{Stick}_K(\gamma),\\
-\theta_k^* &\;\stackrel{\mathrm{iid}}{\sim}\; N(0, \sigma_\theta^2), \qquad k = 1, \ldots, K,\\
+\theta_k^* &\;\stackrel{\mathrm{iid}}{\sim}\; \mathcal{N}(0, \sigma_\theta^2), \qquad k = 1, \ldots, K,\\
 \sigma_s^2 &\;\sim\; \nu \lambda / \chi^2_\nu, \qquad s \in \{0, 1\},\\
 \gamma &\;\sim\; \mathrm{Gamma}(a_\gamma, b_\gamma),\\
 M_s &\;\sim\; \mathrm{Gamma}(a_M, b_M), \qquad s \in \{0, 1\},
 \end{align}
 where $\mathrm{Stick}_K(\gamma)$ is the truncated stick-breaking construction given above.
-We use a default $K = 50$ and track the largest occupied component index across iterations to confirm that it stays well below $K$.\footnote{In our simulation studies the number of occupied components did not exceed 25, so the default $K = 50$ leaves substantial headroom.}
+We use a default $K = 50$ and track the largest occupied component index across iterations to confirm that it stays well below $K$.
+In our simulation studies the number of occupied components did not exceed 25, so the default $K = 50$ leaves substantial headroom.
 
 \subsection{Outer Gibbs sampler}
 
@@ -708,17 +701,19 @@ Conditional on the cluster assignment $Z_i$ and the atoms $\theta^*$, the residu
 
 Within forest $f$, we update each tree by a standard BART backfitting step on $R_i^f$.
 We update the tree structure $\mathcal{T}_j^f$ by a Metropolis-Hastings step with birth-death proposals \citep{chipman1998bayesian, kapelner2016bartmachine}.
-We then draw the leaf step heights $\mathcal{H}_j^f$ from their conjugate Gaussian posterior. The Gaussian leaf prior is conjugate to the Gaussian working response, and the posterior mean and variance at each terminal node are available in closed form.
+We then draw the leaf step heights $\mathcal{H}_j^f$ from their conjugate Gaussian posterior.
+The Gaussian leaf prior is conjugate to the Gaussian working response, and the posterior mean and variance at each terminal node are available in closed form.
 
 \subsection{HDPM error block}
 
 The HDPM error block updates the cluster assignments, atoms, top-level sticks, source-specific weights, concentration parameters, and per-source residual variances.
-All full conditionals are conjugate. Throughout, we write $\mid \cdot$ for conditioning on the data and on the current values of all other parameters.
+All full conditionals are conjugate.
+Throughout, we write $\mid \cdot$ for conditioning on the data and on the current values of all other parameters.
 Algorithm~\ref{alg:sm-hdp} summarises one update of the block.
 
 We sample the cluster assignments from
 \begin{equation}
-\p(Z_i = k \mid \cdot) \;\propto\; \pi_{s_i, k}\, \phi\!\left(\frac{R_i - (\theta_k^* - \mu_{s_i})}{\sigma_{s_i}}\right), \qquad k = 1, \ldots, K.
+\p(Z_i = k \mid \cdot) \;\propto\; \pi_{s_i, k}\, \phi\!\left\{\frac{R_i - (\theta_k^* - \mu_{s_i})}{\sigma_{s_i}}\right\}, \qquad k = 1, \ldots, K.
 \label{eq:sm-cluster}
 \end{equation}
 
@@ -759,7 +754,7 @@ The analogous update for $M_s$ replaces $K^*$ by the source-specific table count
 
 The conjugate update of the per-source residual variance closes the block:
 \begin{equation}
-\sigma_s^2 \mid \cdot \;\sim\; \mathrm{InverseGamma}\!\left(\frac{\nu + n_s}{2},\; \frac{\nu \lambda + \mathrm{SS}_s}{2}\right), \qquad \mathrm{SS}_s = \sum_{i : S_i = s} \bigl(R_i - (\theta_{Z_i}^* - \mu_s)\bigr)^2, \qquad s \in \{0, 1\}.
+\sigma_s^2 \mid \cdot \;\sim\; \mathrm{InverseGamma}\!\left(\frac{\nu + n_s}{2},\; \frac{\nu \lambda + \mathrm{SS}_s}{2}\right), \qquad \mathrm{SS}_s = \sum_{i : S_i = s} \bigl\{R_i - (\theta_{Z_i}^* - \mu_s)\bigr\}^2, \qquad s \in \{0, 1\}.
 \label{eq:sm-sigma}
 \end{equation}
 

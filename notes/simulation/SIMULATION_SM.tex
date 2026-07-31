@@ -16,10 +16,17 @@ The main text discusses these results.
 
 We give the full comparison with the deep-learning competitors here.
 Table~\ref{tab:sim-deepaft} reports each metric across the $(\lambda_d, \lambda_u)$ grid, with $\lambda_d, \lambda_u \in \{0, 1, 2\}$.
+The grid restricts to the deep network because it is the strongest of the four alternatives (Table~\ref{tab:sim-competitors} of the main text).
 The Bayesian fusion forest attains the lowest RMSE at every grid point.
 
 \begin{sidewaystable}
   \centering
+  \caption{CATE metrics for the Bayesian fusion forest (BFF) and the four
+    deepAFT competitors across the $(\lambda_d, \lambda_u)$ grid. Each entry
+    is the mean over simulation replicates, with the 2.5--97.5\% range in
+    brackets. R and P denote the RCT-only and naive-pool fits; S and T denote
+    the S-learner and T-learner.}
+  \label{tab:sim-deepaft}
   \scriptsize
   \setlength{\tabcolsep}{4pt}
   \begin{tabular}{cc ccccc}
@@ -27,56 +34,50 @@ The Bayesian fusion forest attains the lowest RMSE at every grid point.
     $\lambda_d$ & $\lambda_u$ & BFF & DNN (RCT, S) & DNN (RCT, T) & DNN (pool, S) & DNN (pool, T) \\
     \midrule
     \multicolumn{7}{l}{\emph{RMSE}}\\
-    0 & 0 & 0.68 [0.53, 0.87] & 1.11 [0.98, 1.28] & 1.24 [0.89, 1.75] & 1.08 [0.94, 1.27] & 1.11 [0.70, 3.04] \\
-    1 & 0 & 0.68 [0.53, 0.85] & 1.11 [0.98, 1.27] & 1.25 [0.88, 1.74] & 1.08 [0.93, 1.27] & 1.11 [0.73, 2.94] \\
-    2 & 0 & 0.67 [0.52, 0.85] & 1.12 [0.98, 1.29] & 1.27 [0.89, 1.84] & 1.09 [0.95, 1.27] & 1.22 [0.83, 3.06] \\
-    0 & 1 & 0.68 [0.54, 0.85] & 1.11 [0.97, 1.29] & 1.23 [0.91, 1.74] & 1.10 [0.96, 1.27] & 1.09 [0.71, 3.12] \\
-    1 & 1 & 0.68 [0.52, 0.86] & 1.12 [0.98, 1.26] & 1.25 [0.89, 1.77] & 1.10 [0.96, 1.28] & 1.13 [0.74, 3.02] \\
-    2 & 1 & 0.68 [0.53, 0.84] & 1.13 [0.98, 1.28] & 1.26 [0.88, 1.86] & 1.12 [0.96, 1.28] & 1.23 [0.83, 3.13] \\
-    0 & 2 & 0.68 [0.53, 0.86] & 1.11 [0.97, 1.26] & 1.25 [0.91, 1.72] & 1.16 [1.02, 1.33] & 1.12 [0.72, 3.16] \\
-    1 & 2 & 0.69 [0.54, 0.87] & 1.12 [0.99, 1.27] & 1.25 [0.90, 1.76] & 1.17 [1.01, 1.33] & 1.19 [0.78, 3.26] \\
-    2 & 2 & 0.68 [0.53, 0.87] & 1.12 [0.98, 1.29] & 1.24 [0.87, 1.85] & 1.17 [1.01, 1.33] & 1.25 [0.82, 3.20] \\
+    0 & 0 & 0.68 [0.53;0.87] & 1.11 [0.98;1.28] & 1.24 [0.89;1.75] & 1.08 [0.94;1.27] & 1.11 [0.70;3.04] \\
+    1 & 0 & 0.68 [0.53;0.85] & 1.11 [0.98;1.27] & 1.25 [0.88;1.74] & 1.08 [0.93;1.27] & 1.11 [0.73;2.94] \\
+    2 & 0 & 0.67 [0.52;0.85] & 1.12 [0.98;1.29] & 1.27 [0.89;1.84] & 1.09 [0.95;1.27] & 1.22 [0.83;3.06] \\
+    0 & 1 & 0.68 [0.54;0.85] & 1.11 [0.97;1.29] & 1.23 [0.91;1.74] & 1.10 [0.96;1.27] & 1.09 [0.71;3.12] \\
+    1 & 1 & 0.68 [0.52;0.86] & 1.12 [0.98;1.26] & 1.25 [0.89;1.77] & 1.10 [0.96;1.28] & 1.13 [0.74;3.02] \\
+    2 & 1 & 0.68 [0.53;0.84] & 1.13 [0.98;1.28] & 1.26 [0.88;1.86] & 1.12 [0.96;1.28] & 1.23 [0.83;3.13] \\
+    0 & 2 & 0.68 [0.53;0.86] & 1.11 [0.97;1.26] & 1.25 [0.91;1.72] & 1.16 [1.02;1.33] & 1.12 [0.72;3.16] \\
+    1 & 2 & 0.69 [0.54;0.87] & 1.12 [0.99;1.27] & 1.25 [0.90;1.76] & 1.17 [1.01;1.33] & 1.19 [0.78;3.26] \\
+    2 & 2 & 0.68 [0.53;0.87] & 1.12 [0.98;1.29] & 1.24 [0.87;1.85] & 1.17 [1.01;1.33] & 1.25 [0.82;3.20] \\
     \midrule
     \multicolumn{7}{l}{\emph{Bias}}\\
-    0 & 0 & $-0.01$ [$-0.42$, 0.38] & $-0.17$ [$-0.55$, 0.23] & $-0.21$ [$-0.70$, 0.33] & $-0.13$ [$-0.39$, 0.14] & $-0.02$ [$-0.47$, 0.74] \\
-    1 & 0 & $-0.03$ [$-0.44$, 0.36] & $-0.20$ [$-0.53$, 0.19] & $-0.23$ [$-0.70$, 0.27] & $-0.13$ [$-0.42$, 0.14] & 0.01 [$-0.48$, 0.76] \\
-    2 & 0 & $-0.04$ [$-0.46$, 0.36] & $-0.20$ [$-0.53$, 0.20] & $-0.28$ [$-0.81$, 0.28] & $-0.12$ [$-0.40$, 0.18] & $-0.04$ [$-0.58$, 0.88] \\
-    0 & 1 & $-0.03$ [$-0.42$, 0.37] & $-0.18$ [$-0.52$, 0.20] & $-0.23$ [$-0.72$, 0.29] & 0.11 [$-0.14$, 0.39] & 0.09 [$-0.36$, 0.92] \\
-    1 & 1 & $-0.03$ [$-0.45$, 0.37] & $-0.19$ [$-0.54$, 0.21] & $-0.25$ [$-0.77$, 0.26] & 0.11 [$-0.16$, 0.38] & 0.10 [$-0.39$, 0.91] \\
-    2 & 1 & $-0.01$ [$-0.42$, 0.41] & $-0.20$ [$-0.54$, 0.18] & $-0.25$ [$-0.80$, 0.32] & 0.10 [$-0.17$, 0.38] & 0.06 [$-0.51$, 0.99] \\
-    0 & 2 & $-0.03$ [$-0.43$, 0.37] & $-0.20$ [$-0.55$, 0.16] & $-0.25$ [$-0.75$, 0.26] & 0.36 [$-0.03$, 0.65] & 0.19 [$-0.30$, 1.08] \\
-    1 & 2 & $-0.02$ [$-0.43$, 0.39] & $-0.19$ [$-0.53$, 0.21] & $-0.24$ [$-0.76$, 0.31] & 0.35 [$-0.01$, 0.65] & 0.19 [$-0.35$, 1.25] \\
-    2 & 2 & $-0.00$ [$-0.43$, 0.42] & $-0.19$ [$-0.53$, 0.23] & $-0.24$ [$-0.77$, 0.33] & 0.32 [$-0.05$, 0.65] & 0.21 [$-0.43$, 1.25] \\
+    0 & 0 & $-0.01$ [$-0.42$;0.38] & $-0.17$ [$-0.55$;0.23] & $-0.21$ [$-0.70$;0.33] & $-0.13$ [$-0.39$;0.14] & $-0.02$ [$-0.47$;0.74] \\
+    1 & 0 & $-0.03$ [$-0.44$;0.36] & $-0.20$ [$-0.53$;0.19] & $-0.23$ [$-0.70$;0.27] & $-0.13$ [$-0.42$;0.14] & 0.01 [$-0.48$;0.76] \\
+    2 & 0 & $-0.04$ [$-0.46$;0.36] & $-0.20$ [$-0.53$;0.20] & $-0.28$ [$-0.81$;0.28] & $-0.12$ [$-0.40$;0.18] & $-0.04$ [$-0.58$;0.88] \\
+    0 & 1 & $-0.03$ [$-0.42$;0.37] & $-0.18$ [$-0.52$;0.20] & $-0.23$ [$-0.72$;0.29] & 0.11 [$-0.14$;0.39] & 0.09 [$-0.36$;0.92] \\
+    1 & 1 & $-0.03$ [$-0.45$;0.37] & $-0.19$ [$-0.54$;0.21] & $-0.25$ [$-0.77$;0.26] & 0.11 [$-0.16$;0.38] & 0.10 [$-0.39$;0.91] \\
+    2 & 1 & $-0.01$ [$-0.42$;0.41] & $-0.20$ [$-0.54$;0.18] & $-0.25$ [$-0.80$;0.32] & 0.10 [$-0.17$;0.38] & 0.06 [$-0.51$;0.99] \\
+    0 & 2 & $-0.03$ [$-0.43$;0.37] & $-0.20$ [$-0.55$;0.16] & $-0.25$ [$-0.75$;0.26] & 0.36 [$-0.03$;0.65] & 0.19 [$-0.30$;1.08] \\
+    1 & 2 & $-0.02$ [$-0.43$;0.39] & $-0.19$ [$-0.53$;0.21] & $-0.24$ [$-0.76$;0.31] & 0.35 [$-0.01$;0.65] & 0.19 [$-0.35$;1.25] \\
+    2 & 2 & 0.00 [$-0.43$;0.42] & $-0.19$ [$-0.53$;0.23] & $-0.24$ [$-0.77$;0.33] & 0.32 [$-0.05$;0.65] & 0.21 [$-0.43$;1.25] \\
     \midrule
     \multicolumn{7}{l}{\emph{Coverage}}\\
-    0 & 0 & 0.96 [0.92, 0.98] & 0.38 [0.28, 0.50] & 0.91 [0.76, 0.99] & 0.41 [0.31, 0.52] & 0.99 [0.97, 1.00] \\
-    1 & 0 & 0.96 [0.93, 0.98] & 0.37 [0.27, 0.48] & 0.91 [0.78, 0.99] & 0.42 [0.32, 0.54] & 0.99 [0.97, 1.00] \\
-    2 & 0 & 0.97 [0.94, 0.99] & 0.37 [0.27, 0.48] & 0.92 [0.79, 0.99] & 0.43 [0.34, 0.54] & 0.99 [0.97, 1.00] \\
-    0 & 1 & 0.96 [0.93, 0.98] & 0.38 [0.27, 0.48] & 0.91 [0.77, 0.99] & 0.44 [0.33, 0.56] & 0.99 [0.96, 1.00] \\
-    1 & 1 & 0.96 [0.93, 0.99] & 0.38 [0.28, 0.49] & 0.91 [0.78, 0.99] & 0.44 [0.34, 0.56] & 0.99 [0.97, 1.00] \\
-    2 & 1 & 0.97 [0.94, 0.99] & 0.37 [0.27, 0.48] & 0.92 [0.79, 0.99] & 0.45 [0.34, 0.56] & 0.99 [0.96, 1.00] \\
-    0 & 2 & 0.96 [0.93, 0.99] & 0.37 [0.27, 0.49] & 0.91 [0.77, 0.99] & 0.45 [0.36, 0.56] & 0.99 [0.96, 1.00] \\
-    1 & 2 & 0.96 [0.93, 0.99] & 0.37 [0.27, 0.48] & 0.91 [0.79, 0.99] & 0.45 [0.35, 0.58] & 0.99 [0.96, 1.00] \\
-    2 & 2 & 0.97 [0.94, 0.99] & 0.37 [0.27, 0.49] & 0.93 [0.78, 0.99] & 0.45 [0.35, 0.57] & 0.99 [0.96, 1.00] \\
+    0 & 0 & 0.96 [0.92;0.98] & 0.38 [0.28;0.50] & 0.91 [0.76;0.99] & 0.41 [0.31;0.52] & 0.99 [0.97;1.00] \\
+    1 & 0 & 0.96 [0.93;0.98] & 0.37 [0.27;0.48] & 0.91 [0.78;0.99] & 0.42 [0.32;0.54] & 0.99 [0.97;1.00] \\
+    2 & 0 & 0.97 [0.94;0.99] & 0.37 [0.27;0.48] & 0.92 [0.79;0.99] & 0.43 [0.34;0.54] & 0.99 [0.97;1.00] \\
+    0 & 1 & 0.96 [0.93;0.98] & 0.38 [0.27;0.48] & 0.91 [0.77;0.99] & 0.44 [0.33;0.56] & 0.99 [0.96;1.00] \\
+    1 & 1 & 0.96 [0.93;0.99] & 0.38 [0.28;0.49] & 0.91 [0.78;0.99] & 0.44 [0.34;0.56] & 0.99 [0.97;1.00] \\
+    2 & 1 & 0.97 [0.94;0.99] & 0.37 [0.27;0.48] & 0.92 [0.79;0.99] & 0.45 [0.34;0.56] & 0.99 [0.96;1.00] \\
+    0 & 2 & 0.96 [0.93;0.99] & 0.37 [0.27;0.49] & 0.91 [0.77;0.99] & 0.45 [0.36;0.56] & 0.99 [0.96;1.00] \\
+    1 & 2 & 0.96 [0.93;0.99] & 0.37 [0.27;0.48] & 0.91 [0.79;0.99] & 0.45 [0.35;0.58] & 0.99 [0.96;1.00] \\
+    2 & 2 & 0.97 [0.94;0.99] & 0.37 [0.27;0.49] & 0.93 [0.78;0.99] & 0.45 [0.35;0.57] & 0.99 [0.96;1.00] \\
     \midrule
     \multicolumn{7}{l}{\emph{Posterior variance}}\\
-    0 & 0 & 0.48 [0.41, 0.56] & 0.07 [0.04, 0.12] & 1.15 [0.74, 1.94] & 0.12 [0.05, 0.38] & 3.96 [0.97, 11.76] \\
-    1 & 0 & 0.50 [0.44, 0.58] & 0.07 [0.04, 0.14] & 1.18 [0.74, 2.06] & 0.12 [0.05, 0.34] & 4.19 [1.05, 11.48] \\
-    2 & 0 & 0.56 [0.49, 0.65] & 0.07 [0.04, 0.15] & 1.35 [0.74, 2.98] & 0.13 [0.05, 0.42] & 4.72 [1.18, 13.42] \\
-    0 & 1 & 0.49 [0.42, 0.57] & 0.07 [0.04, 0.11] & 1.10 [0.71, 1.79] & 0.12 [0.05, 0.40] & 3.72 [1.02, 10.24] \\
-    1 & 1 & 0.52 [0.44, 0.60] & 0.07 [0.04, 0.11] & 1.13 [0.74, 1.93] & 0.13 [0.05, 0.42] & 4.13 [1.09, 11.12] \\
-    2 & 1 & 0.58 [0.50, 0.67] & 0.07 [0.04, 0.12] & 1.21 [0.76, 2.35] & 0.13 [0.05, 0.45] & 5.19 [1.24, 14.93] \\
-    0 & 2 & 0.52 [0.45, 0.61] & 0.07 [0.04, 0.10] & 1.08 [0.72, 1.65] & 0.15 [0.06, 0.45] & 3.60 [1.08, 10.63] \\
-    1 & 2 & 0.55 [0.46, 0.63] & 0.06 [0.04, 0.10] & 1.09 [0.74, 1.62] & 0.15 [0.06, 0.44] & 4.06 [1.12, 11.81] \\
-    2 & 2 & 0.61 [0.52, 0.71] & 0.07 [0.04, 0.11] & 1.12 [0.75, 1.77] & 0.14 [0.07, 0.45] & 5.27 [1.33, 15.58] \\
+    0 & 0 & 0.48 [0.41;0.56] & 0.07 [0.04;0.12] & 1.15 [0.74;1.94] & 0.12 [0.05;0.38] & 3.96 [0.97;11.76] \\
+    1 & 0 & 0.50 [0.44;0.58] & 0.07 [0.04;0.14] & 1.18 [0.74;2.06] & 0.12 [0.05;0.34] & 4.19 [1.05;11.48] \\
+    2 & 0 & 0.56 [0.49;0.65] & 0.07 [0.04;0.15] & 1.35 [0.74;2.98] & 0.13 [0.05;0.42] & 4.72 [1.18;13.42] \\
+    0 & 1 & 0.49 [0.42;0.57] & 0.07 [0.04;0.11] & 1.10 [0.71;1.79] & 0.12 [0.05;0.40] & 3.72 [1.02;10.24] \\
+    1 & 1 & 0.52 [0.44;0.60] & 0.07 [0.04;0.11] & 1.13 [0.74;1.93] & 0.13 [0.05;0.42] & 4.13 [1.09;11.12] \\
+    2 & 1 & 0.58 [0.50;0.67] & 0.07 [0.04;0.12] & 1.21 [0.76;2.35] & 0.13 [0.05;0.45] & 5.19 [1.24;14.93] \\
+    0 & 2 & 0.52 [0.45;0.61] & 0.07 [0.04;0.10] & 1.08 [0.72;1.65] & 0.15 [0.06;0.45] & 3.60 [1.08;10.63] \\
+    1 & 2 & 0.55 [0.46;0.63] & 0.06 [0.04;0.10] & 1.09 [0.74;1.62] & 0.15 [0.06;0.44] & 4.06 [1.12;11.81] \\
+    2 & 2 & 0.61 [0.52;0.71] & 0.07 [0.04;0.11] & 1.12 [0.75;1.77] & 0.14 [0.07;0.45] & 5.27 [1.33;15.58] \\
     \bottomrule
   \end{tabular}
-    \caption{CATE metrics for the Bayesian fusion forest (BFF) and the four
-    deepAFT competitors across the $(\lambda_d, \lambda_u)$ grid. Each entry
-    is the mean over simulation replicates, with the 2.5--97.5\% range in
-    brackets. R and P denote the RCT-only and naive-pool fits; S and T denote
-    the S-learner and T-learner.}
-  \label{tab:sim-deepaft}
 \end{sidewaystable}
 
 \subsection{Robustness to the covariate dimension}\label{sm:sim-highdim}
@@ -91,7 +92,7 @@ The posterior-variance ratio decreases with $p$, so the fusion's precision advan
 \begin{figure}[!tb]
   \centering
   \includegraphics[width=0.9\textwidth]{sim_hd_ratio_vs_p}
-  \caption{Efficiency of the Bayesian fusion forest relative to the trial-only baseline as the covariate dimension $p$ grows, at $\lambda_d = \lambda_u = 1$. Left: ratio of RMSE; right: ratio of posterior variance. A ratio below one favours the fusion. The fusion oracle is the fusion forest given only the active covariates. Shaded bands are $95\%$ Monte Carlo intervals.}
+  \caption{Efficiency of the Bayesian fusion forest relative to the trial-only baseline as the covariate dimension $p$ grows, at $\lambda_d = \lambda_u = 1$. Left: ratio of RMSE; right: ratio of posterior variance. A ratio below one favours the fusion. The fusion oracle is the Bayesian fusion forest given only the active covariates. Shaded bands are $95\%$ Monte Carlo intervals.}
   \label{fig:sim-hd-ratio}
 \end{figure}
 
@@ -99,14 +100,12 @@ The posterior-variance ratio decreases with $p$, so the fusion's precision advan
 
 We assess the source-specific hierarchical Dirichlet process mixture (HDPM) that the Bayesian fusion forest places on the residual.
 We isolate the residual model by setting $\lambda_u = \lambda_d = 0$, so the two sources share the same structural mean and differ only in their error distribution.
-We compare three residual priors within the fusion forest: a single Gaussian, a Dirichlet process mixture pooled across the two sources (one residual law for both), and the proposed source-specific HDPM (shared atoms, source-specific weights and scale).
+We compare three residual priors within the Bayesian fusion forest: a single Gaussian, a Dirichlet process mixture pooled across the two sources (one residual law for both), and the proposed source-specific HDPM (shared atoms, source-specific weights and scale).
 We escalate the residual difficulty over five settings.
 Setting~1 draws both errors from the standard normal, so the Gaussian prior is correctly specified.
 Settings~2--5 give the real-world source a markedly larger scale than the trial (a standard-deviation ratio of about three), which the single-scale Gaussian and pooled priors cannot represent, and add increasing non-Gaussianity: a pure scale gap (2), a skewed real-world error (3), a bimodal real-world error (4), and multimodal errors in both sources with shared component locations but different weights (5).
 To make the residual model bite, we censor heavily and coarsely: the trial is right-censored at circa $50\%$ and the real-world data are interval-censored at quartile visits, so many observations enter the likelihood only through the error distribution over wide intervals.
-We report two targets.
-The first is the CATE $\tau(x)$, our primary estimand.
-The second is the full conditional-mean outcome $\E[\log T \mid X, A, S]$, the sum of the four forests, which the residual model affects through every component rather than through the treatment contrast alone.
+We report the CATE $\tau(x)$, our estimand throughout.
 
 Table~\ref{tab:sim-err} reports the CATE metrics over the combined population.
 At the correctly-specified null the three priors are indistinguishable, so the flexible residual models cost nothing when a Gaussian would do.
@@ -118,6 +117,14 @@ The pattern is the same in the trial- and real-world-only populations.
 
 \begin{table}[!htbp]
   \centering
+  \caption{CATE metrics by residual prior across the five error settings, over
+    the combined population and averaged over simulation replicates. ``Source
+    HDPM'' is the proposed source-specific hierarchical Dirichlet process
+    mixture; ``Shared DP'' pools one Dirichlet process mixture across sources.
+    The best RMSE and bias per setting are in bold. Coverage is the $95\%$
+    credible-interval coverage; ``Post.\ var.'' is the mean posterior variance
+    of $\hat\tau(x)$.}
+  \label{tab:sim-err}
   \small
   \begin{tabular}{@{}l rrrr@{}}
     \toprule
@@ -149,20 +156,6 @@ The pattern is the same in the trial- and real-world-only populations.
     \quad Source HDPM & $\mathbf{0.752}$ & $\mathbf{-0.107}$ & 0.968 & 0.694 \\
     \bottomrule
   \end{tabular}
-  \caption{CATE metrics by residual prior across the five error settings, over
-    the combined population and averaged over simulation replicates. ``Source
-    HDPM'' is the proposed source-specific hierarchical Dirichlet process
-    mixture; ``Shared DP'' pools one Dirichlet process mixture across sources.
-    The best RMSE and bias per setting are in bold. Coverage is the $95\%$
-    credible-interval coverage; ``Post.\ var.'' is the mean posterior variance
-    of $\hat\tau(x)$.}
-  \label{tab:sim-err}
 \end{table}
 
-% TODO: full-outcome log(T) prediction results (sim_err_v2, target = "outcome").
-% Awaiting the rerun. Add here: a short paragraph interpreting the outcome-
-% prediction metrics (where the m0 surface is not cancelled, so the gap between
-% the priors should be larger), and a Table~\ref{tab:sim-err-outcome} parallel to
-% Table~\ref{tab:sim-err} above (same layout: RMSE / Bias / Coverage / Post. var.,
-% three priors per setting, best RMSE/bias in bold).
 

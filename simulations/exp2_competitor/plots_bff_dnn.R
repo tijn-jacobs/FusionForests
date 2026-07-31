@@ -12,7 +12,7 @@
 # ──────────────────────────────────────────────────────────────────────────────
 
 res_dir <- "simulations/exp2_competitor"
-fig_dir <- "simulations/exp2_competitor/figures"
+fig_dir <- "notes/general/figures"   # write straight to the manuscript figures dir
 dir.create(fig_dir, showWarnings = FALSE, recursive = TRUE)
 
 res <- rbind(
@@ -27,7 +27,12 @@ meth      <- c("Fusion", "deepAFT-RCT-S", "deepAFT-RCT-T",
                "deepAFT-Pooled-S", "deepAFT-Pooled-T")
 meth_labs <- c("Bayesian fusion forest", "DNN (RCT, S)", "DNN (RCT, T)",
                "DNN (pool, S)", "DNN (pool, T)")
-cols      <- c("goldenrod1", "#9ecae1", "#3182bd", "#fc9272", "#de2d26")
+# Okabe-Ito colourblind-safe palette. Fusion keeps the orange it has in every
+# other figure; the DNN variants keep the cool/warm split, with the light shade
+# for the S-learner and the dark shade for the T-learner.
+#   orange #E69F00 | sky blue #56B4E9 | blue #0072B2
+#   reddish purple #CC79A7 | vermillion #D55E00
+cols      <- c("#E69F00", "#56B4E9", "#0072B2", "#CC79A7", "#D55E00")
 stopifnot(all(meth %in% unique(res$method)))
 res$method <- factor(res$method, levels = meth)
 
@@ -59,8 +64,9 @@ draw_main <- function() {
   main_labs <- c(rmse = "RMSE", bias = "Bias",
                  coverage = "Coverage", postvar = "Posterior var.")
   op <- par(mfrow = c(1, 4), family = "serif", oma = c(6, 0, 0, 0),
-            mar = c(3, 9, 2.5, 3.5), mgp = c(5.6, 1.5, 0),
-            cex.lab = 4.3, cex.axis = 3.2)
+            mar = c(3, 10.5, 2.5, 3.5), mgp = c(7.0, 1.5, 0),
+            cex.lab = 4.3, cex.axis = 3.2,
+            las = 1)                     # upright (horizontal) y-axis numbers
   for (m in metrics) panel(d11, m, lab = main_labs[[m]])
   par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0),
       family = "serif", new = TRUE)

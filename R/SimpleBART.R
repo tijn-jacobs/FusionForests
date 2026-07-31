@@ -37,6 +37,15 @@
 #'     Matrix of dimension \code{N_post x n_test} with per-iteration test predictions.}
 #' }
 #'
+#' @examples
+#' set.seed(1)
+#' n <- 100
+#' X <- matrix(rnorm(n * 3), n, 3)
+#' y <- X[, 1] + rnorm(n)
+#' fit <- SimpleBART(y = y, X_train = X, N_post = 50, N_burn = 25,
+#'                   verbose = FALSE)
+#' cor(y, fit$train_predictions)
+#'
 #' @importFrom Rcpp evalCpp
 #' @useDynLib FusionForests, .registration = TRUE
 #' @importFrom stats sd qchisq

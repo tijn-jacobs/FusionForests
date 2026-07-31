@@ -75,3 +75,13 @@ Matrix of dimension \code{N_post x n_test} with per-iteration test predictions.}
 Standard single-forest BART model: \eqn{Y = f(X) + \sigma\varepsilon}.
 A clean entry point for benchmarking and development (e.g., testing IRS).
 }
+\examples{
+set.seed(1)
+n <- 100
+X <- matrix(rnorm(n * 3), n, 3)
+y <- X[, 1] + rnorm(n)
+fit <- SimpleBART(y = y, X_train = X, N_post = 50, N_burn = 25,
+                  verbose = FALSE)
+cor(y, fit$train_predictions)
+
+}

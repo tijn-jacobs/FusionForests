@@ -2,37 +2,42 @@
 
 First release of **FusionForests**.
 
-## New model: `FusionForest`
+## New model: `FusionForest()`
 
-Added `FusionForest()`, a 3-forest Bayesian tree ensemble for combining
-data from a randomised controlled trial (RCT) and real-world data (RWD).
+`FusionForest()` is a Bayesian tree ensemble for combining data from a
+randomised controlled trial (RCT) and real-world data (RWD).
 
-The model decomposes the outcome as:
+The outcome (continuous, or log survival time) is decomposed over
+separate tree forests: a control forest, a treatment forest, a
+deconfounding forest and, in four-forest mode, a deviation forest that
+captures how the treatment effect in the RWD deviates from the RCT.
+A **commensurate prior** controls the strength of borrowing from the
+real-world data.
 
-  ŷᵢ = m(xᵢ) + bᵢ · τ₀(xᵢ) + bᵢ · (1 − sᵢ) · τ₁(xᵢ)
+Continuous, right-censored and interval-censored outcomes are
+supported via an accelerated failure time formulation, with Gaussian
+or Dirichlet-process mixture error distributions (`error_dist`).
 
-where `m(x)` is the control forest, `τ₀(x)` is the RCT treatment forest,
-and `τ₁(x)` is the RWD deconfounding forest. The binary variable `sᵢ` indicates
-whether observation `i` comes from the RCT (1) or the RWD (0).
+## Posterior summaries
 
-A **commensurate prior** with spike-and-slab structure controls borrowing
-strength from the real-world data. The `eta_commensurate` argument
-configures this prior.
+- `fusion_estimand()` — posterior draws of causal survival estimands:
+  survival difference, RMST difference and acceleration factor.
+- `fusion_projection()` — interpretable linear projections of the
+  posterior treatment effect surface.
+- `print()` and `summary()` methods for `FusionForest` fits.
 
-All three forests default to standard BART with leaf hyperparameters
-automatically scaled to `1 / sqrt(number_of_trees_*)`.
+## Additional models
 
-## Inherited models from FusionForests
+- `SimpleBART()` — single-forest BART.
+- `SimpleBCF()` — Bayesian causal forest with prognostic and treatment
+  forests.
 
-The package also includes the full suite of models from the FusionForests
-framework for single-study causal inference and survival analysis:
+## Re-exports
 
-- `HorseTrees()`, `ShrinkageTrees()` — single-forest models with Horseshoe
-  and flexible shrinkage priors
-- `CausalHorseForest()`, `CausalShrinkageForest()` — BCF-style causal models
-- `SurvivalBART()`, `SurvivalDART()`, `SurvivalBCF()`, `SurvivalShrinkageBCF()`
-  — survival wrappers supporting right-censored and interval-censored outcomes
-
-All models support continuous, binary, and censored survival outcomes via
-an AFT framework, multi-chain MCMC, and S3 methods for `print`, `summary`,
-`predict`, and `plot`.
+The single-study causal and survival models from the
+[ShrinkageTrees](https://cran.r-project.org/package=ShrinkageTrees)
+package (`ShrinkageTrees()`, `HorseTrees()`, `CausalShrinkageForest()`,
+`CausalHorseForest()`, `SurvivalBART()`, `SurvivalDART()`,
+`SurvivalBCF()`, `SurvivalShrinkageBCF()`) are re-exported, so
+`library(FusionForests)` provides every model from the accompanying
+paper in one namespace.

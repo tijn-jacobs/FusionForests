@@ -72,6 +72,31 @@
 #' Rubin, D.~B. (1981).  The Bayesian bootstrap.  \emph{The Annals of
 #' Statistics}, 9, 130--134.
 #'
+#' @examples
+#' # Continuous fusion fit with stored posterior samples
+#' set.seed(1)
+#' n <- 100
+#' X <- matrix(rnorm(n * 3), n, 3)
+#' colnames(X) <- paste0("x", 1:3)
+#' s <- rbinom(n, 1, 0.5)
+#' a <- rbinom(n, 1, 0.5)
+#' y <- X[, 1] + (0.5 + 0.3 * X[, 2]) * a + rnorm(n)
+#'
+#' fit <- FusionForest(
+#'   y = y,
+#'   X_train_control = X, X_train_treat = X,
+#'   treatment_indicator_train = a, source_indicator_train = s,
+#'   X_test_control = X, X_test_treat = X,
+#'   treatment_indicator_test = a, source_indicator_test = s,
+#'   N_post = 50, N_burn = 25,
+#'   store_posterior_sample = TRUE, verbose = FALSE
+#' )
+#'
+#' # Project the posterior CATE surface onto a linear basis
+#' proj <- fusion_projection(fit, basis = ~ x1 + x2 + x3,
+#'                           X_eval = as.data.frame(X))
+#' colMeans(proj)
+#'
 #' @importFrom stats model.matrix rgamma lm.wfit
 #' @export
 fusion_projection <- function(

@@ -685,10 +685,10 @@ cat_summary(macs, "RWD")
 ## simulation panels).  Written to notes/general/figures/.
 ################################################################################
 
-## Higher-contrast pair (ColorBrewer Set1, blue + red): pops more than
-## the green/firebrick from the earlier draft and stays colour-blind
-## safe.  RCT carries the trial-aligned look; RWD stands apart.
-src_cols <- c(RCT = "#1f78b4", RWD = "#e31a1c")
+## Okabe-Ito colourblind-safe palette, shared with every other figure in the
+## paper: blue #0072B2 for the trial, vermillion #D55E00 for the real-world
+## data.  RCT carries the trial-aligned look; RWD stands apart.
+src_cols <- c(RCT = "#0072B2", RWD = "#D55E00")
 
 ## Caterpillar helper -- transposed orientation (rank on the vertical
 ## axis, acceleration factor on the longer horizontal axis), Times font
@@ -910,7 +910,8 @@ g_plot$coef  <- factor(g_plot$coef, levels = rev(harmCovars))
 g_plot$model <- factor(g_plot$model,
                        levels = c("M1 (RCT only)", "M2 (Fusion)"))
 
-model_cols <- c("M1 (RCT only)" = "#1f78b4", "M2 (Fusion)" = "#e31a1c")
+# Okabe-Ito, same assignment as every other figure: trial green, Fusion orange.
+model_cols <- c("M1 (RCT only)" = "#009E73", "M2 (Fusion)" = "#E69F00")
 
 p_proj <- ggplot(g_plot,
                  aes(y = coef, x = mean, xmin = lo, xmax = hi,

@@ -1,0 +1,10 @@
+BJ-ELM competitor (S- and T-learner) vs the fusion forest
+Combined RCT + MACS cohort, B = 100 stratified bootstrap.
+MACS interval-censored deaths approximated by the right-censored
+last-lab-year encoding (see ANALYSIS_SM.tex).
+
+         method af_ci_width pct_benefit
+    bjelm-RCT-S       0.408       99.11
+    bjelm-RCT-T       4.067        3.31
+ bjelm-Pooled-S       0.530       99.86
+ bjelm-Pooled-T       2.388       48.69

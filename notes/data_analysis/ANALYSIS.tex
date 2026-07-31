@@ -19,7 +19,7 @@ Figure~\ref{fig:km-curves} shows the Kaplan--Meier survival curves.
 
 
 
-\begin{figure}[!t]
+\begin{figure}[!tb]
   \centering
   \includegraphics[width=0.8\linewidth]{survival_curves_manuscript.pdf}
   \caption{Kaplan--Meier curves of event-free survival, by data source
@@ -35,13 +35,13 @@ We fit a Bayesian fusion forest to the combined data with default parameter sett
 We compare it with an AFT Bayesian causal forest fitted to the trial alone.
 We compute the average effect with a source-specific Bayesian bootstrap.
 The source weights follow a Dirichlet prior proportional to the sample sizes.
-The fusion estimate of the average acceleration factor is $1.65$ (95\% CrI: $1.43$ to $1.90$).
-The trial-only baseline is close at $1.70$ (95\% CrI: $1.51$ to $1.92$).
-Combination therapy stretches the event-free survival time scale by a factor of $1.65$ relative to monotherapy.
+The fusion estimate of the average acceleration factor is $1.65$ ($95\%$ credible interval $[1.43;1.90]$).
+The trial-only baseline is close at $1.70$ ($95\%$ credible interval $[1.51;1.92]$).
+Combination therapy thus stretches the event-free survival time scale by a factor of $1.65$ relative to monotherapy.
 Equivalently, the median event-free survival time under combination therapy is $1.65$ times the median under monotherapy.
 
 
-The Bayesian fusion forest estimates each patient's effect far more precisely than the trial alone.
+The Bayesian fusion forest estimates each patient's effect with lower posterior variance than the trial alone.
 Figure~\ref{fig:cate} shows the subject-level acceleration factor for every patient, ordered by posterior mean.
 The estimates lie above one, so combination helps almost everyone.
 The size of the gain differs across patients.
@@ -50,7 +50,7 @@ The average 95\% credible-interval width falls from $3.16$ to $1.21$ on the acce
 The fusion sharpens the individual estimates.
 This contrasts with the average effects presented above: the fusion interval there is slightly wider, because the Bayesian bootstrap propagates uncertainty about the target population's covariate distribution.
 
-\begin{figure}[!t]
+\begin{figure}[!tb]
   \centering
   \includegraphics[width=0.8\linewidth]{cate_caterpillar_manuscript.pdf}
   \caption{Subject-level acceleration factor for every
@@ -61,48 +61,13 @@ This contrasts with the average effects presented above: the fusion interval the
   \label{fig:cate}
 \end{figure}
 
-We compare the fusion estimates with a flexible deep-learning competitor on the cohort.
-We fit a deep accelerated failure time network as an S- and a T-learner, on the trial alone and on a naive pool of both sources (Supplementary Materials~\ref{sm:analysis-additional}).
-We report in Table~\ref{tab:dnn-compare} the only two quantities a point predictor yields on the causal scale: the mean width of the per-patient interval and the share of patients at least $95\%$ certain to benefit.
-Supplementary Materials~\ref{sm:analysis-additional} plot the per-patient acceleration factor and its uncertainty for each method.
-The deep neural network reaches a different conclusion for each combination of learner and pooling.
-The share certain to benefit ranges from $7.8\%$ under the pooled T-learner to $96.6\%$ under the pooled S-learner, and the interval width ranges just as widely.
-No principled rule selects among these configurations.
-The pooled S-learner nearly matches the fusion ($96.6\%$ against $96.4\%$), but the equally defensible pooled T-learner reverses it.
-Its probability of benefit is in any case a bootstrap proportion, not a posterior probability.
-The S-learners give the narrowest intervals of all.
-The simulation showed such intervals undercover, so their narrowness reflects overconfidence rather than precision.
+We also fit the flexible machine-learning predictors of the simulation study to this cohort.
+None of them targets a causal contrast, and none offers a mechanism for combining a randomised with a confounded source.
+We fit a deep accelerated failure time network, gradient-boosted trees, and Buckley--James boosting over extreme learning machines and over regression trees, each as an S- and a T-learner, on the trial alone and on a naive pool of both sources.
+Across the sixteen resulting configurations the share of patients declared at least $95\%$ certain to benefit ranges from $0.0\%$ to $100\%$, and no principled rule selects among them.
+Interval width cannot decide between the methods here, because the cohort supplies no ground truth: a narrow interval may reflect genuine precision or mere overconfidence.
+We report the comparison in full in Supplementary Materials~\ref{sm:analysis-competitors}.
 The Bayesian fusion forest instead gives a single coherent answer, with calibrated intervals and a posterior probability of benefit for every patient.
-
-
-\begin{table}[!t]
-  \centering
-  \small
-  \begin{tabular}{@{}lrr@{}}
-    \toprule
-    Method                        & Mean 95\% width & $\geq 95\%$ certain \\
-                                  & (AF scale)      & of benefit (\%)     \\
-    \midrule
-    Bayesian fusion forest        & $1.21$ & $96.4$ \\
-    Trial-only causal forest      & $3.16$ & $36.8$ \\
-    \addlinespace
-    Deep network, trial-only, S   & $0.58$ & $77.5$ \\
-    Deep network, trial-only, T   & $1.79$ & $25.8$ \\
-    Deep network, pooled, S       & $0.88$ & $96.6$ \\
-    Deep network, pooled, T       & $2.34$ & $7.8$  \\
-    \bottomrule
-  \end{tabular}
-  \caption{Comparison with a deep-learning competitor over the combined
-    RCT + MACS cohort ($n = 2144$). ``Mean 95\% width'' is the average width of
-    the per-patient interval on the acceleration-factor scale. The last column
-    is the percentage of patients at least $95\%$ certain to benefit, that is
-    with $\p(\tau(x) > 0 \mid \text{data}) \geq 0.95$; for the deep network this
-    probability is a bootstrap proportion rather than a posterior. The deep
-    network is fitted as an S- or T-learner on the trial alone or on a naive
-    pool of both sources; the setup and the subject-level estimates are in
-    Supplementary Materials~\ref{sm:analysis-additional}.}
-  \label{tab:dnn-compare}
-\end{table}
 
 We investigate which patient characteristics drive the variation in benefit.
 We summarise the treatment-effect forest $\tau$ by the posterior projection, with a single regression tree as the second-stage model (CART; \citealp{breiman1984cart}).
@@ -115,7 +80,7 @@ Every leaf exceeds $1.4$, so all subgroups benefit.
 The treatment benefit is largest at high CD8.
 
 \definecolor{splitfill}{RGB}{230,244,250}
-\begin{figure}[!b]
+\begin{figure}[!tb]
   \centering
   % First arg of \resizebox is the target width -- change this fraction
   % to scale the whole figure uniformly (height auto-follows via !).
@@ -141,13 +106,13 @@ The treatment benefit is largest at high CD8.
     \node[splitn] (raceC) at ( 5.70, 1.9) {race};
 
     % Leaves
-    \node[leafn] (L1) at (-5.4, 0) {$1.45$\\$[1.05,\,1.92]$\\$n = 124$};
-    \node[leafn] (L2) at (-3.6, 0) {$1.51$\\$[1.19,\,1.87]$\\$n = 381$};
-    \node[leafn] (L3) at (-1.4, 0) {$1.60$\\$[1.31,\,1.92]$\\$n = 330$};
-    \node[leafn] (L4) at ( 0.8, 0) {$1.65$\\$[1.25,\,2.13]$\\$n = 107$};
-    \node[leafn] (L5) at ( 2.6, 0) {$1.72$\\$[1.43,\,2.07]$\\$n = 425$};
-    \node[leafn] (L6) at ( 4.8, 0) {$1.76$\\$[1.33,\,2.32]$\\$n = 178$};
-    \node[leafn] (L7) at ( 6.6, 0) {$1.83$\\$[1.51,\,2.22]$\\$n = 599$};
+    \node[leafn] (L1) at (-5.4, 0) {$1.45$\\$[1.05;1.92]$\\$n = 124$};
+    \node[leafn] (L2) at (-3.6, 0) {$1.51$\\$[1.19;1.87]$\\$n = 381$};
+    \node[leafn] (L3) at (-1.4, 0) {$1.60$\\$[1.31;1.92]$\\$n = 330$};
+    \node[leafn] (L4) at ( 0.8, 0) {$1.65$\\$[1.25;2.13]$\\$n = 107$};
+    \node[leafn] (L5) at ( 2.6, 0) {$1.72$\\$[1.43;2.07]$\\$n = 425$};
+    \node[leafn] (L6) at ( 4.8, 0) {$1.76$\\$[1.33;2.32]$\\$n = 178$};
+    \node[leafn] (L7) at ( 6.6, 0) {$1.83$\\$[1.51;2.22]$\\$n = 599$};
 
     % Edges
     \draw[edgeln] (root) -- (mid1)  node[elabel] {$\le 800$};
@@ -166,7 +131,7 @@ The treatment benefit is largest at high CD8.
     \draw[edgeln] (raceC) -- (L7) node[elabel] {white};
   \end{tikzpicture}}
   \caption{Regression-tree summary of the acceleration factor
-    $\exp(\tau(x))$ from the fusion forest. We fit the tree to the
+    $\exp\{\tau(x)\}$ from the Bayesian fusion forest. We fit the tree to the
     posterior-mean log-time CATE on the six baseline covariates. Each leaf
     gives the within-leaf average acceleration factor, as a posterior mean
     and 95\% credible interval.}
@@ -185,8 +150,8 @@ We summarise the deviation forest $d(x)$ by a projection on a linear model.
 The deviation forest measures how the baseline prognosis differs between the trial and the real-world data.
 We project $d(\cdot)$ onto the covariates by least squares and present the results in Table~\ref{tab:projection}.
 The gap is dominated by a constant shift.
-The intercept is $1.70$ (95\% CrI: $1.31$ to $2.10$), so the observational baseline sits well above the trial.
-Among the covariates, only prior antiretroviral years moves the gap, by $0.27$ (95\% CrI: $-0.01$ to $0.55$).
+The intercept is $1.70$ ($95\%$ credible interval $[1.31;2.10]$), so the observational baseline sits well above the trial.
+Among the covariates, only prior antiretroviral years moves the gap, by $0.27$ ($95\%$ credible interval $[-0.01;0.55]$).
 Age, CD4, CD8, calendar year, and race have coefficients near zero, with intervals covering zero.
 The baseline prognosis therefore differs mainly through a large average shift.
 This shift likely reflects population and measurement differences which the six covariates do not capture.
@@ -200,50 +165,48 @@ The Buckley--James Q-learner \citep{lee2026bjboost} likewise recommends it for o
 We found that the treatment effect varies with CD8 count and race.
 This agrees with evidence that the benefit of combination therapy varies with baseline risk \citep{kennedy2023}.
 The baseline prognosis differs between the sources, mainly through a large average shift and in part through its dependence on prior antiretroviral exposure.
-The fusion delivers this certainty with calibrated uncertainty that a black-box predictor does not provide.
+The fusion delivers this certainty with calibrated uncertainty.
 
-\begin{table}[!t]
+\begin{table}[!tb]
   \centering
-  \begin{minipage}[t]{0.46\textwidth}
-    \centering
-    \small
-    \begin{tabular}{@{}lrr@{}}
-      \toprule
-      $\p(\tau(x_i) > 0 \mid \text{data})$        & Fusion & Trial-only \\
-      \midrule
-      $(0.99, 1]$    & $0.767$ & $0.180$ \\
-      $(0.95, 0.99]$ & $0.206$ & $0.198$ \\
-      $(0.75, 0.95]$ & $0.028$ & $0.364$ \\
-      $(0.25, 0.75]$ & $0.000$ & $0.245$ \\
-      $[0, 0.25]$    & $0.000$ & $0.014$ \\
-      \bottomrule
-    \end{tabular}
-    \captionof{table}{Posterior probability of benefit over the trial
-      population. Higher bins give stronger evidence of benefit, the
-      lowest evidence of harm. Entries are fractions of patients.}
-    \label{tab:hte-summary}
-  \end{minipage}
-  \hfill
-  \begin{minipage}[t]{0.50\textwidth}
-    \centering
-    \small
-    \begin{tabular}{@{}lrr@{}}
-      \toprule
-      Term          & Coefficient & 95\% CrI \\
-      \midrule
-      Intercept     & $1.701$  & $(1.312, 2.099)$ \\
-      \midrule
-      Age           & $-0.003$ & $(-0.020, 0.015)$ \\
-      CD4           & $0.001$  & $(-0.001, 0.002)$ \\
-      CD8           & $0.000$  & $(-0.000, 0.000)$ \\
-      Calendar year & $-0.032$ & $(-0.256, 0.194)$ \\
-      Race          & $0.071$  & $(-0.304, 0.443)$ \\
-      Prior ART, y  & $0.269$  & $(-0.008, 0.550)$ \\
-      \bottomrule
-    \end{tabular}
-    \captionof{table}{Linear projection of the deviation forest
-      $d(x)$ onto the covariates: posterior mean coefficient and 95\%
-      credible interval on the log-transformed time scale.}
-    \label{tab:projection}
-  \end{minipage}
+  \caption{Posterior probability of benefit over the trial
+    population. Higher bins give stronger evidence of benefit, the
+    lowest evidence of harm. Entries are fractions of patients.}
+  \label{tab:hte-summary}
+  \small
+  \begin{tabular}{@{}lrr@{}}
+    \toprule
+    $\p(\tau(x_i) > 0 \mid \text{data})$        & Fusion & Trial-only \\
+    \midrule
+    $(0.99, 1]$    & $0.767$ & $0.180$ \\
+    $(0.95, 0.99]$ & $0.206$ & $0.198$ \\
+    $(0.75, 0.95]$ & $0.028$ & $0.364$ \\
+    $(0.25, 0.75]$ & $0.000$ & $0.245$ \\
+    $[0, 0.25]$    & $0.000$ & $0.014$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[!tb]
+  \centering
+  \caption{Linear projection of the deviation forest
+    $d(x)$ onto the covariates: posterior mean coefficient and $95\%$
+    credible interval on the log-transformed time scale. The CD4 and CD8
+    coefficients are reported per $100$ cells/mm$^3$.}
+  \label{tab:projection}
+  \small
+  \begin{tabular}{@{}lrr@{}}
+    \toprule
+    Term          & Coefficient & $95\%$ credible interval \\
+    \midrule
+    Intercept     & $1.701$  & $[1.312;2.099]$ \\
+    \midrule
+    Age, y                    & $-0.003$ & $[-0.020;0.015]$ \\
+    CD4, per 100 cells/mm$^3$ & $0.061$  & $[-0.064;0.189]$ \\
+    CD8, per 100 cells/mm$^3$ & $0.005$  & $[-0.019;0.032]$ \\
+    Calendar year & $-0.032$ & $[-0.256;0.194]$ \\
+    Race          & $0.071$  & $[-0.304;0.443]$ \\
+    Prior ART, y  & $0.269$  & $[-0.008;0.550]$ \\
+    \bottomrule
+  \end{tabular}
 \end{table}

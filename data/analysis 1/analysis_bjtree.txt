@@ -1,0 +1,10 @@
+BJ-trees competitor (S- and T-learner) vs the fusion forest
+Combined RCT + MACS cohort, B = 100 stratified bootstrap.
+MACS interval-censored deaths approximated by the right-censored
+last-lab-year encoding (see ANALYSIS_SM.tex).
+
+          method af_ci_width pct_benefit
+    bjtree-RCT-S       0.155       100.0
+    bjtree-RCT-T       1.309        70.8
+ bjtree-Pooled-S       0.321       100.0
+ bjtree-Pooled-T       1.853        68.1

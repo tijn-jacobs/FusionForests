@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Package Overview
 
-FusionForests is an R package for Bayesian tree ensemble models focused on data fusion and causal inference. The flagship model `FusionForest` combines RCT and observational study data using commensurate priors. It also includes `SimpleBART` for standard single-forest BART. The package is under active development — API may change.
+FusionForests is an R package for Bayesian tree ensemble models focused on data fusion and causal inference. The flagship model `FusionForest` combines RCT and observational study data using commensurate priors. It also includes `SimpleBART` (single-forest BART) and `SimpleBCF` (Bayesian causal forest), posterior summaries via `fusion_estimand`/`fusion_projection`, and re-exports the single-study models from the CRAN `ShrinkageTrees` package. Accompanies the paper "Bayesian fusion forests for heterogeneous treatment effects on survival from randomised and real-world data".
 
 ## Build & Development Commands
 
@@ -16,7 +16,7 @@ devtools::install()
 devtools::test()
 
 # Run a single test file
-testthat::test_file("tests/testthat/test-ShrinkageTrees.R")
+testthat::test_file("tests/testthat/test-FusionForest.R")
 
 # Full R CMD check (build + tests + examples + documentation)
 devtools::check()
@@ -50,19 +50,20 @@ devtools::load_all()        # recompiles and loads
 - `CommensurateParameters.h/cpp` — Commensurate prior for information borrowing
 - `Prerequisites.h` — Common includes, constants (PI, log2pi), utility math functions
 
-Compiled with OpenMP and aggressive optimization (`-O3 -march=native -funroll-loops -ffast-math`) via `src/Makevars`.
+Compiled with OpenMP via `src/Makevars` (portable flags only — CRAN rejects `-O3 -march=native -ffast-math`).
 
 ### R layer (`R/`)
 
 - `FusionForest.R` — Main export: data fusion model
-- `SimpleBART.R` — Main export: single-forest BART
-- `ShrinkageTrees.R`, `HorseTrees.R`, `CausalShrinkageForest.R`, `CausalHorseForest.R` — Legacy wrapper functions (not exported in NAMESPACE)
-- `SurvivalWrappers.R` — Survival analysis wrappers (SurvivalBART, SurvivalDART, SurvivalBCF, etc.)
-- `methods.R` — S3 methods (print, summary, predict, plot)
+- `FusionForest-methods.R` — S3 methods (print, summary) for FusionForest fits
+- `SimpleBART.R`, `SimpleBCF.R` — Single-forest BART and Bayesian causal forest
+- `estimands.R` — `fusion_estimand()`: posterior causal survival estimands
+- `projection.R` — `fusion_projection()`: posterior linear projections
+- `reexports.R` — Re-exports of single-study models from the CRAN `ShrinkageTrees` package (Imports)
 - `helpers.R` — Utility functions
 - `RcppExports.R` — Auto-generated Rcpp bindings (do not edit manually)
 
-Only `FusionForest` and `SimpleBART` are exported in NAMESPACE.
+Exported: `FusionForest`, `SimpleBART`, `SimpleBCF`, `fusion_estimand`, `fusion_projection`, plus the ShrinkageTrees re-exports.
 
 ### Tests (`tests/testthat/`)
 

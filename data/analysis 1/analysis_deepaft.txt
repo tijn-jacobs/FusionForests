@@ -4,9 +4,9 @@ MACS interval-censored deaths approximated by the right-censored
 last-lab-year encoding (see ANALYSIS_SM.tex).
 
               method af_ci_width pct_benefit
-       deepAFT-RCT-S       0.576       77.47
-       deepAFT-RCT-T       1.793       25.84
-    deepAFT-Pooled-S       0.875       96.64
-    deepAFT-Pooled-T       2.342        7.84
-   FusionForest (M2)       1.208       96.36
- Trial-only CSF (M1)       3.155       36.85
+       deepAFT-RCT-S        1.06        0.00
+       deepAFT-RCT-T        5.09        0.14
+    deepAFT-Pooled-S        1.16       96.08
+    deepAFT-Pooled-T        3.32        6.58
+   FusionForest (M2)        1.21       96.36
+ Trial-only CSF (M1)        3.15       36.85

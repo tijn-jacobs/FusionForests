@@ -32,9 +32,16 @@ d_fuse <- d_fuse[is.finite(d_fuse$log_time), ]
 src_M2 <- as.integer(d_fuse$source == "RCT")
 
 ## --- Caterpillar helper (mirrors make_caterpillar() in analysis.R) -------
-src_cols <- c(RCT = "#1f78b4", RWD = "#e31a1c")
-make_caterpillar <- function(samples, src, out_path,
-                             width = 14, height = 8, xlim = NULL) {
+## Okabe-Ito, matching analysis.R and every other figure in the paper.
+src_cols <- c(RCT = "#0072B2", RWD = "#D55E00")
+## `compact = TRUE` emits a panel for the small-multiples grid in the SM: no
+## legend, no axis titles, and a canvas whose base_size survives placement at a
+## quarter of the text width.
+make_caterpillar <- function(samples, src, out_path, compact = FALSE,
+                             width = if (compact) 3.2 else 14,
+                             height = if (compact) 2.4 else 8,
+                             base_size = if (compact) 14 else 24,
+                             xlim = NULL) {
   af      <- exp(samples)
   mean_af <- colMeans(af)
   lo_af   <- apply(af, 2, quantile, 0.025)
@@ -51,17 +58,19 @@ make_caterpillar <- function(samples, src, out_path,
     scale_colour_manual(values = src_cols) +
     coord_cartesian(xlim = xlim) +   # NULL = automatic; c(lo, hi) to fix the AF axis
     scale_y_continuous(breaks = NULL) +
-    labs(y = "Patients (ordered by posterior mean)",
-         x = expression("Acceleration factor"), colour = NULL) +
+    labs(y = if (compact) NULL else "Patients (ordered by posterior mean)",
+         x = if (compact) NULL else expression("Acceleration factor"),
+         colour = NULL) +
     guides(colour = guide_legend(
       override.aes = list(linewidth = 4, alpha = 1, size = 0))) +
-    theme_minimal(base_size = 24) +
+    theme_minimal(base_size = base_size) +
     theme(text              = element_text(family = "Times"),
-          legend.position   = "top",
-          legend.text       = element_text(size = 24, family = "Times"),
+          legend.position   = if (compact) "none" else "top",
+          legend.text       = element_text(size = base_size, family = "Times"),
           legend.key.width  = unit(40, "pt"),
           legend.key.height = unit(16, "pt"),
           legend.spacing.x  = unit(8, "pt"),
+          plot.margin       = if (compact) margin(2, 4, 2, 2) else margin(6, 6, 6, 6),
           panel.grid.major.y = element_blank(),
           panel.grid.minor.y = element_blank(),
           panel.background  = element_rect(fill = "white", colour = NA))
@@ -92,5 +101,9 @@ for (f in dd$fits) {
     t(f$draws), src_M2,
     file.path(fig_dir, paste0("cate_caterpillar_", tag, ".pdf")),
     xlim = dd_xlims[[tag]])
+  make_caterpillar(
+    t(f$draws), src_M2,
+    file.path(fig_dir, paste0("cate_caterpillar_", tag, "_small.pdf")),
+    compact = TRUE, xlim = dd_xlims[[tag]])
 }
 cat("Done: four deepAFT caterpillars written to ", fig_dir, "\n", sep = "")

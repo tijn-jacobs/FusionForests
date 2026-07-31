@@ -83,9 +83,37 @@ or on \code{target_source}.}
 }
 
 Population-averaged versions use Bayesian-bootstrap weights drawn fresh
-at each MCMC iteration (\code{w^{(r)} \sim Dirichlet(1, ..., 1)}), as
+at each MCMC iteration (\eqn{w^{(r)} \sim Dirichlet(1, \ldots, 1)}), as
 in Rubin (1981); set \code{bayesian_bootstrap = FALSE} for equal
 weights.
+}
+\examples{
+# Right-censored survival fusion fit with stored posterior samples
+set.seed(1)
+n <- 100
+X <- matrix(rnorm(n * 3), n, 3)
+s <- rbinom(n, 1, 0.5)
+a <- rbinom(n, 1, 0.5)
+true_time <- exp(1 + X[, 1] + 0.5 * a + 0.3 * rnorm(n))
+cens_time <- rexp(n, rate = 1 / (2 * mean(true_time)))
+time   <- pmin(true_time, cens_time)
+status <- as.integer(true_time <= cens_time)
+
+fit <- FusionForest(
+  y = time, status = status,
+  X_train_control = X, X_train_treat = X,
+  treatment_indicator_train = a, source_indicator_train = s,
+  X_test_control = X, X_test_treat = X,
+  treatment_indicator_test = a, source_indicator_test = s,
+  outcome_type = "right-censored",
+  N_post = 50, N_burn = 25,
+  store_posterior_sample = TRUE, verbose = FALSE
+)
+
+# Posterior draws of the acceleration factor at each test point
+af <- fusion_estimand(fit, estimand = "AF")
+quantile(colMeans(af), c(0.25, 0.5, 0.75))
+
 }
 \references{
 Rubin, D.~B. (1981).  The Bayesian bootstrap.

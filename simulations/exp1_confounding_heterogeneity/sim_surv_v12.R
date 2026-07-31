@@ -1585,15 +1585,18 @@ print(summary_tbl[ord, c("lambda_d", "lambda_u", "population", "method",
 # lambda_d = 1) and one sweeping lambda_d (at lambda_u = 1).
 a <- res[res$population == "All", ]
 meth <- c("Fusion", "RCT-only", "RWD-only")
-# Estimator colours: darker green (Fusion), orange (RCT-only), teal (RWD-only).
-cols <- c("goldenrod1", "olivedrab", "firebrick3")
+# Estimator colours from the Okabe-Ito colourblind-safe palette, shared across
+# every figure in the paper: Fusion is always orange, the trial always green,
+# the real-world data always vermillion.
+#   orange #E69F00 | bluish green #009E73 | vermillion #D55E00
+cols <- c("#E69F00", "#009E73", "#D55E00")   # Fusion, RCT-only, RWD-only
 a$method <- factor(a$method, levels = meth)
 metrics  <- c("rmse", "bias", "coverage", "postvar")
 # Pretty y-axis labels for each metric.
 metric_labs <- c(rmse = "RMSE", bias = "Bias", coverage = "Coverage",
                  width = "CI width", postvar = "Posterior variance")
 
-fig_dir <- "simulations/exp1_confounding_heterogeneity/figures"
+fig_dir <- "notes/general/figures"   # write straight to the manuscript figures dir
 dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
 # Draws the 2x2 metric grid to the active device (so it shows in the RStudio
 # plot pane) and, when `file` is given, also writes the same figure to PDF.
@@ -1603,12 +1606,13 @@ plot_panel_grid <- function(dat, group, group_lab, file = NULL, ylims = NULL) {
     op <- par(mfrow = c(2, 2),
               family = "serif",         # serif font (Times / Computer Modern)
               oma = c(5, 0, 0, 0),       # outer bottom margin for shared legend
-              mar = c(6.5, 7.5, 2, 2),   # per-panel margins (space between panels)
-              mgp = c(4.3, 1.3, 0),      # axis-title / label / line positions
+              mar = c(6.5, 8.8, 2, 2),   # per-panel margins (space between panels)
+              mgp = c(5.6, 1.3, 0),      # axis-title / label / line positions
               # Font sizes ~10% above the manuscript KM figure: axis titles
               # ~33 pt (cex 2.75) and tick labels ~26 pt (cex 2.2) on the
               # default 12 pt device.
-              cex.lab = 2.75, cex.axis = 2.2)
+              cex.lab = 2.75, cex.axis = 2.2,
+              las = 1)                   # upright (horizontal) y-axis numbers
     nb  <- length(meth)               # estimators per group
     ng  <- nlevels(dat[[group]])      # number of swept-lambda levels
     gap <- 1.5                       # extra horizontal space between groups

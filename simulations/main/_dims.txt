@@ -1,2 +1,0 @@
-combined_rows: 576
-per_cell: 144,144,144,144

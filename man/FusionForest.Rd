@@ -285,3 +285,25 @@ The earlier three-forest decomposition with a single prognostic
 re-exposed by accepting \code{"three-forest"} again in the
 \code{decomposition} argument.
 }
+\examples{
+# Small simulated fusion example combining an RCT and RWD
+set.seed(1)
+n <- 100
+X <- matrix(rnorm(n * 3), n, 3)
+s <- rbinom(n, 1, 0.5)  # 1 = RCT, 0 = RWD
+a <- rbinom(n, 1, 0.5)  # treatment
+y <- X[, 1] + 0.5 * a + rnorm(n)
+
+fit <- FusionForest(
+  y = y,
+  X_train_control = X,
+  X_train_treat = X,
+  treatment_indicator_train = a,
+  source_indicator_train = s,
+  N_post = 50, N_burn = 25,
+  verbose = FALSE
+)
+print(fit)
+summary(fit)
+
+}

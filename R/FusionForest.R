@@ -199,6 +199,27 @@
 #'     (only present when \code{store_posterior_sample = TRUE}).}
 #' }
 #'
+#' @examples
+#' # Small simulated fusion example combining an RCT and RWD
+#' set.seed(1)
+#' n <- 100
+#' X <- matrix(rnorm(n * 3), n, 3)
+#' s <- rbinom(n, 1, 0.5)  # 1 = RCT, 0 = RWD
+#' a <- rbinom(n, 1, 0.5)  # treatment
+#' y <- X[, 1] + 0.5 * a + rnorm(n)
+#'
+#' fit <- FusionForest(
+#'   y = y,
+#'   X_train_control = X,
+#'   X_train_treat = X,
+#'   treatment_indicator_train = a,
+#'   source_indicator_train = s,
+#'   N_post = 50, N_burn = 25,
+#'   verbose = FALSE
+#' )
+#' print(fit)
+#' summary(fit)
+#'
 #' @importFrom Rcpp evalCpp
 #' @useDynLib FusionForests, .registration = TRUE
 #' @importFrom stats sd qchisq qnorm runif
@@ -716,7 +737,14 @@ FusionForest <- function(
     timescale     = timescale,
     outcome_type  = outcome_type,
     decomposition = decomposition,
-    error_dist    = error_dist
+    error_dist    = error_dist,
+    n_train       = n_train,
+    n_rct         = sum(source_indicator_train == 1),
+    n_rwd         = sum(source_indicator_train == 0),
+    p_control     = p_control,
+    p_treat       = p_treat,
+    N_post        = N_post,
+    N_burn        = N_burn
   )
   class(fit) <- c("FusionForest", class(fit))
 

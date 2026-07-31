@@ -66,12 +66,16 @@ print(summary_tbl[ord, c("p", "population", "method",
       row.names = FALSE, digits = 3)
 
 # ── Figures (written to the manuscript figures directory) ─────────────────────
-fig_dir <- "simulations/exp3_covariate_dimension/figures"
+fig_dir <- "notes/general/figures"   # write straight to the manuscript figures dir
 dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
 
 meth        <- c("Fusion", "Fusion-oracle", "RCT-only", "RWD-only")
-# Fusion (olive), oracle floor (dark green, dashed), RCT-only (gold), RWD (red).
-cols        <- c("olivedrab", "darkgreen", "goldenrod1", "firebrick3")
+# Okabe-Ito colourblind-safe palette, matching the other figures: Fusion orange,
+# trial green, real-world vermillion. NOTE this swaps the previous assignment --
+# Fusion was green here and gold elsewhere, RCT-only the other way round. The
+# oracle is a reference floor rather than an estimator, so it takes black.
+#   orange #E69F00 | blue #0072B2 | reddish purple #CC79A7 | vermillion #D55E00
+cols        <- c("#E69F00", "#0072B2", "#CC79A7", "#D55E00")
 metrics     <- c("rmse", "bias", "coverage", "postvar")
 metric_labs <- c(rmse = "RMSE", bias = "Bias", coverage = "Coverage",
                  width = "CI width", postvar = "Posterior variance")
@@ -99,8 +103,9 @@ plot_vs_p <- function(stbl, pop = "All", file = NULL, z = 1.96, sm_degree = 3) {
   }
   render <- function() {
     op <- par(mfrow = c(2, 2), family = "serif",
-              oma = c(5, 0, 2, 0), mar = c(6.5, 7.5, 2, 2),
-              mgp = c(4.3, 1.3, 0), cex.lab = 2.4, cex.axis = 2.0)
+              oma = c(5, 0, 2, 0), mar = c(6.5, 8.8, 2, 2),
+              mgp = c(5.6, 1.3, 0), cex.lab = 2.4, cex.axis = 2.0,
+              las = 1)                   # upright (horizontal) y-axis numbers
     for (metric in metrics) {
       se_col <- paste0(metric, "_se")
       lo_all <- dat[[metric]] - z * dat[[se_col]]
@@ -177,8 +182,8 @@ ratio_vs_p <- function(stbl, raw, pop = "All", file = NULL, z = 1.96,
     }))
   }
   series <- list(
-    list(num = "Fusion",        col = "olivedrab", lab = "Fusion / RCT-only"),
-    list(num = "Fusion-oracle", col = "darkgreen", lab = "Fusion-oracle / RCT-only"))
+    list(num = "Fusion",        col = "#E69F00", lab = "Fusion / RCT-only"),
+    list(num = "Fusion-oracle", col = "#0072B2", lab = "Fusion-oracle / RCT-only"))
   panels <- c(rmse    = "RMSE ratio (vs RCT-only)",
               postvar = "Posterior-variance ratio (vs RCT-only)")
   summ <- list()
@@ -186,8 +191,9 @@ ratio_vs_p <- function(stbl, raw, pop = "All", file = NULL, z = 1.96,
     summ[[paste(m, s$num)]] <- ratio_summary(m, s$num)
   render <- function() {
     op <- par(mfrow = c(1, 2), family = "serif",
-              oma = c(5, 0, 2, 0), mar = c(6.5, 8.5, 2, 2),
-              mgp = c(4.8, 1.3, 0), cex.lab = 2.2, cex.axis = 1.9)
+              oma = c(5, 0, 2, 0), mar = c(6.5, 9.8, 2, 2),
+              mgp = c(6.0, 1.3, 0), cex.lab = 2.2, cex.axis = 1.9,
+              las = 1)                   # upright (horizontal) y-axis numbers
     for (m in names(panels)) {
       ss <- lapply(series, function(s) summ[[paste(m, s$num)]])
       yl <- range(c(1, unlist(lapply(ss, function(d)

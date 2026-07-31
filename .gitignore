@@ -15,7 +15,8 @@
 src/*.so
 src/*.dll
 src/*.o
-src/RcppExports.cpp
+# NOTE: src/RcppExports.cpp must be tracked — the package cannot be
+# installed from GitHub without it.
 
 # R build output
 *.tar.gz
@@ -84,4 +85,13 @@ tests/testthat/_snaps/
 **/MWCCS PDS/
 
 # Backups
-**/backups/
+**/backups/Rplots.pdf
+
+# Stray plot output at repo root
+Rplots.pdf
+
+# Local-only folders (not part of the package or the paper's simulations)
+archive/
+backups/
+file
+notes/

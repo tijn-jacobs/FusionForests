@@ -1,6 +1,5 @@
 ^sticker$
 ^simulations$
-^NEWS\.md$
 ^paper$
 ^\.github$
 ^\.devcontainer$
@@ -11,11 +10,14 @@
 ^examples$
 
 ## Heavy folders not part of the package proper
+^archive$
+^backups$
 ^data$
 ^notes$
 ^info$
 ^inst/AFTrees-master$
 ^src/deprecated$
+^\.vscode$
 
 ## Stray files at the repo root
 ^\.RDataTmp$
@@ -25,3 +27,5 @@
 ^error_distribution_notes\.md$
 ^texput\.log$
 ^CLAUDE\.md$
+^Rplots\.pdf$
+^file$
