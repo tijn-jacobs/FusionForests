@@ -1,0 +1,148 @@
+\documentclass[11pt]{article}
+
+%% Page geometry
+\usepackage[a4paper, margin=1in]{geometry}
+
+%% Core math + fonts
+\usepackage{amsthm,amsmath,amsfonts,amssymb}
+\usepackage{microtype}
+
+%% Citations
+\usepackage[authoryear, round]{natbib}
+
+%% Hyperlinks
+\usepackage[colorlinks, citecolor=blue, urlcolor=blue, linkcolor=blue]{hyperref}
+\usepackage{xurl}
+
+%% No paragraph indentation, blank line between paragraphs
+\usepackage{parskip}
+
+%% Graphics & figures
+\usepackage{graphicx}
+\graphicspath{{./images/}}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{booktabs}
+
+%% Algorithms
+\usepackage[linesnumbered, ruled, vlined]{algorithm2e}
+
+%% TikZ for diagrams
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,fit,calc,positioning}
+\tikzset{box/.style={draw, diamond, thick, text centered, minimum height=0.5cm, minimum width=1cm}}
+\tikzset{line/.style={draw, thick, -latex'}}
+
+%% Misc
+\usepackage{comment}
+\usepackage{dsfont}
+
+%% Theorem environments
+\theoremstyle{plain}
+\newtheorem{axiom}{Axiom}
+\newtheorem{claim}[axiom]{Claim}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem*{example}{Example}
+\newtheorem*{fact}{Fact}
+
+\theoremstyle{remark}
+\newtheorem{case}{Case}
+
+%% Custom math commands
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\1}{\mathds{1}}
+\newcommand{\p}{\mathbb{P}}
+\renewcommand{\H}{\mathcal{H}}
+\newcommand{\T}{\mathcal{T}}
+\newcommand{\ind}{\perp\!\!\!\perp}
+
+%% Cross-references to supplement (kept from original)
+\makeatletter
+\newcommand{\fakeappendixlabels}{
+  \newlabel{appendix:outer_gibbs}{{S.1}{0}}
+  \newlabel{appendix:comp_details}{{S.2}{0}}
+  \newlabel{appendix:main_sim}{{S.3}{0}}
+  \newlabel{appendix:additional_sim}{{S.4}{0}}
+  \newlabel{appendix:clinical_covariates}{{S.5}{0}}
+  \newlabel{appendix:landmark}{{S.6}{0}}
+}
+\makeatother
+\fakeappendixlabels
+
+
+\title{Horseshoe Forests for High-Dimensional Causal Survival Analysis}
+
+\author{
+  Tijn Jacobs\thanks{Department of Mathematics, Vrije Universiteit Amsterdam. \texttt{t.jacobs@vu.nl}} \and
+  Wessel N.\ van Wieringen\thanks{Department of Epidemiology and Data Science, Amsterdam University Medical Centre. \texttt{w.n.van.wieringen@vu.nl}} \and
+  St\'ephanie L.\ van der Pas\thanks{Department of Mathematics, Vrije Universiteit Amsterdam. \texttt{s.l.vander.pas@vu.nl}}
+}
+
+\date{\today}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.8em}
+
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We develop a Bayesian tree ensemble model to estimate heterogeneous treatment effects in censored survival data with high-dimensional covariates.
+Instead of imposing sparsity through the tree structure, we place a horseshoe prior directly on the step heights to achieve adaptive global--local shrinkage.
+This strategy allows flexible regularisation and reduces noise.
+We develop a reversible jump Gibbs sampler to accommodate the non-conjugate horseshoe prior within the tree ensemble framework.
+We show through extensive simulations that the method accurately estimates treatment effects in high-dimensional covariate spaces, at various sparsity levels, and under non-linear treatment effect functions.
+We further illustrate the practical utility of the proposed approach by a re-analysis of pancreatic ductal adenocarcinoma (PDAC) survival data from The Cancer Genome Atlas.
+
+\medskip
+\noindent\textbf{Keywords:} Causal inference; heterogeneous treatment effects; survival analysis; high-dimensional; tree ensembles; shrinkage priors.
+\end{abstract}
+
+\input{introduction}
+\input{context}
+\input{model}
+\input{sampling}
+\input{simulation}
+\input{PDAC}
+\input{discussion}
+
+
+\section*{Acknowledgments}
+The software implementation is available on CRAN: \url{https://cran.r-project.org/package=ShrinkageTrees}.
+All data and replication code can be found at: \url{https://github.com/tijn-jacobs/ShrinkageTrees}.
+
+\section*{Funding}
+Tijn Jacobs and St\'ephanie van der Pas were funded by the European Union.
+Views and opinions expressed are however those of the author(s) only and do not necessarily reflect those of the European Union or the European Research Council Executive Agency.
+Neither the European Union nor the granting authority can be held responsible for them.
+This work is supported by ERC grant BayCause, nr.\ 101074802.
+
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+
+%% Supplementary material
+\newpage
+\appendix
+\renewcommand{\thesection}{S.\arabic{section}}
+\setcounter{section}{0}
+
+\section*{Supplementary Materials}
+\addcontentsline{toc}{section}{Supplementary Materials}
+
+\input{app_outer_gibbs} \newpage
+\input{app_comp_details} \newpage
+\input{app_main_sim} \newpage
+\input{app_continuous_simulations} \newpage
+\input{app_case_study} \newpage
+\input{app_landmark}
+
+
+\end{document}

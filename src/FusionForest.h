@@ -7,6 +7,8 @@
 Rcpp::List FusionForest_cpp(
   SEXP nSEXP, SEXP p_treatSEXP, SEXP p_controlSEXP, SEXP X_train_treatSEXP,
   SEXP X_train_controlSEXP, SEXP ySEXP, SEXP status_indicatorSEXP, SEXP is_survivalSEXP,
+  SEXP observed_left_timeSEXP, SEXP observed_right_timeSEXP,
+  SEXP interval_censoring_indicatorSEXP,
   SEXP treatment_indicatorSEXP, SEXP source_indicatorSEXP,
   SEXP n_testSEXP, SEXP X_test_controlSEXP, SEXP X_test_treatSEXP, SEXP X_test_deconfSEXP,
   SEXP treatment_indicator_testSEXP, SEXP source_indicator_testSEXP,
@@ -20,7 +22,14 @@ Rcpp::List FusionForest_cpp(
   SEXP sigma_knownSEXP, SEXP sigmaSEXP, SEXP lambdaSEXP, SEXP nuSEXP,
   SEXP N_postSEXP, SEXP N_burnSEXP,
   SEXP store_posterior_sampleSEXP,
-  SEXP verboseSEXP
+  SEXP verboseSEXP,
+  SEXP treatment_codingSEXP,
+  SEXP propensity_trainSEXP,
+  SEXP propensity_testSEXP,
+  SEXP mixture_modeSEXP,
+  SEXP mixture_KSEXP,
+  SEXP mixture_prior_atom_varianceSEXP,
+  SEXP mixture_mass_initSEXP
 );
 
 #endif // FUSIONFOREST_H

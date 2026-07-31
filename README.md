@@ -1,29 +1,98 @@
-# FusionForests <img src="https://img.shields.io/badge/R%3E%3D-4.1-blue" alt="R >= 4.1"> ![License: MIT](https://img.shields.io/badge/license-MIT-green) ![Status: Development](https://img.shields.io/badge/status-in%20development-orange)
+# FusionForests <img src="https://img.shields.io/badge/R%3E%3D-3.5-blue" alt="R >= 3.5"> ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
 <img src="sticker/FusionForests_hex.png" align="right" width="150"/>
 
-> **This package is under active development. The API may change without notice and features may be incomplete or unstable.**
+**FusionForests** is an R package for Bayesian tree ensemble models for
+**data fusion** and **causal inference**. The flagship model,
+`FusionForest()`, combines data from a randomised controlled trial (RCT)
+and an observational study (real-world data, RWD) in a single Bayesian
+framework, using a commensurate prior for adaptive information borrowing.
 
-## Overview
+The model targets heterogeneous treatment effects on continuous and
+(interval-)censored survival outcomes via an accelerated failure time
+formulation. The outcome is decomposed over separate tree forests — a
+control forest, a treatment forest, a deconfounding forest and,
+optionally, a deviation forest — so that the RWD can sharpen the RCT
+treatment effect estimate without importing its confounding.
 
-**FusionForests** is an R package for Bayesian tree ensemble models focused on **data fusion** and **causal inference**. The flagship model, `FusionForest`, combines data from a randomised controlled trial (RCT) and an observational study into a single Bayesian framework using commensurate priors for automatic information borrowing.
+## Installation
 
-The package also includes the full **FusionForests** suite for single-study causal inference and survival analysis.
+The development version can be installed from GitHub:
+
+```r
+# install.packages("remotes")
+remotes::install_github("tijn-jacobs/FusionForests")
+```
+
+Installation compiles C++ source code, so a working toolchain
+(Rtools on Windows, Xcode command line tools on macOS) is required.
+
+## Quick example
+
+```r
+library(FusionForests)
+
+# Simulated fusion data: an RCT and an RWD cohort
+set.seed(1)
+n <- 500
+X <- matrix(rnorm(n * 3), n, 3)
+s <- rbinom(n, 1, 0.5)  # 1 = RCT, 0 = RWD
+a <- rbinom(n, 1, 0.5)  # treatment
+true_time <- exp(1 + X[, 1] + 0.5 * a + 0.3 * rnorm(n))
+cens_time <- rexp(n, rate = 1 / (2 * mean(true_time)))
+time   <- pmin(true_time, cens_time)
+status <- as.integer(true_time <= cens_time)
+
+fit <- FusionForest(
+  y = time, status = status,
+  X_train_control = X, X_train_treat = X,
+  treatment_indicator_train = a, source_indicator_train = s,
+  X_test_control = X, X_test_treat = X,
+  treatment_indicator_test = a, source_indicator_test = s,
+  outcome_type = "right-censored",
+  store_posterior_sample = TRUE
+)
+print(fit)
+
+# Posterior draws of causal survival estimands at the test points
+af   <- fusion_estimand(fit, estimand = "AF")            # acceleration factor
+rmst <- fusion_estimand(fit, estimand = "RMST", time = 5) # RMST difference
+
+# Interpretable linear projection of the treatment effect surface
+colnames(X) <- paste0("x", 1:3)
+proj <- fusion_projection(fit, basis = ~ x1 + x2 + x3,
+                          X_eval = as.data.frame(X))
+```
+
+## Models
+
+| Function | Description |
+|---|---|
+| `FusionForest()` | RCT + RWD data fusion with commensurate-prior borrowing |
+| `fusion_estimand()` | Posterior causal survival estimands (survival difference, RMST, acceleration factor) |
+| `fusion_projection()` | Posterior linear projections of the treatment effect surface |
+| `SimpleBART()` | Single-forest BART |
+| `SimpleBCF()` | Bayesian causal forest (prognostic + treatment forest) |
+
+The single-study causal and survival models from the
+[ShrinkageTrees](https://cran.r-project.org/package=ShrinkageTrees)
+package (`CausalShrinkageForest()`, `SurvivalBART()`, and friends) are
+re-exported, so `library(FusionForests)` provides every model from the
+accompanying paper in one namespace.
 
 ## Reference
 
-> _Horseshoe Forests for High-Dimensional Causal Survival Analysis_
+The methodology is described in:
+
+> *Bayesian fusion forests for heterogeneous treatment effects on survival from randomised and real-world data*
+> T. Jacobs, S.L. van der Pas, W.N. van Wieringen
+> arXiv preprint (2026)
+
+The single-study horseshoe models are described in:
+
+> *Horseshoe Forests for High-Dimensional Causal Survival Analysis*
 > T. Jacobs, W.N. van Wieringen, S.L. van der Pas
-> https://arxiv.org/abs/2507.22004
-
-## Development notes
-
-The C++ backend contains two historically parallel implementations:
-
-1. **Stan-based forest** (`Stan*` files) — standard BART and Dirichlet BART (DART). This is the active implementation used going forward.
-2. **RJMCMC forest** (`Forest`, `Tree`, `TreeModifications`, etc.) — BART with global-local shrinkage priors (horseshoe / half-Cauchy) on the leaf step heights, requiring a reversible-jump MCMC sampler. **This implementation has been deprecated during development** and the source files have been moved to `src/deprecated/` for reference. The associated R entry points (`HorseTrees`, `CausalHorseForest`, `probitHorseTrees`) are no longer exported.
-
-All new development targets the Stan-based path.
+> [arXiv:2507.22004](https://arxiv.org/abs/2507.22004)
 
 ## License
 

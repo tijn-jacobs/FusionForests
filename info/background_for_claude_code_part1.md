@@ -2,21 +2,21 @@
 
 ## Project overview
 
-We are building a Bayesian nonparametric model that combines randomized controlled trial (RCT) data with real-world/observational data (RWD) to estimate heterogeneous treatment effects (HTEs) in survival settings. The target journal is *Biostatistics*.
+We are building a Bayesian nonparametric model that combines randomized controlled trial (RCT) data with real-world/real-world data (RWD) to estimate heterogeneous treatment effects (HTEs) in survival settings. The target journal is *Biostatistics*.
 
-The key innovation is that we **do not assume unconfoundedness of the observational data**. Instead, we explicitly model unmeasured confounding through a confounding function. The model uses Bayesian Additive Regression Trees (BART) as the nonparametric engine for all three model components.
+The key innovation is that we **do not assume unconfoundedness of the real-world data**. Instead, we explicitly model unmeasured confounding through a confounding function. The model uses Bayesian Additive Regression Trees (BART) as the nonparametric engine for all three model components.
 
 ---
 
 ## Notation
 
 - `A ∈ {0, 1}`: treatment assignment
-- `S ∈ {0, 1}`: data source indicator (`S = 1` for RCT, `S = 0` for observational study)
+- `S ∈ {0, 1}`: data source indicator (`S = 1` for RCT, `S = 0` for real-world data)
 - `X ∈ ℝ^p`: high-dimensional baseline covariates
 - `T`: survival (time-to-event) outcome
 - `Y(a)`: potential outcome under treatment `a`
 - `τ(x)`: conditional average treatment effect (CATE)
-- `c(x)`: confounding function (bias due to unmeasured confounding in the OS)
+- `c(x)`: confounding function (bias due to unmeasured confounding in the RWD)
 - `m_0(x, s)`: baseline/prognostic function (expected outcome under control)
 
 ---
@@ -32,7 +32,7 @@ log(T) = m_0(X, S) + A * τ(X) + A * (1 - S) * c(X) + σ * ε
 where:
 - `m_0(X, S)`: prognostic/baseline function — the expected log-survival under control
 - `τ(X)`: the conditional average treatment effect (CATE) — the causal effect of treatment
-- `c(X)`: the confounding function — captures the bias due to unmeasured confounding in the observational data. This term is only active when `S = 0` (observational) and `A = 1` (treated)
+- `c(X)`: the confounding function — captures the bias due to unmeasured confounding in the real-world data. This term is only active when `S = 0` (observational) and `A = 1` (treated)
 - `ε ~ p(ε)`: mean-zero error with a nonparametric prior (centered stick-breaking mixture)
 
 ### Interpretation of each component
@@ -40,14 +40,14 @@ where:
 The decomposition separates three distinct sources of variation:
 1. **m_0(X, S)**: What would happen without treatment? Can differ by data source (different populations).
 2. **τ(X)**: The true causal treatment effect, assumed transportable across sources (by exchangeability assumption A4).
-3. **c(X)**: The confounding bias. Only present in the observational treated group. Captures the difference between the observed treatment-control contrast in the OS and the true causal effect.
+3. **c(X)**: The confounding bias. Only present in the observational treated group. Captures the difference between the observed treatment-control contrast in the RWD and the true causal effect.
 
 ### Why three separate BART models
 
 Each of `m_0`, `τ`, and `c` is modeled by its own BART ensemble. This gives:
 - Transparent decomposition: each component is interpretable on its own
 - Separate regularization: each function can have its own prior (e.g., stronger shrinkage on `c` to encourage borrowing)
-- Identifiability: `τ` is identified from the RCT; `c` captures the residual discrepancy in the OS
+- Identifiability: `τ` is identified from the RCT; `c` captures the residual discrepancy in the RWD
 
 ---
 
@@ -59,7 +59,7 @@ The following assumptions are required:
 2. **(A2) Unconfoundedness of the RCT**: `Y(a) ⊥ A | X, S = 1`. Holds by design.
 3. **(A3) Positivity of the RCT**: `0 < P(A = a | X, S = 1) < 1`.
 4. **(A4) Exchangeability across sources**: `Y(a) | X, S = 1 =d Y(a) | X, S = 0`. The CATE is the same in both populations conditional on X. This is the transportability assumption.
-5. **(A5) Unconfoundedness of OS**: This is **not assumed**. Instead, the confounding function `c(x)` captures the violation.
+5. **(A5) Unconfoundedness of RWD**: This is **not assumed**. Instead, the confounding function `c(x)` captures the violation.
 
 Under (A1)–(A4) and the decomposition, the confounding function is defined as:
 
@@ -186,8 +186,8 @@ This uses the machinery already inside BART (conjugate normal leaf model) to mak
 
 - **Ye et al. (2025)**: Frequentist AFT-based integrative analysis of RCT + RWD with censoring and hidden confounding. Penalized weighted least squares. Synthetic data: https://github.com/ke-zhu/intFRT
 - **Yozova et al. (2025)**: Bayesian data fusion under weak identifiability using BCF with tempering
-- **Yang et al. (2025)**: Semiparametric framework for combining RCT + OS through confounding function, efficiency bounds for HTE
-- **Kallus et al. (2018)**: Experimental grounding — using small RCT to correct hidden confounding in larger OS
+- **Yang et al. (2025)**: Semiparametric framework for combining RCT + RWD through confounding function, efficiency bounds for HTE
+- **Kallus et al. (2018)**: Experimental grounding — using small RCT to correct hidden confounding in larger RWD
 - **Zhou and Ji (2021)**: BART for incorporating external data into clinical trials (T-learner approach)
 - **Hahn et al. (2020)**: Bayesian Causal Forest (BCF) — regularization, confounding, heterogeneous effects
 - **Lin et al. (2024)**: Shows bias correction helps HTE but not marginal ATE — motivates our HTE focus

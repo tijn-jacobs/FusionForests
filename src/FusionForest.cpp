@@ -1,9 +1,12 @@
 #include "FusionForest.h"
+#include "MixtureDP.h"
 
 // [[Rcpp::export]]
 Rcpp::List FusionForest_cpp(
   SEXP nSEXP, SEXP p_treatSEXP, SEXP p_controlSEXP, SEXP X_train_treatSEXP,
   SEXP X_train_controlSEXP, SEXP ySEXP, SEXP status_indicatorSEXP, SEXP is_survivalSEXP,
+  SEXP observed_left_timeSEXP, SEXP observed_right_timeSEXP,
+  SEXP interval_censoring_indicatorSEXP,
   SEXP treatment_indicatorSEXP, SEXP source_indicatorSEXP,
   SEXP n_testSEXP, SEXP X_test_controlSEXP, SEXP X_test_treatSEXP, SEXP X_test_deconfSEXP,
   SEXP treatment_indicator_testSEXP, SEXP source_indicator_testSEXP,
@@ -17,7 +20,14 @@ Rcpp::List FusionForest_cpp(
   SEXP sigma_knownSEXP, SEXP sigmaSEXP, SEXP lambdaSEXP, SEXP nuSEXP,
   SEXP N_postSEXP, SEXP N_burnSEXP,
   SEXP store_posterior_sampleSEXP,
-  SEXP verboseSEXP
+  SEXP verboseSEXP,
+  SEXP treatment_codingSEXP,
+  SEXP propensity_trainSEXP,
+  SEXP propensity_testSEXP,
+  SEXP mixture_modeSEXP,
+  SEXP mixture_KSEXP,
+  SEXP mixture_prior_atom_varianceSEXP,
+  SEXP mixture_mass_initSEXP
 ) {
 
   // ---- Argument conversion ----
@@ -44,6 +54,19 @@ Rcpp::List FusionForest_cpp(
   double* status_indicator = &status_indicator_vector[0];
   std::vector<double> y_observed_vector(y_vector.begin(), y_vector.end());
   double* y_observed = y_observed_vector.data();
+  // Interval-censoring bounds.  When the R wrapper does not supply them,
+  // observed_left_time = observed_right_time = y and
+  // interval_censoring_indicator is all zeros, reproducing the original
+  // right-censored behaviour bit-for-bit (the right-censoring branch of
+  // the interval-overload uses observed_right_time as the lower bound).
+  // Both bounds are passed on the SAME scale as y (the R wrapper applies
+  // the log-and-standardise transform symmetrically).
+  Rcpp::NumericVector observed_left_time_vector(observed_left_timeSEXP);
+  double* observed_left_time = &observed_left_time_vector[0];
+  Rcpp::NumericVector observed_right_time_vector(observed_right_timeSEXP);
+  double* observed_right_time = &observed_right_time_vector[0];
+  Rcpp::NumericVector interval_censoring_indicator_vector(interval_censoring_indicatorSEXP);
+  double* interval_censoring_indicator = &interval_censoring_indicator_vector[0];
   Rcpp::IntegerVector source_indicator_vector(source_indicatorSEXP);
   int* source_indicator = &source_indicator_vector[0];
 
@@ -104,6 +127,83 @@ Rcpp::List FusionForest_cpp(
 
   bool verbose = Rcpp::as<bool>(verboseSEXP);
 
+  // Residual mixture configuration (MixtureDP):
+  //   mixture_mode: 0=GAUSSIAN (no DP), 1=SHARED_DP, 2=SOURCE_DP
+  //   mixture_K   : truncation level (number of stick-breaking components)
+  //   mixture_prior_atom_variance: prior variance for each atom (N(0, .))
+  //   mixture_mass_init: starting value of concentration alpha
+  int    mixture_mode               = Rcpp::as<int>(mixture_modeSEXP);
+  size_t mixture_K                  = Rcpp::as<size_t>(mixture_KSEXP);
+  double mixture_prior_atom_variance = Rcpp::as<double>(mixture_prior_atom_varianceSEXP);
+  double mixture_mass_init           = Rcpp::as<double>(mixture_mass_initSEXP);
+
+  // Treatment-effect coding b_i: maps {0,1} treatment indicator to a real
+  // weight in the BCF parameterisation y = mu(X) + b_i * tau(X) + ... .
+  //   "binary"  : b = 1 if treated, 0 if control
+  //   "centered": b = 0.5 if treated, -0.5 if control (default)
+  //   "adaptive": b = z_i - propensity_i (covariate-balanced)
+  // The tau and c (deconfounding) forests are fit on (residual / b) with
+  // per-observation weights b_i^2 to recover the correct full-data
+  // likelihood; tiny |b| are floored to weight 0 to avoid 0/0.
+  std::string treatment_coding = Rcpp::as<std::string>(treatment_codingSEXP);
+  Rcpp::NumericVector propensity_train_vector(propensity_trainSEXP);
+  double* propensity_train = (propensity_train_vector.size() > 0)
+    ? &propensity_train_vector[0] : nullptr;
+  Rcpp::NumericVector propensity_test_vector(propensity_testSEXP);
+  double* propensity_test = (propensity_test_vector.size() > 0)
+    ? &propensity_test_vector[0] : nullptr;
+
+  const double b_eps = 1e-10;
+
+  double* b_train = new double[n];
+  double* b_test  = n_test ? new double[n_test] : nullptr;
+
+  if (treatment_coding == "binary") {
+    for (size_t k = 0; k < n; ++k)
+      b_train[k] = (treatment_indicator[k] == 1) ? 1.0 : 0.0;
+    for (size_t k = 0; k < n_test; ++k)
+      b_test[k]  = (treatment_indicator_test[k] == 1) ? 1.0 : 0.0;
+  } else if (treatment_coding == "adaptive") {
+    if (propensity_train == nullptr || propensity_test == nullptr) {
+      delete[] b_train; if (b_test) delete[] b_test;
+      Rcpp::stop("treatment_coding = 'adaptive' requires propensity_train "
+                 "and propensity_test.");
+    }
+    for (size_t k = 0; k < n; ++k)
+      b_train[k] = static_cast<double>(treatment_indicator[k])
+                   - propensity_train[k];
+    for (size_t k = 0; k < n_test; ++k)
+      b_test[k]  = static_cast<double>(treatment_indicator_test[k])
+                   - propensity_test[k];
+  } else if (treatment_coding == "centered") {
+    for (size_t k = 0; k < n; ++k)
+      b_train[k] = (treatment_indicator[k] == 1) ? 0.5 : -0.5;
+    for (size_t k = 0; k < n_test; ++k)
+      b_test[k]  = (treatment_indicator_test[k] == 1) ? 0.5 : -0.5;
+  } else {
+    delete[] b_train; if (b_test) delete[] b_test;
+    Rcpp::stop("Unknown treatment_coding: '%s'. "
+               "Use 'binary', 'centered', or 'adaptive'.",
+               treatment_coding.c_str());
+  }
+
+  // Per-observation weights b_i^2 for the tau forest (length n) and the
+  // deconfounding c forest (length n_deconf, RWD subset only).  These are
+  // fixed for the whole MCMC run.
+  double* weights_treat  = new double[n];
+  double* weights_deconf = n_deconf ? new double[n_deconf] : nullptr;
+  {
+    size_t j = 0;
+    for (size_t k = 0; k < n; ++k) {
+      double bk = b_train[k];
+      weights_treat[k] = (std::abs(bk) < b_eps) ? 0.0 : bk * bk;
+      if (source_indicator[k] == 0) {
+        weights_deconf[j] = weights_treat[k];
+        ++j;
+      }
+    }
+  }
+
 
   // ---- Storage containers ----
 
@@ -147,6 +247,9 @@ Rcpp::List FusionForest_cpp(
   double* testpred_control = n_test ? new double[n_test] : nullptr;
   double* testpred_deconf  = n_test ? new double[n_test] : nullptr;
   double* total_predictions       = new double[n];
+  double* total_plus_shift        = new double[n];   // total_predictions + theta_shift
+  double* theta_shift             = new double[n];   // per-obs DP cluster shift (0 if Gaussian)
+  double* residuals_for_dp        = new double[n];   // y - total_predictions (DP input)
   double* augmented_outcome_treat   = new double[n];
   double* augmented_outcome_control = new double[n];
   double* augmented_outcome_deconf  = new double[n_deconf];
@@ -154,8 +257,63 @@ Rcpp::List FusionForest_cpp(
   for (size_t i = 0; i < n; ++i) {
     augmented_outcome_treat[i]   = y[i] / 2.0;
     augmented_outcome_control[i] = y[i] / 2.0;
+    theta_shift[i]               = 0.0;
   }
   for (size_t i = 0; i < n_deconf; ++i) augmented_outcome_deconf[i] = 0.0;
+
+  // --- MixtureDP: residual-distribution prior ---
+  MixtureDP mixture(mixture_mode, n, mixture_K,
+                    mixture_prior_atom_variance, mixture_mass_init,
+                    source_indicator,
+                    /*sigma_init=*/sigma,
+                    /*nu_sigma=*/nu,
+                    /*lambda_sigma=*/lambda);
+  const bool dp_active     = mixture.active();
+  const int  dp_groups     = mixture.num_groups();
+  const bool dp_hdp_scale_mode = (mixture_mode == MixtureDP::SOURCE_HDP_SCALE);
+  const bool dp_scale_mode = (mixture_mode == MixtureDP::SOURCE_DP_SCALE) || dp_hdp_scale_mode;
+  const bool dp_hdp_mode   = (mixture_mode == MixtureDP::SOURCE_HDP) || dp_hdp_scale_mode;
+
+  // DP posterior storage (only allocated when DP is active).
+  // For each group g we keep an N_post x K matrix for mix_prop / locations and
+  // an N_post-vector for the concentration mass.  SOURCE_DP_SCALE also tracks
+  // per-source sigma_g; SOURCE_HDP additionally tracks shared atoms theta_k*,
+  // top-level sticks beta, per-source means mu_s, and gamma.
+  Rcpp::List dp_mix_prop_list(dp_active ? dp_groups : 0);
+  Rcpp::List dp_locations_list(dp_active ? dp_groups : 0);
+  Rcpp::List dp_mass_list(dp_active ? dp_groups : 0);
+  Rcpp::List dp_sigma_g_list(dp_scale_mode ? dp_groups : 0);
+  Rcpp::List dp_mu_g_list   (dp_hdp_mode   ? dp_groups : 0);
+  Rcpp::NumericMatrix dp_locations_shared_mat;
+  Rcpp::NumericMatrix dp_beta_mat;
+  Rcpp::NumericVector dp_gamma_vec;
+  if (dp_active) {
+    for (int g = 0; g < dp_groups; ++g) {
+      dp_mix_prop_list[g]  = Rcpp::NumericMatrix(N_post, static_cast<int>(mixture_K));
+      dp_locations_list[g] = Rcpp::NumericMatrix(N_post, static_cast<int>(mixture_K));
+      dp_mass_list[g]      = Rcpp::NumericVector(N_post);
+      if (dp_scale_mode) dp_sigma_g_list[g] = Rcpp::NumericVector(N_post);
+      if (dp_hdp_mode)   dp_mu_g_list[g]    = Rcpp::NumericVector(N_post);
+    }
+  }
+  if (dp_hdp_mode) {
+    dp_locations_shared_mat = Rcpp::NumericMatrix(N_post, static_cast<int>(mixture_K));
+    dp_beta_mat             = Rcpp::NumericMatrix(N_post, static_cast<int>(mixture_K));
+    dp_gamma_vec            = Rcpp::NumericVector(N_post);
+  }
+
+  // ---- Per-observation precision weight buffers (SCALE mode only) ----
+  // weights_treat (length n) and weights_deconf (length n_deconf) already hold
+  // the BCF b_i^2 weights.  In SCALE mode we redirect the forests to dynamic
+  // copies that get multiplied by a source-specific precision factor each sweep.
+  // The control forest, normally unweighted, also gets a dynamic weight buffer.
+  double* weight_treat_dyn   = new double[n];
+  double* weight_deconf_dyn  = n_deconf ? new double[n_deconf] : nullptr;
+  double* weight_control_dyn = dp_scale_mode ? new double[n] : nullptr;
+  for (size_t k = 0; k < n; ++k) weight_treat_dyn[k] = weights_treat[k];
+  for (size_t j = 0; j < n_deconf; ++j) weight_deconf_dyn[j] = weights_deconf[j];
+  if (dp_scale_mode)
+    for (size_t k = 0; k < n; ++k) weight_control_dyn[k] = 1.0;
 
 
   // ---- Set up forests ----
@@ -175,6 +333,7 @@ Rcpp::List FusionForest_cpp(
                             0.5, 1.0, static_cast<double>(p_treat),
                             true, false, 1.0);
   forest_treat.SetUpForest(p_treat, n, X_train_treat, augmented_outcome_treat, nullptr, omega_treat);
+  forest_treat.SetWeights(weight_treat_dyn);
 
   // Deconfounding forest
   ForestEngine forest_deconf(no_trees_deconf);
@@ -183,6 +342,11 @@ Rcpp::List FusionForest_cpp(
                              0.5, 1.0, static_cast<double>(p_deconf),
                              true, false, 1.0);
   forest_deconf.SetUpForest(p_deconf, n_deconf, X_train_deconf, augmented_outcome_deconf, nullptr, omega_deconf);
+  forest_deconf.SetWeights(weight_deconf_dyn);
+
+  // SOURCE_DP_SCALE: enable per-obs precision weighting on the control forest
+  // too (normally unweighted).  The weight buffer is updated each sweep.
+  if (dp_scale_mode) forest_control.SetWeights(weight_control_dyn);
 
 
   // ---- Timing ----
@@ -215,19 +379,24 @@ Rcpp::List FusionForest_cpp(
     {
       size_t j = 0;
       for (size_t k = 0; k < n; ++k) {
-        const double b = (treatment_indicator[k] == 1) ? 0.5 : -0.5;
+        const double b = b_train[k];
+        const bool   b_zero = (std::abs(b) < b_eps);
         const double s = (source_indicator[k]   == 1) ? 1.0 :  0.0;
 
         double c_k = 0.0;
         if (source_indicator[k] == 0) {
           c_k = forest_deconf.GetPrediction(j);
-          augmented_outcome_deconf[j] = (y[k] - forest_control.GetPrediction(k)
-                                              - eta - b * forest_treat.GetPrediction(k)) / b;
+          augmented_outcome_deconf[j] = b_zero ? 0.0
+            : (y[k] - forest_control.GetPrediction(k)
+                    - eta - b * forest_treat.GetPrediction(k)
+                    - theta_shift[k]) / b;
           ++j;
         }
-        augmented_outcome_treat[k] = (y[k] - (1.0 - s) * eta
-                                           - forest_control.GetPrediction(k)
-                                           - b * c_k) / b;
+        augmented_outcome_treat[k] = b_zero ? 0.0
+          : (y[k] - (1.0 - s) * eta
+                  - forest_control.GetPrediction(k)
+                  - b * c_k
+                  - theta_shift[k]) / b;
       }
     }
 
@@ -238,19 +407,23 @@ Rcpp::List FusionForest_cpp(
     {
       size_t j = 0;
       for (size_t k = 0; k < n; ++k) {
-        const double b = (treatment_indicator[k] == 1) ? 0.5 : -0.5;
+        const double b = b_train[k];
+        const bool   b_zero = (std::abs(b) < b_eps);
         const double s = (source_indicator[k]   == 1) ? 1.0 :  0.0;
 
         double c_k = 0.0;
         if (source_indicator[k] == 0) {
-          augmented_outcome_deconf[j] = (y[k] - forest_control.GetPrediction(k)
-                                              - eta - b * forest_treat.GetPrediction(k)) / b;
+          augmented_outcome_deconf[j] = b_zero ? 0.0
+            : (y[k] - forest_control.GetPrediction(k)
+                    - eta - b * forest_treat.GetPrediction(k)
+                    - theta_shift[k]) / b;
           c_k = forest_deconf.GetPrediction(j);
           ++j;
         }
         augmented_outcome_control[k] = y[k] - (1.0 - s) * eta
                                             - b * forest_treat.GetPrediction(k)
-                                            - b * c_k;
+                                            - b * c_k
+                                            - theta_shift[k];
       }
     }
 
@@ -261,7 +434,8 @@ Rcpp::List FusionForest_cpp(
     {
       size_t j = 0;
       for (size_t k = 0; k < n; ++k) {
-        const double b = (treatment_indicator[k] == 1) ? 0.5 : -0.5;
+        const double b = b_train[k];
+        const bool   b_zero = (std::abs(b) < b_eps);
         const double s = (source_indicator[k]   == 1) ? 1.0 :  0.0;
 
         double c_k = 0.0;
@@ -269,12 +443,15 @@ Rcpp::List FusionForest_cpp(
           c_k = forest_deconf.GetPrediction(j);
           ++j;
         }
-        augmented_outcome_treat[k]   = (y[k] - (1.0 - s) * eta
-                                             - forest_control.GetPrediction(k)
-                                             - b * c_k) / b;
+        augmented_outcome_treat[k] = b_zero ? 0.0
+          : (y[k] - (1.0 - s) * eta
+                  - forest_control.GetPrediction(k)
+                  - b * c_k
+                  - theta_shift[k]) / b;
         augmented_outcome_control[k] =  y[k] - (1.0 - s) * eta
                                              - b * forest_treat.GetPrediction(k)
-                                             - b * c_k;
+                                             - b * c_k
+                                             - theta_shift[k];
       }
     }
 
@@ -282,7 +459,7 @@ Rcpp::List FusionForest_cpp(
     {
       size_t j = 0;
       for (size_t k = 0; k < n; ++k) {
-        const double b = (treatment_indicator[k] == 1) ? 0.5 : -0.5;
+        const double b = b_train[k];
         double c_k = 0.0, s = 1.0;
         if (source_indicator[k] == 0) {
           s   = 0.0;
@@ -295,28 +472,76 @@ Rcpp::List FusionForest_cpp(
       }
     }
 
-    // -- Update sigma --
-    UpdateSigma(sigma_known, sigma, store_sigma, i, y, n, total_predictions, nu, lambda, random);
+    // -- Update residual-mixture (DP) --
+    // Residual eps_k = y_k - total_predictions[k] is the input the DP sees;
+    // labels, weights, atoms and concentration are all refreshed here.
+    // SOURCE_DP_SCALE additionally updates sigma_g per source inside Update().
+    if (dp_active) {
+      for (size_t k = 0; k < n; ++k)
+        residuals_for_dp[k] = y[k] - total_predictions[k];
+      mixture.Update(residuals_for_dp, sigma, random);
+      mixture.GetIndividualShifts(theta_shift);
+    }
+
+    // SCALE mode: recompute per-obs precision weights using the new sigma_g
+    // and override sigma with the pooled value (used downstream by the forest
+    // backfitting, censored augmentation, and storage).  We skip UpdateSigma
+    // because the per-source sigmas are already updated inside MixtureDP.
+    if (dp_scale_mode) {
+      const double sg_rwd    = mixture.sigma_g(0);
+      const double sg_rct   = mixture.sigma_g(1);
+      const double sigma_ref = mixture.sigma_pooled();
+      const double sigma_ref_sq = sigma_ref * sigma_ref;
+      const double factor_rwd  = sigma_ref_sq / (sg_rwd  * sg_rwd );
+      const double factor_rct = sigma_ref_sq / (sg_rct * sg_rct);
+      for (size_t k = 0; k < n; ++k) {
+        const double fac = (source_indicator[k] == 1) ? factor_rct : factor_rwd;
+        weight_treat_dyn  [k] = weights_treat[k] * fac;
+        weight_control_dyn[k] = fac;
+      }
+      for (size_t j = 0; j < n_deconf; ++j)
+        weight_deconf_dyn[j] = weights_deconf[j] * factor_rwd;
+      sigma = sigma_ref;
+      if (!sigma_known) store_sigma[i] = sigma;
+    }
+
+    // Build prediction+shift vector for sigma update and censored augmentation.
+    // When dp_active is false, theta_shift is identically zero, so this collapses
+    // to the original behaviour.
+    for (size_t k = 0; k < n; ++k)
+      total_plus_shift[k] = total_predictions[k] + theta_shift[k];
+
+    // -- Update sigma -- (skipped in SCALE mode; DP owns sigma)
+    if (!dp_scale_mode)
+      UpdateSigma(sigma_known, sigma, store_sigma, i, y, n, total_plus_shift, nu, lambda, random);
 
     // -- Augment censored observations --
-    AugmentCensoredObservations(is_survival, y, y_observed, status_indicator,
-                                total_predictions, sigma, n, random);
+    // Interval-censoring overload.  When the wrapper sets
+    // interval_censoring_indicator[i] = 0 the right-censoring branch fires
+    // and uses observed_right_time[i] as the lower bound on the event, so
+    // passing observed_left_time = observed_right_time = y reproduces the
+    // historical right-censored behaviour exactly.
+    AugmentCensoredObservations(is_survival, y,
+                                observed_left_time, status_indicator,
+                                observed_right_time,
+                                interval_censoring_indicator,
+                                total_plus_shift, sigma, n, random);
 
 
     // -- Post-burn-in storage --
     if (i >= N_burn) {
 
-      size_t j_os = 0;
+      size_t j_rwd = 0;
       for (size_t k = 0; k < n; ++k) {
-        const double b = (treatment_indicator[k] == 1) ? 0.5 : -0.5;
+        const double b = b_train[k];
         const double m_k   = forest_control.GetPrediction(k);
         const double tau_k = forest_treat.GetPrediction(k);
         double c_k = 0.0, s = 1.0;
         if (source_indicator[k] == 0) {
           s   = 0.0;
-          c_k = forest_deconf.GetPrediction(j_os);
-          train_predictions_mean_deconf[j_os] += c_k;
-          ++j_os;
+          c_k = forest_deconf.GetPrediction(j_rwd);
+          train_predictions_mean_deconf[j_rwd] += c_k;
+          ++j_rwd;
         }
         train_predictions_mean[k]         += m_k + (1.0 - s) * eta + b * (tau_k + c_k);
         train_predictions_mean_control[k] += m_k;
@@ -328,11 +553,11 @@ Rcpp::List FusionForest_cpp(
           train_predictions_sample_control(i - N_burn, k) = forest_control.GetPrediction(k);
           train_predictions_sample_treat(i - N_burn, k)   = forest_treat.GetPrediction(k);
         }
-        size_t j_os2 = 0;
+        size_t j_rwd2 = 0;
         for (size_t k = 0; k < n; ++k) {
           if (source_indicator[k] == 0) {
-            train_predictions_sample_deconf(i - N_burn, j_os2) = forest_deconf.GetPrediction(j_os2);
-            ++j_os2;
+            train_predictions_sample_deconf(i - N_burn, j_rwd2) = forest_deconf.GetPrediction(j_rwd2);
+            ++j_rwd2;
           }
         }
       }
@@ -351,7 +576,7 @@ Rcpp::List FusionForest_cpp(
         }
 
         for (size_t k = 0; k < n_test; ++k) {
-          const double b = (treatment_indicator_test[k] == 1) ? 0.5 : -0.5;
+          const double b = b_test[k];
           const double s = (source_indicator_test[k]    == 1) ? 1.0 : 0.0;
           const double c_k = testpred_deconf[k];
           test_predictions_mean[k]         += testpred_control[k] + (1.0 - s) * eta + b * (testpred_treat[k] + (1.0 - s) * c_k);
@@ -366,6 +591,38 @@ Rcpp::List FusionForest_cpp(
       for (size_t j = 0; j < no_trees_treat;   ++j) sum_accept_treat   += accepted_treat[j];
       for (size_t j = 0; j < no_trees_deconf;  ++j) sum_accept_deconf  += accepted_deconf[j];
 
+      // DP posterior draws
+      if (dp_active) {
+        for (int g = 0; g < dp_groups; ++g) {
+          Rcpp::NumericMatrix mp = dp_mix_prop_list[g];
+          Rcpp::NumericMatrix lc = dp_locations_list[g];
+          Rcpp::NumericVector ms = dp_mass_list[g];
+          const std::vector<double>& prop = mixture.mix_prop(g);
+          const std::vector<double>& locs = mixture.locations(g);
+          for (size_t k = 0; k < mixture_K; ++k) {
+            mp(i - N_burn, static_cast<int>(k)) = prop[k];
+            lc(i - N_burn, static_cast<int>(k)) = locs[k];
+          }
+          ms[i - N_burn] = mixture.mass(g);
+          if (dp_scale_mode) {
+            Rcpp::NumericVector sg = dp_sigma_g_list[g];
+            sg[i - N_burn] = mixture.sigma_g(g);
+          }
+          if (dp_hdp_mode) {
+            Rcpp::NumericVector mug = dp_mu_g_list[g];
+            mug[i - N_burn] = mixture.mu_g_vec()[g];
+          }
+        }
+        if (dp_hdp_mode) {
+          const std::vector<double>& locs_sh = mixture.locations_shared();
+          const std::vector<double>& betas   = mixture.beta();
+          for (size_t k = 0; k < mixture_K; ++k) {
+            dp_locations_shared_mat(i - N_burn, static_cast<int>(k)) = locs_sh[k];
+            dp_beta_mat            (i - N_burn, static_cast<int>(k)) = betas[k];
+          }
+          dp_gamma_vec[i - N_burn] = mixture.gamma_top();
+        }
+      }
     }
 
   } // end MCMC loop
@@ -428,6 +685,21 @@ Rcpp::List FusionForest_cpp(
     results["train_predictions_sample_deconf"]  = train_predictions_sample_deconf;
     results["test_predictions_sample_deconf"]   = test_predictions_sample_deconf;
   }
+  if (dp_active) {
+    results["dp_mode"]       = mixture_mode;
+    results["dp_K"]          = static_cast<int>(mixture_K);
+    results["dp_num_groups"] = dp_groups;
+    results["dp_mix_prop"]   = dp_mix_prop_list;
+    results["dp_locations"]  = dp_locations_list;
+    results["dp_mass"]       = dp_mass_list;
+    if (dp_scale_mode) results["dp_sigma_g"] = dp_sigma_g_list;
+    if (dp_hdp_mode) {
+      results["dp_locations_shared"] = dp_locations_shared_mat;
+      results["dp_beta"]             = dp_beta_mat;
+      results["dp_gamma"]            = dp_gamma_vec;
+      results["dp_mu_g"]             = dp_mu_g_list;
+    }
+  }
 
   // ---- Clean up ----
 
@@ -438,9 +710,19 @@ Rcpp::List FusionForest_cpp(
   delete[] accepted_treat;
   delete[] accepted_deconf;
   delete[] total_predictions;
+  delete[] total_plus_shift;
+  delete[] theta_shift;
+  delete[] residuals_for_dp;
   delete[] augmented_outcome_control;
   delete[] augmented_outcome_treat;
   delete[] augmented_outcome_deconf;
+  delete[] b_train;
+  if (b_test) delete[] b_test;
+  delete[] weights_treat;
+  if (weights_deconf) delete[] weights_deconf;
+  delete[] weight_treat_dyn;
+  if (weight_deconf_dyn)  delete[] weight_deconf_dyn;
+  if (weight_control_dyn) delete[] weight_control_dyn;
 
   return results;
 }

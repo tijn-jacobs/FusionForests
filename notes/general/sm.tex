@@ -1,0 +1,175 @@
+\documentclass[11pt]{article}
+
+%% Page geometry
+\usepackage[a4paper, margin=1in]{geometry}
+
+%% Core math + fonts
+\usepackage{amsthm,amsmath,amsfonts,amssymb}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+%% Citations
+\usepackage[authoryear, round]{natbib}
+
+%% Main-article cross-references (assumptions, propositions, equations)
+%% are hardcoded just after \begin{document} via \newlabel, so this
+%% supplement is self-contained and needs no main.aux / xr-hyper.
+
+%% Colour (for revision marks)
+\usepackage{xcolor}
+
+%% Hyperlinks
+\usepackage[colorlinks, citecolor=blue, urlcolor=blue, linkcolor=blue]{hyperref}
+\usepackage{xurl}
+
+%% Graphics & figures
+\usepackage{graphicx}
+\graphicspath{{figures/}{./figures/}}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{rotating}
+
+%% Float placement. placeins keeps floats inside their section, which is what
+%% stops them accumulating into a queue that flushes late -- into the reference
+%% list. The LaTeX default fractions are left alone on purpose: overriding
+%% textfraction lets a float fill almost a whole page, and on the title page
+%% that squeezes the author block.
+\usepackage[section]{placeins}
+
+%% Algorithms
+\usepackage[linesnumbered, ruled, vlined]{algorithm2e}
+
+%% TikZ for diagrams
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,fit,calc,positioning}
+\tikzset{box/.style={draw, diamond, thick, text centered, minimum height=0.5cm, minimum width=1cm}}
+\tikzset{line/.style={draw, thick, -latex'}}
+
+%% Misc
+\usepackage{comment}
+\usepackage{dsfont}
+\usepackage{enumitem}
+\usepackage{changepage}
+\usepackage{bm}
+
+%% Theorem environments
+\theoremstyle{plain}
+\newtheorem{axiom}{Axiom}
+\newtheorem{claim}[axiom]{Claim}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{assumption}{Assumption}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem*{example}{Example}
+\newtheorem*{fact}{Fact}
+
+\theoremstyle{remark}
+\newtheorem{case}{Case}
+\newtheorem{remark}{Remark}
+
+%% Custom math commands
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\1}{\mathds{1}}
+\newcommand{\p}{\mathbb{P}}
+\renewcommand{\H}{\mathcal{H}}
+\newcommand{\T}{\mathcal{T}}
+\newcommand{\ind}{\perp\!\!\!\perp}
+\newcommand{\RCT}{\mathrm{RCT}}
+\newcommand{\RWD}{\mathrm{RWD}}
+\newcommand{\AF}{\mathrm{AF}}
+\newcommand{\expit}{\operatorname{expit}}
+
+%% Supplementary-materials numbering: everything carries an "S" prefix
+%% so that, e.g., \ref{sm:proofs} reads as "S1" in the main article.
+\renewcommand{\thesection}{S.\arabic{section}}
+\renewcommand{\thesubsection}{\thesection.\arabic{subsection}}
+\renewcommand{\theequation}{S\arabic{equation}}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\thetable}{S\arabic{table}}
+\renewcommand{\theproposition}{S\arabic{proposition}}
+\renewcommand{\thecorollary}{S\arabic{corollary}}
+\renewcommand{\thealgocf}{S\arabic{algocf}}
+
+
+\title{Bayesian fusion forests for heterogeneous treatment effects on
+  survival from randomised and real-world data\\[0.4em]
+   Supplementary Materials}
+
+
+
+%% Authors and affiliations match the main manuscript file, as required.
+%% Affiliations are set as a numbered block rather than through \thanks:
+%% Biostatistics does not allow footnotes.
+\author{
+  Tijn Jacobs$^{1,\ast}$ \quad
+  St\'ephanie L.\ van der Pas$^{1}$ \quad
+  Wessel N.\ van Wieringen$^{1, 2}$
+}
+
+\date{}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.8em}
+
+
+\begin{document}
+
+%% --- Numbers of main-article objects, hardcoded for a self-contained SM. ---
+%% Update these if the main-text numbering changes.
+\makeatletter
+\@namedef{r@ass:sutva}{{1}{}{}{}{}}
+\@namedef{r@ass:rct-unconf}{{2}{}{}{}{}}
+\@namedef{r@ass:positivity-both}{{3}{}{}{}{}}
+\@namedef{r@ass:transport}{{4}{}{}{}{}}
+\@namedef{r@ass:censoring}{{5}{}{}{}{}}
+\@namedef{r@prop:decomp}{{1}{}{}{}{}}
+\@namedef{r@prop:ident}{{2}{}{}{}{}}
+\@namedef{r@eq:cf}{{2}{}{}{}{}}
+\@namedef{r@eq:aft-model}{{5}{}{}{}{}}
+\@namedef{r@eq:m0-decomp-prop}{{11}{}{}{}{}}
+\@namedef{r@fig:sim-lambda-u}{{1}{}{}{}{}}
+\@namedef{r@tab:sim-competitors}{{1}{}{}{}{}}
+\@namedef{r@fig:cate}{{4}{}{}{}{}}
+\makeatother
+
+\maketitle
+
+\begin{center}
+\begin{minipage}{0.9\textwidth}
+\setlength{\parskip}{0.4em}
+\small
+\noindent
+$^{1}$Department of Mathematics, Vrije Universiteit Amsterdam \\
+$^{2}$Department of Epidemiology and Data Science, Amsterdam University Medical Centre
+
+\noindent
+$^{\ast}$Corresponding author: Tijn Jacobs, Department of Mathematics, Vrije
+Universiteit Amsterdam, \texttt{t.jacobs@vu.nl}.
+\end{minipage}
+\end{center}
+
+%% Keep the title page to the title and the affiliations: no float may drift
+%% onto it and squeeze the author block.
+\FloatBarrier
+
+\input{../methodology/METHODOLOGY_SM}
+
+% \input{../introduction/INTRODUCTION_SM}
+
+\input{../simulation/SIMULATION_SM}
+
+\input{../data_analysis/ANALYSIS_SM}
+
+
+%% \clearpage, not \newpage: it flushes every pending float before the
+%% references begin, so no figure can surface inside the reference list.
+\clearpage
+\bibliographystyle{apalike}
+\bibliography{references}
+
+\end{document}

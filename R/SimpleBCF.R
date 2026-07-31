@@ -39,9 +39,15 @@
 #' @return A named list with:
 #' \describe{
 #'   \item{train_predictions}{Posterior mean of
+<<<<<<< HEAD
 #'     mu(x,e) + b*tau(x) (length n).}
 #'   \item{test_predictions}{Posterior mean of
 #'     mu(x,e) + b*tau(x) (length n_test).}
+=======
+#'     mu(x,e) + b * tau(x) (length n).}
+#'   \item{test_predictions}{Posterior mean of
+#'     mu(x,e) + b * tau(x) (length n_test).}
+>>>>>>> borrow
 #'   \item{train_predictions_prog}{Posterior mean of mu(x,e).}
 #'   \item{test_predictions_prog}{Posterior mean of mu(x,e).}
 #'   \item{train_predictions_treat}{Posterior mean of tau(x)
@@ -59,6 +65,19 @@
 #'     per-iteration total predictions.}
 #' }
 #'
+<<<<<<< HEAD
+=======
+#' @examples
+#' set.seed(1)
+#' n <- 100
+#' X <- matrix(rnorm(n * 3), n, 3)
+#' a <- rbinom(n, 1, 0.5)
+#' y <- X[, 1] + 0.5 * a + rnorm(n)
+#' fit <- SimpleBCF(y = y, X_train = X, treatment_indicator = a,
+#'                  N_post = 50, N_burn = 25, verbose = FALSE)
+#' mean(fit$train_predictions_treat)  # average estimated CATE
+#'
+>>>>>>> borrow
 #' @importFrom Rcpp evalCpp
 #' @useDynLib FusionForests, .registration = TRUE
 #' @importFrom stats sd qchisq

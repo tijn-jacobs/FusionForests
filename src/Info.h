@@ -6,13 +6,19 @@
 // Data container passed to the birth-death and sufficient-statistics functions.
 // X is stored column-major: the j-th predictor of the i-th observation is
 // *(X + p * i + j).  residuals holds the current working residuals.
+//
+// weights holds optional per-observation weights for weighted regression
+// (e.g., b_i^2 in BCF when fitting tau on (y - mu)/b).  When weights == nullptr
+// the implementation behaves as if every weight equals 1.0 (i.e., the standard
+// homoscedastic BART likelihood).
 class DataInfo {
 public:
-  DataInfo() : p(0), n(0), X(nullptr), residuals(nullptr) {}
+  DataInfo() : p(0), n(0), X(nullptr), residuals(nullptr), weights(nullptr) {}
   size_t p;          // Number of predictors
   size_t n;          // Number of observations
   double* X;         // Feature matrix (n x p, column-major)
   double* residuals; // Working residuals (length n)
+  double* weights;   // Optional per-observation weights (length n, or nullptr)
 };
 
 // Prior and MCMC tuning parameters used by the birth-death sampler.
