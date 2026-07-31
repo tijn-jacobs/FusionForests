@@ -101,7 +101,7 @@ per-iteration total predictions.}
 }
 \description{
 Two-forest Bayesian Causal Forest:
-\eqn{Y = \mu(X, e) + \tau(X) \cdot A + \sigma\varepsilon},
+\eqn{Y = \mu(X, e) + \tau(X) \cdot A + \varepsilon},
 where \eqn{\mu} is a prognostic forest (optionally including the
 propensity score \eqn{e}) and \eqn{\tau} is a treatment effect
 forest.  Both forests use a standard BART prior.

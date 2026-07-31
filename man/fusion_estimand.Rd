@@ -6,7 +6,7 @@
 \usage{
 fusion_estimand(
   fit,
-  estimand = c("SD", "RMST", "AF"),
+  estimand = c("SD", "AF"),
   time = NULL,
   target_source = c("rwd", "rct"),
   population_average = FALSE,
@@ -18,15 +18,14 @@ fusion_estimand(
 \item{fit}{A fitted \code{FusionForest} object obtained with
 \code{store_posterior_sample = TRUE}.  Must include posterior sample
 matrices for all relevant component forests.  When
-\code{estimand \%in\% c("SD", "RMST")}, the fit must use one of the
-supported \code{error_dist} families.}
+\code{estimand = "SD"}, the fit must use one of the supported
+\code{error_dist} families.}
 
-\item{estimand}{Character, one of \code{"SD"}, \code{"RMST"},
-\code{"AF"}.}
+\item{estimand}{Character, one of \code{"SD"}, \code{"AF"}.}
 
-\item{time}{Numeric scalar (positive).  Required for \code{"SD"} and
-\code{"RMST"}; ignored for \code{"AF"}.  Interpreted on the
-\emph{time} (not log-time) scale.}
+\item{time}{Numeric scalar (positive).  Required for \code{"SD"};
+ignored for \code{"AF"}.  Interpreted on the \emph{time} (not
+log-time) scale.}
 
 \item{target_source}{Character, \code{"rwd"} (default) or \code{"rct"}.
 Selects the target population \eqn{s_t} appearing in the survival
@@ -55,28 +54,26 @@ attributes \code{estimand}, \code{time}, \code{target_source}, and
 (when applicable) \code{bayesian_bootstrap}.
 }
 \description{
-Compute posterior draws of the survival difference, restricted mean
-survival time (RMST) difference, or acceleration factor (AF) at the
-covariate values supplied to \code{FusionForest()} as the test set,
-using the closed-form expressions of the AFT decomposition with
-(H)DP error.  See \code{notes/estimands.tex} for the derivations.
+Compute posterior draws of the survival difference or the
+acceleration factor (AF) at the covariate values supplied to
+\code{FusionForest()} as the test set, using the closed-form
+expressions of the AFT decomposition with (H)DP error.
 }
 \details{
-Under \deqn{\log T = m_0(X, S) + A \tau(X) + (1-S) A c(X) + \sigma
-\varepsilon, \quad \varepsilon \sim \sum_k \pi_{S,k} N(\theta_{S,k},
-1),} the survival function under treatment \eqn{a} in target
-population \eqn{s_t} is
-\deqn{S_a(t | x, s_t) = 1 - \sum_k \pi_{s_t,k} \Phi\!\bigl((\log t -
-\eta_a(x, s_t) - \theta_{s_t,k})/\sigma\bigr),}
-with \eqn{\eta_a(x, s_t) = m_0(x, s_t) + a \tau(x) + (1-s_t) a c(x)}
-and \eqn{m_0(x, s_t) = \mu(x) + (1 - s_t) g(x)} in four-forest mode.
-The three estimands implemented here are
+Under \deqn{\log T = m_0(X, S) + A \tau(X) + (1-S) A c(X) +
+\varepsilon,} with mean-zero error \eqn{\varepsilon} following a
+(source-specific) Gaussian or Dirichlet-process mixture
+distribution, the survival function under treatment \eqn{a} in
+target population \eqn{s_t} is
+\deqn{S_a(t | x, s_t) = 1 - F_{s_t}\bigl(\log t - \eta_a(x,
+s_t)\bigr),}
+where \eqn{F_{s_t}} is the error distribution function in source
+\eqn{s_t}, \eqn{\eta_a(x, s_t) = m_0(x, s_t) + a \tau(x) + (1-s_t) a
+c(x)} and \eqn{m_0(x, s_t) = \mu(x) + (1 - s_t) g(x)}.
+The estimands implemented here are
 \describe{
 \item{\code{"SD"}}{Survival difference
 \eqn{\Delta_{SD}(t; x, s_t) = S_1(t|x, s_t) - S_0(t|x, s_t)}.}
-\item{\code{"RMST"}}{Restricted mean survival time difference at
-horizon \eqn{t^{*}}, computed in closed form as the source-weighted
-sum of lognormal RMSTs.}
 \item{\code{"AF"}}{Causal acceleration factor
 \eqn{\exp(\tau(x))}.  Does not depend on the error distribution
 or on \code{target_source}.}
@@ -118,9 +115,4 @@ quantile(colMeans(af), c(0.25, 0.5, 0.75))
 \references{
 Rubin, D.~B. (1981).  The Bayesian bootstrap.
 \emph{The Annals of Statistics}, 9, 130--134.
-
-Royston, P.\ and Parmar, M.~K.~B. (2013).  Restricted mean survival
-time: an alternative to the hazard ratio for the design and analysis
-of randomized trials with a time-to-event outcome.
-\emph{BMC Medical Research Methodology}, 13, 152.
 }

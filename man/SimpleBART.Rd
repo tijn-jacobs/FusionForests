@@ -72,7 +72,7 @@ Matrix of dimension \code{N_post x n_test} with per-iteration test predictions.}
 }
 }
 \description{
-Standard single-forest BART model: \eqn{Y = f(X) + \sigma\varepsilon}.
+Standard single-forest BART model: \eqn{Y = f(X) + \varepsilon}.
 A clean entry point for benchmarking and development (e.g., testing IRS).
 }
 \examples{
