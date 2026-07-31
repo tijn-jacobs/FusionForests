@@ -74,7 +74,7 @@ augmentation. \code{observed_left_time[i]} and
 \code{observed_right_time[i]} are ignored.}
 \item{\code{status[i] = 0} and \code{interval_censoring_indicator[i] = 0}}{
 Standard right-censoring at \code{observed_right_time[i]} (event
-time unknown but \eqn{> \code{observed_right_time[i]}}).}
+time unknown but greater than \code{observed_right_time[i]}).}
 \item{\code{status[i] = 0} and \code{interval_censoring_indicator[i] = 1}}{
 Interval-censored: event lies in
 \code{(observed_left_time[i], observed_right_time[i]]}.  At each

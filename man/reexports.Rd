@@ -18,6 +18,6 @@ These objects are imported from other packages. Follow the links
 below to see their documentation.
 
 \describe{
-  \item{ShrinkageTrees}{\code{\link[ShrinkageTrees:CausalHorseForest]{CausalHorseForest()}}, \code{\link[ShrinkageTrees:CausalShrinkageForest]{CausalShrinkageForest()}}, \code{\link[ShrinkageTrees:HorseTrees]{HorseTrees()}}, \code{\link[ShrinkageTrees:ShrinkageTrees]{ShrinkageTrees()}}, \code{\link[ShrinkageTrees:SurvivalBART]{SurvivalBART()}}, \code{\link[ShrinkageTrees:SurvivalBCF]{SurvivalBCF()}}, \code{\link[ShrinkageTrees:SurvivalDART]{SurvivalDART()}}, \code{\link[ShrinkageTrees:SurvivalShrinkageBCF]{SurvivalShrinkageBCF()}}}
+  \item{ShrinkageTrees}{\code{\link[ShrinkageTrees]{CausalHorseForest}}, \code{\link[ShrinkageTrees]{CausalShrinkageForest}}, \code{\link[ShrinkageTrees]{HorseTrees}}, \code{\link[ShrinkageTrees]{ShrinkageTrees}}, \code{\link[ShrinkageTrees]{SurvivalBART}}, \code{\link[ShrinkageTrees]{SurvivalBCF}}, \code{\link[ShrinkageTrees]{SurvivalDART}}, \code{\link[ShrinkageTrees]{SurvivalShrinkageBCF}}}
 }}
 

@@ -30,10 +30,5 @@ Useful links:
 \author{
 \strong{Maintainer}: Tijn Jacobs \email{t.jacobs@vu.nl} (\href{https://orcid.org/0009-0003-6188-9296}{ORCID})
 
-Authors:
-\itemize{
-  \item Tijn Jacobs \email{t.jacobs@vu.nl} (\href{https://orcid.org/0009-0003-6188-9296}{ORCID})
-}
-
 }
 \keyword{internal}
