@@ -77,13 +77,8 @@ Rcpp::List SimpleBART_cpp(
                       p_grow, p_prune,
                       0.5, 1.0, static_cast<double>(p),
                       true, false, 1.0);
-<<<<<<< HEAD
   forest.SetUpForest(p, n, X_train, y, static_cast<size_t>(100), omega);
   if (irs > 0) forest.SetIRS(irs);
-=======
-  forest.SetUpForest(p, n, X_train, y, nullptr, omega);
-  (void) irs;  // IRS modes not currently wired into ForestEngine; ignored.
->>>>>>> borrow
 
 
   // ---- Timing ----
@@ -128,15 +123,11 @@ Rcpp::List SimpleBART_cpp(
       }
 
       if (n_test > 0) {
-<<<<<<< HEAD
         if (irs > 0) {
           forest.Predict(p, n_test, X_test, testpred, random);
         } else {
           forest.Predict(p, n_test, X_test, testpred);
         }
-=======
-        forest.Predict(p, n_test, X_test, testpred);
->>>>>>> borrow
         for (size_t k = 0; k < n_test; ++k)
           test_predictions_mean[k] += testpred[k];
 

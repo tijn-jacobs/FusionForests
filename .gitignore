@@ -97,3 +97,5 @@ archive/
 backups/
 file
 notes/
+examples/
+.vscode/

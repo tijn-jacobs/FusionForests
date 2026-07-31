@@ -37,8 +37,6 @@
 #'     Matrix of dimension \code{N_post x n_test} with per-iteration test predictions.}
 #' }
 #'
-<<<<<<< HEAD
-=======
 #' @examples
 #' set.seed(1)
 #' n <- 100
@@ -48,7 +46,6 @@
 #'                   verbose = FALSE)
 #' cor(y, fit$train_predictions)
 #'
->>>>>>> borrow
 #' @importFrom Rcpp evalCpp
 #' @useDynLib FusionForests, .registration = TRUE
 #' @importFrom stats sd qchisq
