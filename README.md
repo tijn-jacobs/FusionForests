@@ -66,13 +66,13 @@ proj <- fusion_projection(fit, basis = ~ x1 + x2 + x3,
 
 ## Models
 
-| Function | Description |
-|---|---|
-| `FusionForest()` | RCT + RWD data fusion with commensurate-prior borrowing |
-| `fusion_estimand()` | Posterior causal survival estimands (survival difference, RMST, acceleration factor) |
-| `fusion_projection()` | Posterior linear projections of the treatment effect surface |
-| `SimpleBART()` | Single-forest BART |
-| `SimpleBCF()` | Bayesian causal forest (prognostic + treatment forest) |
+| Function              | Description                                                                          |
+| --------------------- | ------------------------------------------------------------------------------------ |
+| `FusionForest()`      | RCT + RWD data fusion with commensurate-prior borrowing                              |
+| `fusion_estimand()`   | Posterior causal survival estimands (survival difference, RMST, acceleration factor) |
+| `fusion_projection()` | Posterior linear projections of the treatment effect surface                         |
+| `SimpleBART()`        | Single-forest BART                                                                   |
+| `SimpleBCF()`         | Bayesian causal forest (prognostic + treatment forest)                               |
 
 The single-study causal and survival models from the
 [ShrinkageTrees](https://cran.r-project.org/package=ShrinkageTrees)
@@ -84,13 +84,13 @@ accompanying paper in one namespace.
 
 The methodology is described in:
 
-> *Bayesian fusion forests for heterogeneous treatment effects on survival from randomised and real-world data*
+> _Bayesian fusion forests for heterogeneous treatment effects on survival from randomised and real-world data_
 > T. Jacobs, S.L. van der Pas, W.N. van Wieringen
 > arXiv preprint (2026)
 
 The single-study horseshoe models are described in:
 
-> *Horseshoe Forests for High-Dimensional Causal Survival Analysis*
+> _Horseshoe Forests for High-Dimensional Causal Survival Analysis_
 > T. Jacobs, W.N. van Wieringen, S.L. van der Pas
 > [arXiv:2507.22004](https://arxiv.org/abs/2507.22004)
 
@@ -100,4 +100,4 @@ The single-study horseshoe models are described in:
 
 ## Funding
 
-Funded by the European Research Council (ERC) under Horizon Europe (Grant No. 101074082).
+This project has received funding from the European Research Council (ERC) under the European Union’s Horizon Europe program under Grant agreement No. 101074802. Views and opinions expressed are however those of the author(s) only and do not necessarily reflect those of the European Union or the European Research Council Executive Agency. Neither the European Union nor the granting authority can be held responsible for them. This work used the Dutch national e-infrastructure with the support of the SURF Cooperative using grant no. EINF-18803.
