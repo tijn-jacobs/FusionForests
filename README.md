@@ -9,11 +9,27 @@ and an observational study (real-world data, RWD) in a single Bayesian
 framework, using a commensurate prior for adaptive information borrowing.
 
 The model targets heterogeneous treatment effects on continuous and
-(interval-)censored survival outcomes via an accelerated failure time
-formulation. The outcome is decomposed over separate tree forests — a
-control forest, a treatment forest, a deconfounding forest and,
-optionally, a deviation forest — so that the RWD can sharpen the RCT
-treatment effect estimate without importing its confounding.
+(interval-)censored survival outcomes. The outcome is decomposed over
+separate tree forests:
+
+$$Y = \mu(X) + (1-S)\ g(X) + A\ \tau(X) + (1-S)\ A\ c(X) + \sigma\varepsilon,$$
+
+where $Y$ is the log survival time (accelerated failure time
+formulation) or a continuous outcome, $A$ is the treatment and $S$
+indicates the source ($S = 1$ for the RCT, $S = 0$ for the RWD). Each
+term is modelled by its own forest:
+
+- $\mu(X)$ — **control forest**: the prognostic surface under control;
+- $g(X)$ — **deconfounding forest**: an RWD-only shift that absorbs
+  confounding in the observational data;
+- $\tau(X)$ — **treatment forest**: the heterogeneous treatment effect,
+  identified by the RCT;
+- $c(X)$ — **deviation forest**: how the RWD treatment effect deviates
+  from the RCT one.
+
+A commensurate prior shrinks the deviation forest towards zero, so the
+RWD sharpens the RCT treatment effect estimate without importing its
+confounding.
 
 ## Installation
 
@@ -23,9 +39,6 @@ The development version can be installed from GitHub:
 # install.packages("remotes")
 remotes::install_github("tijn-jacobs/FusionForests")
 ```
-
-Installation compiles C++ source code, so a working toolchain
-(Rtools on Windows, Xcode command line tools on macOS) is required.
 
 ## Quick example
 
@@ -64,21 +77,26 @@ proj <- fusion_projection(fit, basis = ~ x1 + x2 + x3,
                           X_eval = as.data.frame(X))
 ```
 
-## Models
+## The FusionForest model
 
-| Function              | Description                                                                          |
-| --------------------- | ------------------------------------------------------------------------------------ |
-| `FusionForest()`      | RCT + RWD data fusion with commensurate-prior borrowing                              |
-| `fusion_estimand()`   | Posterior causal survival estimands (survival difference, RMST, acceleration factor) |
-| `fusion_projection()` | Posterior linear projections of the treatment effect surface                         |
-| `SimpleBART()`        | Single-forest BART                                                                   |
-| `SimpleBCF()`         | Bayesian causal forest (prognostic + treatment forest)                               |
+`FusionForest()` is the heart of the package. It fits the decomposition
+above with standard BART priors on each forest and returns posterior
+draws of every component, so treatment effects, borrowing strength and
+uncertainty are all available directly from one fit. Right-censored and
+interval-censored survival outcomes are handled through data
+augmentation, and the error distribution can be Gaussian or a
+Dirichlet-process mixture (`error_dist`) for added robustness.
+
+Two companion functions summarise a fit: `fusion_estimand()` returns
+posterior draws of causal survival estimands (survival difference,
+RMST difference, acceleration factor), and `fusion_projection()`
+projects the treatment effect surface onto an interpretable linear
+basis.
 
 The single-study causal and survival models from the
 [ShrinkageTrees](https://cran.r-project.org/package=ShrinkageTrees)
-package (`CausalShrinkageForest()`, `SurvivalBART()`, and friends) are
-re-exported, so `library(FusionForests)` provides every model from the
-accompanying paper in one namespace.
+package are re-exported, so `library(FusionForests)` provides every
+model from the accompanying paper in one namespace.
 
 ## Reference
 
@@ -87,12 +105,6 @@ The methodology is described in:
 > _Bayesian fusion forests for heterogeneous treatment effects on survival from randomised and real-world data_
 > T. Jacobs, S.L. van der Pas, W.N. van Wieringen
 > arXiv preprint (2026)
-
-The single-study horseshoe models are described in:
-
-> _Horseshoe Forests for High-Dimensional Causal Survival Analysis_
-> T. Jacobs, W.N. van Wieringen, S.L. van der Pas
-> [arXiv:2507.22004](https://arxiv.org/abs/2507.22004)
 
 ## License
 
