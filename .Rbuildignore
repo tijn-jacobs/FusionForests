@@ -1,6 +1,5 @@
 ^sticker$
 ^simulations$
-^NEWS\.md$
 ^paper$
 ^\.github$
 ^\.devcontainer$
@@ -9,4 +8,28 @@
 ^CONTRIBUTING\.md$
 ^info$
 ^examples$
+<<<<<<< HEAD
 ^CLAUDE\.md$
+=======
+
+## Heavy folders not part of the package proper
+^archive$
+^backups$
+^data$
+^notes$
+^info$
+^inst/AFTrees-master$
+^src/deprecated$
+^\.vscode$
+
+## Stray files at the repo root
+^\.RDataTmp$
+^\.Rhistory$
+^\.DS_Store$
+^TEST\.md$
+^error_distribution_notes\.md$
+^texput\.log$
+^CLAUDE\.md$
+^Rplots\.pdf$
+^file$
+>>>>>>> borrow

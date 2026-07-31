@@ -17,7 +17,8 @@ CLAUDE.md
 src/*.so
 src/*.dll
 src/*.o
-src/RcppExports.cpp
+# NOTE: src/RcppExports.cpp must be tracked — the package cannot be
+# installed from GitHub without it.
 
 # R build output
 *.tar.gz
@@ -37,6 +38,62 @@ src/RcppExports.cpp
 
 # pkgdown site output
 docs/
+inst/
 
 # testthat output
 tests/testthat/_snaps/
+
+# LaTeX build byproducts (keep only .tex and .pdf)
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.synctex(busy)
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+*.nav
+*.snm
+*.vrb
+*.dvi
+*.ps
+*.idx
+*.ilg
+*.ind
+*.glo
+*.gls
+*.glg
+*.acn
+*.acr
+*.alg
+*.xdy
+*.tdo
+*.figlist
+*.makefile
+*.thm
+*.brf
+*-blx.bib
+*.xml
+
+# Large PDS data folders (too big for GitHub)
+**/MACS PDS/
+**/WIHS PDS/
+**/MWCCS PDS/
+
+# Backups
+**/backups/Rplots.pdf
+
+# Stray plot output at repo root
+Rplots.pdf
+
+# Local-only folders (not part of the package or the paper's simulations)
+archive/
+backups/
+file
+notes/

@@ -1,48 +1,62 @@
-## Example: Comparing BART (RCT only) vs FusionForest (RCT + RWD)
-## for estimating Heterogeneous Treatment Effects (HTE)
+## Example: Comparing FusionForest decompositions for HTE estimation
 ##
 ## Simulation design:
 ##   - True CATE varies by covariate X1 (effect modifier)
 ##   - RCT: small, randomised, no unmeasured confounding
-##   - RWD: large, observational, with confounding on X2
+##   - RWD: large, observational, with unmeasured confounding (U)
 ##
-## We compare:
-##   1. CausalShrinkageForest fitted on RCT data only  (from ShrinkageTrees)
-##   2. FusionForest combining RCT + RWD               (from FusionForests)
+## We compare four models, all using the FusionForest engine so that
+## tree priors (power, base, p_grow, p_prune), error-variance prior
+## (nu, q), and MCMC settings (N_post, N_burn) are identical:
+##
+##   1. Two-forest BCF on RCT data only   (unconfounded, low power)
+##   2. Two-forest BCF on RWD data only   (naive — ignores confounding)
+##   3. Three-forest FusionForest (RCT+RWD, with deconfounding)
+##   4. Four-forest FusionForest  (RCT+RWD, deconfounding + deviation)
+##
+## For the two-forest models, the deconfounding forest is neutralised
+## by setting number_of_trees_deconf = 1 and flagging a single training
+## observation as source = 0 (the minimum the API requires). All test
+## predictions use source = 1, so c(X) contributes nothing.
 
-library(FusionForests)
-library(ShrinkageTrees)
 
-set.seed(42)
+setwd("~/Library/CloudStorage/OneDrive-VrijeUniversiteitAmsterdam/Documents/GitHub/FusionForests")
+devtools::document()
+devtools::load_all()
 
 # -------------------------------------------------------------------------
 # 1. DATA GENERATING PROCESS
 # -------------------------------------------------------------------------
 
-n_rct <- 200   # RCT sample size (small, as is typical)
-n_rwd <- 800   # RWD sample size (larger observational dataset)
+n_rct <- 100   # RCT sample size (small, as is typical)
+n_rwd <- 500   # RWD sample size (larger observational dataset)
 p     <- 10    # number of covariates
 
 # --- True functions -------------------------------------------------------
 mu0       <- function(X) 2 * X[, 1] - X[, 3]^2
 true_cate <- function(X) 1.5 + 2 * X[, 1]
 
-sigma_true <- 1.0
+sigma_true <- 2
 
 # --- Generate RCT ---------------------------------------------------------
-X_rct <- matrix(rnorm(n_rct * p), nrow = n_rct, ncol = p)
+X_rct <- matrix(runif(n_rct * p), nrow = n_rct, ncol = p)
 colnames(X_rct) <- paste0("X", seq_len(p))
 
 trt_rct <- rbinom(n_rct, 1, 0.5)   # balanced randomisation
-y_rct   <- mu0(X_rct) + true_cate(X_rct) * trt_rct + rnorm(n_rct, sd = sigma_true)
+y_rct   <- mu0(X_rct) + true_cate(X_rct) * trt_rct +
+           rnorm(n_rct, sd = sigma_true)
 
 # --- Generate RWD ---------------------------------------------------------
-X_rwd <- matrix(rnorm(n_rwd * p), nrow = n_rwd, ncol = p)
+X_rwd <- matrix(runif(n_rwd * p), nrow = n_rwd, ncol = p)
 colnames(X_rwd) <- paste0("X", seq_len(p))
 
-prop_score_rwd <- plogis(0.8 * X_rwd[, 2])   # confounded on X2
+# U is an unmeasured confounder: it drives both treatment assignment
+# and the outcome but is NOT included in the covariate matrix X_rwd.
+U_rwd          <- rnorm(n_rwd)
+prop_score_rwd <- plogis(0.8 * U_rwd)
 trt_rwd <- rbinom(n_rwd, 1, prop_score_rwd)
-y_rwd   <- mu0(X_rwd) + true_cate(X_rwd) * trt_rwd + rnorm(n_rwd, sd = sigma_true)
+y_rwd   <- mu0(X_rwd) + 1.0*U_rwd + true_cate(X_rwd) * trt_rwd +
+           rnorm(n_rwd, sd = sigma_true)
 
 # --- Pool RCT + RWD -------------------------------------------------------
 X_all      <- rbind(X_rct, X_rwd)
@@ -51,7 +65,7 @@ trt_all    <- c(trt_rct, trt_rwd)
 source_all <- c(rep(1L, n_rct), rep(0L, n_rwd))   # 1 = RCT, 0 = RWD
 
 true_cate_all <- true_cate(X_all)
-true_cate_rct <- true_cate(X_rct)
+n_all         <- nrow(X_all)
 
 cat("--------------------------------------------------------------\n")
 cat("Data summary\n")
@@ -64,197 +78,229 @@ cat("  True CATE range: [", round(min(true_cate_all), 2),
 cat("--------------------------------------------------------------\n\n")
 
 # -------------------------------------------------------------------------
-# 2. HYPERPARAMETER SETUP
+# 2. HYPERPARAMETERS
+#
+# Tree counts and k (leaf-prior scale) vary by forest type but are
+# kept identical across the four models for a fair comparison.
+# The remaining tree-prior and error-variance parameters are shared.
 # -------------------------------------------------------------------------
-n_trees  <- 50    # use 200+ in practice
-N_post   <- 2500
-N_burn   <- 1500
 
-# CausalShrinkageForest horseshoe scale
-hp_local  <- 0.5 / sqrt(n_trees)
-hp_global <- 0.5 / sqrt(n_trees)
+# Per-forest-type tree counts
+n_trees_prog   <- 200   # prognostic forest (mu / m0)
+n_trees_treat  <- 100   # treatment-effect forest (tau)
+n_trees_deconf <- 200   # deconfounding forest (c)
+n_trees_dev    <- 50    # deviation forest (g, four-forest only)
+
+# Leaf-prior scale k for the deviation forest.  omega_g = k_g / sqrt(m_g);
+# smaller k_g => stronger shrinkage of g toward zero (more borrowing).
+# The control/treat/deconf forests use the package default k = 0.5.
+# (k_g = 0.25 is half of that, encoding the MAP-prior preference for
+# borrowing across sources.)
+k_g <- 0.25
+
+# MCMC
+N_post <- 3000
+N_burn <- 2000
+
+# Shared across all forests
+power   <- 2.0
+base    <- 0.95
+p_grow  <- 0.4
+p_prune <- 0.4
+nu      <- 3
+q       <- 0.90
 
 # -------------------------------------------------------------------------
-# 3. MODEL 1: CausalShrinkageForest on RCT data only (horseshoe BART)
+# 3. MODEL 1: Two-forest BCF --- RCT only
+#
+# FusionForest requires >= 1 RWD row. We flag one training
+# observation as source = 0 and set number_of_trees_deconf = 1
+# so the deconfounding forest is effectively inert.
 # -------------------------------------------------------------------------
-cat("Fitting Model 1: CausalShrinkageForest (RCT only)...\n")
+cat("Fitting Model 1: Two-forest BCF (RCT only)...\n")
 
-fit_rct <- CausalShrinkageForest(
+src_rct      <- rep(1L, n_rct)
+src_rct[n_rct] <- 0L                    # single dummy RWD row
+
+fit_rct <- FusionForest(
   y                         = y_rct,
   X_train_control           = X_rct,
   X_train_treat             = X_rct,
-  treatment_indicator_train = trt_rct,
+  treatment_indicator_train  = trt_rct,
+  source_indicator_train     = src_rct,
   X_test_control            = X_all,
   X_test_treat              = X_all,
-  treatment_indicator_test  = trt_all,
+  treatment_indicator_test   = trt_all,
+  source_indicator_test      = rep(1L, n_all),
   outcome_type              = "continuous",
-  number_of_trees_control   = n_trees,
-  number_of_trees_treat     = n_trees,
-  prior_type_control        = "horseshoe",
-  prior_type_treat          = "horseshoe",
-  local_hp_control          = hp_local,
-  local_hp_treat            = hp_local,
-  global_hp_control         = hp_global,
-  global_hp_treat           = hp_global,
-  store_posterior_sample    = TRUE,
+  decomposition             = "four-forest",
+  treatment_coding          = "centered",
+  number_of_trees_control   = n_trees_prog,
+  number_of_trees_treat     = n_trees_treat,
+  number_of_trees_deconf    = 1,
+  power                     = power,
+  base                      = base,
+  p_grow                    = p_grow,
+  p_prune                   = p_prune,
+  nu                        = nu,
+  q                         = q,
   N_post                    = N_post,
   N_burn                    = N_burn,
+  store_posterior_sample     = TRUE,
   verbose                   = FALSE
 )
 
 cat("  Done.\n\n")
 
 # -------------------------------------------------------------------------
-# 4. MODEL 2: FusionForest on RCT + RWD
+# 4. MODEL 2: Two-forest BCF --- RWD only (naive, ignores confounding)
 #
-# API changes from FusionShrinkageForest:
-#   - Function renamed to FusionForest
-#   - prior_type_*/local_hp_*/global_hp_* removed; standard BART leaf prior
-#     (omega = 0.5/sqrt(trees)) is used internally for all three forests
-#   - eta_commensurate removed; eta is fixed at 0 (no inter-source mean shift)
+# Same trick: all observations labelled source = 1 except one dummy
+# source = 0 row, so c(X) is inert. By treating RWD as if it
+# were randomised we get a naive BCF that does not adjust for
+# unmeasured confounding.
 # -------------------------------------------------------------------------
-cat("Fitting Model 2: FusionForest (RCT + RWD)...\n")
+cat("Fitting Model 2: Two-forest BCF (RWD only)...\n")
 
-fit_fusion <- FusionForest(
+src_rwd       <- rep(1L, n_rwd)
+src_rwd[n_rwd] <- 0L                     # single dummy RWD row
+
+fit_rwd <- FusionForest(
+  y                         = y_rwd,
+  X_train_control           = X_rwd,
+  X_train_treat             = X_rwd,
+  treatment_indicator_train  = trt_rwd,
+  source_indicator_train     = src_rwd,
+  X_test_control            = X_all,
+  X_test_treat              = X_all,
+  treatment_indicator_test   = trt_all,
+  source_indicator_test      = rep(1L, n_all),
+  outcome_type              = "continuous",
+  decomposition             = "four-forest",
+  treatment_coding          = "centered",
+  number_of_trees_control   = n_trees_prog,
+  number_of_trees_treat     = n_trees_treat,
+  number_of_trees_deconf    = 1,
+  power                     = power,
+  base                      = base,
+  p_grow                    = p_grow,
+  p_prune                   = p_prune,
+  nu                        = nu,
+  q                         = q,
+  N_post                    = N_post,
+  N_burn                    = N_burn,
+  store_posterior_sample     = TRUE,
+  verbose                   = FALSE
+)
+
+cat("  Done.\n\n")
+
+# -------------------------------------------------------------------------
+# 5. MODEL 3: Three-forest FusionForest (RCT + RWD)
+# -------------------------------------------------------------------------
+cat("Fitting Model 3: Three-forest FusionForest (RCT + RWD)...\n")
+
+fit_three <- FusionForest(
   y                         = y_all,
   X_train_control           = X_all,
   X_train_treat             = X_all,
-  treatment_indicator_train = trt_all,
-  source_indicator_train    = source_all,
+  treatment_indicator_train  = trt_all,
+  source_indicator_train     = source_all,
   X_test_control            = X_all,
   X_test_treat              = X_all,
-  treatment_indicator_test  = trt_all,
-  source_indicator_test     = source_all,
+  treatment_indicator_test   = trt_all,
+  source_indicator_test      = source_all,
   outcome_type              = "continuous",
-  number_of_trees_control   = n_trees,
-  number_of_trees_treat     = n_trees,
-  number_of_trees_deconf    = n_trees,
-  store_posterior_sample    = TRUE,
+  decomposition             = "four-forest",
+  treatment_coding          = "centered",
+  number_of_trees_control   = n_trees_prog,
+  number_of_trees_treat     = n_trees_treat,
+  number_of_trees_deconf    = n_trees_deconf,
+  power                     = power,
+  base                      = base,
+  p_grow                    = p_grow,
+  p_prune                   = p_prune,
+  nu                        = nu,
+  q                         = q,
   N_post                    = N_post,
   N_burn                    = N_burn,
+  store_posterior_sample    = TRUE,
   verbose                   = FALSE
 )
 
 cat("  Done.\n\n")
 
 # -------------------------------------------------------------------------
-# 5. EXTRACT CATE ESTIMATES
+# 6. MODEL 4: Four-forest FusionForest (RCT + RWD)
 # -------------------------------------------------------------------------
-cate_rct_only <- fit_rct$test_predictions_treat
-cate_fusion   <- fit_fusion$test_predictions_treat
+cat("Fitting Model 4: Four-forest FusionForest (RCT + RWD)...\n")
 
-cate_rct_samples    <- fit_rct$test_predictions_sample_treat      # N_post x n_all
-cate_fusion_samples <- fit_fusion$test_predictions_sample_treat   # N_post x n_all
+fit_four <- FusionForest(
+  y                         = y_all,
+  X_train_control           = X_all,
+  X_train_treat             = X_all,
+  treatment_indicator_train  = trt_all,
+  source_indicator_train     = source_all,
+  X_test_control            = X_all,
+  X_test_treat              = X_all,
+  treatment_indicator_test   = trt_all,
+  source_indicator_test      = source_all,
+  outcome_type              = "continuous",
+  decomposition             = "four-forest",
+  treatment_coding          = "centered",
+  number_of_trees_control   = n_trees_prog,
+  number_of_trees_treat     = n_trees_treat,
+  number_of_trees_deconf    = n_trees_deconf,
+  number_of_trees_deviation = n_trees_dev,
+  k_g                       = k_g,
+  power                     = power,
+  base                      = base,
+  p_grow                    = p_grow,
+  p_prune                   = p_prune,
+  nu                        = nu,
+  q                         = q,
+  N_post                    = N_post,
+  N_burn                    = N_burn,
+  store_posterior_sample     = TRUE,
+  verbose                   = FALSE
+)
 
-# -------------------------------------------------------------------------
-# 6. EVALUATE PERFORMANCE
-# -------------------------------------------------------------------------
-rmse <- function(pred, truth) sqrt(mean((pred - truth)^2))
-mae  <- function(pred, truth) mean(abs(pred - truth))
-
-rmse_rct    <- rmse(cate_rct_only, true_cate_all)
-rmse_fusion <- rmse(cate_fusion,   true_cate_all)
-mae_rct     <- mae(cate_rct_only,  true_cate_all)
-mae_fusion  <- mae(cate_fusion,    true_cate_all)
-
-ci_rct    <- apply(cate_rct_samples,    2, quantile, probs = c(0.025, 0.975))
-ci_fusion <- apply(cate_fusion_samples, 2, quantile, probs = c(0.025, 0.975))
-
-coverage_rct    <- mean(true_cate_all >= ci_rct[1, ]    & true_cate_all <= ci_rct[2, ])
-coverage_fusion <- mean(true_cate_all >= ci_fusion[1, ] & true_cate_all <= ci_fusion[2, ])
-
-width_rct    <- mean(ci_rct[2, ]    - ci_rct[1, ])
-width_fusion <- mean(ci_fusion[2, ] - ci_fusion[1, ])
-
-cat("==============================================================\n")
-cat("HTE Estimation Performance (evaluated on all n =", nrow(X_all), "obs)\n")
-cat("==============================================================\n")
-cat(sprintf("%-35s %10s %10s\n", "Metric", "RCT only", "Fusion"))
-cat(sprintf("%-35s %10.4f %10.4f\n", "RMSE (CATE)",        rmse_rct,     rmse_fusion))
-cat(sprintf("%-35s %10.4f %10.4f\n", "MAE  (CATE)",        mae_rct,      mae_fusion))
-cat(sprintf("%-35s %10.4f %10.4f\n", "95%% CI coverage",   coverage_rct, coverage_fusion))
-cat(sprintf("%-35s %10.4f %10.4f\n", "Mean 95%% CI width", width_rct,    width_fusion))
-cat("==============================================================\n\n")
+cat("  Done.\n\n")
 
 # -------------------------------------------------------------------------
-# 7. PLOTS
+# 7. EXTRACT CATE ESTIMATES
 # -------------------------------------------------------------------------
-old_par <- par(mfrow = c(2, 3), mar = c(4, 4, 3, 1))
-on.exit(par(old_par), add = TRUE)
+cate_rct   <- fit_rct$test_predictions_treat
+cate_rwd    <- fit_rwd$test_predictions_treat
+cate_three <- fit_three$test_predictions_treat
+cate_four  <- fit_four$test_predictions_treat
 
-col_rct    <- rgb(0.2, 0.4, 0.8, 0.6)
-col_fusion <- rgb(0.8, 0.3, 0.1, 0.6)
-col_truth  <- "black"
-n_all      <- nrow(X_all)
+cate_rct_samples   <- fit_rct$test_predictions_sample_treat
+cate_rwd_samples    <- fit_rwd$test_predictions_sample_treat
+cate_three_samples <- fit_three$test_predictions_sample_treat
+cate_four_samples  <- fit_four$test_predictions_sample_treat
 
-# --- Panel 1: Estimated vs True CATE (RCT only) --------------------------
-plot(true_cate_all, cate_rct_only,
-     pch = 16, cex = 0.5, col = col_rct,
-     xlab = "True CATE", ylab = "Estimated CATE",
-     main = "RCT only: Estimated vs True CATE")
-abline(0, 1, col = col_truth, lwd = 2)
+# -------------------------------------------------------------------------
+# 8. EVALUATE PERFORMANCE
+# -------------------------------------------------------------------------
+model_names <- c("RCT only", "RWD only", "Three-forest", "Four-forest")
+cate_list   <- list(cate_rct, cate_rwd, cate_three, cate_four)
+sample_list <- list(cate_rct_samples, cate_rwd_samples,
+                    cate_three_samples, cate_four_samples)
 
-# --- Panel 2: Estimated vs True CATE (Fusion) ----------------------------
-plot(true_cate_all, cate_fusion,
-     pch = 16, cex = 0.5, col = col_fusion,
-     xlab = "True CATE", ylab = "Estimated CATE",
-     main = "Fusion: Estimated vs True CATE")
-abline(0, 1, col = col_truth, lwd = 2)
+rmse_vec <- cov_vec <- width_vec <- numeric(4)
 
-# --- Panel 3: CATE bias by X1 (the true effect modifier) -----------------
-x1_vals <- X_all[, 1]
-plot(x1_vals, cate_rct_only - true_cate_all,
-     pch = 16, cex = 0.4, col = col_rct,
-     xlab = "X1 (effect modifier)", ylab = "CATE bias (estimate - truth)",
-     main = "Bias by effect modifier X1",
-     ylim = range(c(cate_rct_only - true_cate_all,
-                    cate_fusion   - true_cate_all)))
-points(x1_vals, cate_fusion - true_cate_all,
-       pch = 16, cex = 0.4, col = col_fusion)
-abline(h = 0, lwd = 2)
-legend("topleft", legend = c("RCT only", "Fusion"),
-       col = c(col_rct, col_fusion), pch = 16, bty = "n")
+for (i in seq_len(4)) {
+  ci <- apply(sample_list[[i]], 2, quantile, probs = c(0.025, 0.975))
+  rmse_vec[i]  <- sqrt(mean((cate_list[[i]] - true_cate_all)^2))
+  cov_vec[i]   <- mean(true_cate_all >= ci[1, ] & true_cate_all <= ci[2, ])
+  width_vec[i] <- mean(ci[2, ] - ci[1, ])
+}
 
-# --- Panel 4: Sorted CATE with 95% CI (RCT only) -------------------------
-ord <- order(true_cate_all)
-
-plot(seq_len(n_all), true_cate_all[ord],
-     type = "l", lwd = 2, col = col_truth,
-     xlab = "Individual (sorted by true CATE)", ylab = "CATE",
-     main = "RCT only: CATE estimates with 95% CI",
-     ylim = range(ci_rct))
-polygon(c(seq_len(n_all), rev(seq_len(n_all))),
-        c(ci_rct[1, ord], rev(ci_rct[2, ord])),
-        col = adjustcolor(col_rct, alpha.f = 0.3), border = NA)
-lines(seq_len(n_all), cate_rct_only[ord], col = col_rct, lwd = 2)
-legend("topleft", legend = c("Truth", "Estimate", "95% CI"),
-       col = c(col_truth, col_rct, col_rct),
-       lty = c(1, 1, NA), fill = c(NA, NA, adjustcolor(col_rct, 0.3)),
-       border = NA, bty = "n")
-
-# --- Panel 5: Sorted CATE with 95% CI (Fusion) ---------------------------
-plot(seq_len(n_all), true_cate_all[ord],
-     type = "l", lwd = 2, col = col_truth,
-     xlab = "Individual (sorted by true CATE)", ylab = "CATE",
-     main = "Fusion: CATE estimates with 95% CI",
-     ylim = range(ci_fusion))
-polygon(c(seq_len(n_all), rev(seq_len(n_all))),
-        c(ci_fusion[1, ord], rev(ci_fusion[2, ord])),
-        col = adjustcolor(col_fusion, alpha.f = 0.3), border = NA)
-lines(seq_len(n_all), cate_fusion[ord], col = col_fusion, lwd = 2)
-legend("topleft", legend = c("Truth", "Estimate", "95% CI"),
-       col = c(col_truth, col_fusion, col_fusion),
-       lty = c(1, 1, NA), fill = c(NA, NA, adjustcolor(col_fusion, 0.3)),
-       border = NA, bty = "n")
-
-# --- Panel 6: Sigma traceplots -------------------------------------------
-plot(fit_rct$sigma, type = "l", col = col_rct,
-     xlab = "Posterior iteration", ylab = expression(sigma),
-     main = "Sigma traceplots",
-     ylim = range(c(fit_rct$sigma, fit_fusion$sigma)))
-lines(fit_fusion$sigma, col = col_fusion)
-abline(h = sigma_true, lwd = 2, lty = 2)
-legend("topright",
-       legend = c("RCT only", "Fusion", "True sigma"),
-       col    = c(col_rct, col_fusion, "black"),
-       lty    = c(1, 1, 2), lwd = 2, bty = "n")
+results <- data.frame(
+  Model    = model_names,
+  RMSE     = round(rmse_vec, 4),
+  Coverage = round(cov_vec, 4),
+  Width    = round(width_vec, 4)
+)
+print(results, row.names = FALSE)

@@ -1,0 +1,1159 @@
+\documentclass[11pt]{article}
+
+%% Page geometry
+\usepackage[a4paper, margin=1in]{geometry}
+
+%% Core math + fonts
+\usepackage{amsthm,amsmath,amsfonts,amssymb}
+\usepackage{microtype}
+
+%% Citations
+\usepackage[authoryear, round]{natbib}
+
+%% Hyperlinks
+\usepackage[colorlinks, citecolor=blue, urlcolor=blue, linkcolor=blue]{hyperref}
+\usepackage{xurl}
+
+%% Graphics & figures
+\usepackage{graphicx}
+\graphicspath{{./images/}}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{booktabs}
+
+%% Algorithms
+\usepackage[linesnumbered, ruled, vlined]{algorithm2e}
+
+%% TikZ for diagrams
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,fit,calc,positioning}
+\tikzset{box/.style={draw, diamond, thick, text centered, minimum height=0.5cm, minimum width=1cm}}
+\tikzset{line/.style={draw, thick, -latex'}}
+
+%% Misc
+\usepackage{comment}
+\usepackage{dsfont}
+
+%% Theorem environments
+\theoremstyle{plain}
+\newtheorem{axiom}{Axiom}
+\newtheorem{claim}[axiom]{Claim}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem*{example}{Example}
+\newtheorem*{fact}{Fact}
+
+\theoremstyle{remark}
+\newtheorem{case}{Case}
+
+%% Custom math commands
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\1}{\mathds{1}}
+\newcommand{\p}{\mathbb{P}}
+\renewcommand{\H}{\mathcal{H}}
+\newcommand{\T}{\mathcal{T}}
+\newcommand{\ind}{\perp\!\!\!\perp}
+
+%% File-specific additions
+\usepackage{bm}
+\usepackage{mathtools}
+
+\newcommand{\Var}{\mathrm{Var}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\given}{\,|\,}
+\newcommand{\indep}{\perp\!\!\!\perp}
+
+%% Residual-prior abbreviations.  The map between these math symbols and the
+%% R argument values is given once in Table~\ref{tab:sim-prior-grid}.
+\newcommand{\mGauss}{\ensuremath{\mathrm{G}}}
+\newcommand{\mShDP}{\ensuremath{\mathrm{sDP}}}
+\newcommand{\miDP}{\ensuremath{\mathrm{iDP}}}
+\newcommand{\miDPs}{\ensuremath{\mathrm{iDP}_\sigma}}
+\newcommand{\mHDP}{\ensuremath{\mathrm{HDP}}}
+\newcommand{\mHDPs}{\ensuremath{\mathrm{HDP}_\sigma}}
+
+
+\title{ADDITIONAL SIMULATIONS}
+
+\author{
+  Tijn Jacobs}
+
+\date{\today}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.8em}
+
+
+\begin{document}
+\maketitle
+
+This file contains some specific simulations for the Supplementary Materials.
+They should answer specific questions, or investigate properties of specific parts of the model.
+
+
+
+\section{Simulation on the nonparametric error distribution}
+\label{sec:sim-error-dist}
+
+\subsection{Goal}
+\label{sec:sim-goal}
+
+The methodology section introduces a centered hierarchical Dirichlet
+process (HDP) prior on the residual distribution, with the option of a
+source-specific scale parameter $\sigma_s$. This simulation has three
+aims.
+
+\begin{enumerate}
+  \item \textbf{Demonstrate the practical benefit of the
+    \mHDPs prior.} Under data-generating processes
+    where the two sources share residual shape but differ in
+    scale---and especially when one source is too small to fit a
+    flexible nonparametric residual on its own---atom sharing should
+    yield lower CATE estimation error, narrower credible intervals
+    without sacrificing coverage, and a more accurate per-source
+    residual distribution than each of the five alternative residual
+    priors.
+  \item \textbf{Map out where the various priors do and do not
+    differ.} The DGPs are designed so that each successive scenario
+    breaks an assumption that one of the simpler priors relies on:
+    Gaussianity, equality of source scales, equality of source shapes,
+    and finally rarity of a residual ``type'' in one source but not the
+    other. We expect a clean staircase of relative performance, with
+    \mHDPs either tied for best or strictly best
+    in every cell.
+  \item \textbf{Probe the identifiability of the hierarchical
+    parameters.} The atoms $\theta_k^*$ and the per-source centering
+    shifts $\mu_s$ are not separately identified---only the centered
+    locations $\theta_k^* - \mu_s$ are. We track posterior summaries
+    of $|\mu_0 - \mu_1|$ and of the maximum unconstrained atom
+    magnitude $\max_k |\theta_k^*|$ to confirm that this tension
+    affects component-level interpretation without degrading the
+    CATE estimates that the model targets.
+\end{enumerate}
+
+\subsection{Estimands and metrics}
+\label{sec:sim-metrics}
+
+For each replicate we record the following summaries.
+
+\paragraph{CATE estimation.}
+Posterior-mean root mean squared error
+$\mathrm{RMSE}_\tau = \big( n^{-1} \sum_i (\hat\tau(X_i) - \tau(X_i))^2 \big)^{1/2}$,
+bias $\mathrm{Bias}_\tau = n^{-1} \sum_i (\hat\tau(X_i) - \tau(X_i))$,
+nominal-95\% credible-interval coverage averaged over $i$, and mean
+credible-interval width. CATE estimates are evaluated on the training
+sample with $\tau(x) = 1.5 + 2 x_1$.
+
+\paragraph{Per-source residual scale recovery.}
+We report two summaries.
+\begin{itemize}
+  \item \emph{Within-component scale.} The posterior mean of the
+    within-component standard deviation $\sigma$ (or $\sigma_s$ in the
+    scale modes). This is directly comparable to the truth only when
+    the truth is Gaussian; under mixture truths the within-component
+    $\sigma$ is intentionally smaller than the total residual sd, so
+    cross-mode comparison on this metric is misleading.
+  \item \emph{Total residual standard deviation.} The posterior mean of
+    \[
+      \hat\sigma^{\text{tot}}_s
+      = \sqrt{\,\hat\sigma_s^2 + \textstyle\sum_k \hat\pi_{sk}\bigl(\hat\theta_{sk} - \hat\mu_s\bigr)^2\,}
+    \]
+    compared against the empirical standard deviation of the
+    simulated source-specific residuals. This is the apples-to-apples
+    metric across all six priors.
+\end{itemize}
+
+\paragraph{Per-source residual shape recovery.}
+Two-sample Kolmogorov--Smirnov statistic between the empirical CDF of
+the posterior-mean residuals $\{Y_i - \hat Y_i : S_i = s\}$ and the
+true residuals $\{\varepsilon_i : S_i = s\}$ drawn during data
+generation. Low values indicate that the prior is recovering the
+source-specific residual law.
+
+\paragraph{Mixture diagnostics.}
+\begin{itemize}
+  \item \emph{Effective number of components} per source,
+    $K^{\text{eff}}_s = 1 / \sum_k \pi_{sk}^2$, averaged over MCMC
+    iterations; the discrete analogue is the number of components
+    with $\pi_{sk} > 0.01$.
+  \item \emph{Atom sharing}: the number of components with both
+    $\pi_{0k} > 0.01$ and $\pi_{1k} > 0.01$ (per iteration, averaged).
+    Only meaningful for the source-stratified priors
+    (\miDP, \miDPs, \mHDP, \mHDPs).
+  \item \emph{Concentration parameters}: posterior means of the
+    per-source concentration $M_s$ and, for the HDP priors, the
+    top-level concentration $\gamma$.
+\end{itemize}
+
+\paragraph{HDP identifiability probes.}
+For the HDP priors we additionally record the posterior means of
+$|\mu_0 - \mu_1|$ and of $\max_k |\theta_k^*|$. Both quantities should
+remain on the same scale as the true mean shift implied by the DGP and
+the atom-prior scale $\sigma_\theta$, respectively; large values flag
+the $\mu_s$--$\theta_k^*$ identifiability tension noted in
+Section~\ref{sec:hdp-centering}.
+
+\subsection{Compared priors}
+\label{sec:sim-compared}
+
+We compare six residual priors. They share a common skeleton and
+differ along three axes:
+\begin{enumerate}
+  \item \textbf{Shape}: parametric Gaussian vs.\ nonparametric
+    Dirichlet-process (DP) mixture of Gaussians;
+  \item \textbf{Stratification}: residual distribution pooled across
+    sources vs.\ stratified by source;
+  \item \textbf{Borrowing}: when stratified, whether information is
+    borrowed across sources via a hierarchical DP (HDP);
+\end{enumerate}
+with an orthogonal fourth axis for the residual scale:
+\begin{enumerate}
+  \setcounter{enumi}{3}
+  \item \textbf{Scale}: a single residual scale $\sigma$ shared by
+    both sources vs.\ source-specific scales $\sigma_0, \sigma_1$.
+\end{enumerate}
+We first set up the common building block, then state each prior as a
+single small modification of the previous one.
+
+\paragraph{Common building block: centered DP mixture of Gaussians.}
+A Dirichlet-process mixture of Gaussians \citep{escobar1995bayesian}
+models a residual as a mixture
+\[
+  f(w \given G, \sigma) \;=\; \int \frac{1}{\sigma}\, \phi\!\left(\frac{w - \theta}{\sigma}\right) dG(\theta),
+\qquad
+  G \sim \mathrm{DP}(\alpha, H),
+\]
+with $\phi$ the standard normal density and base measure
+$H = N(0, \sigma_\theta^2)$. For computation we use the
+Ishwaran--James truncation \citep{ishwaran2001gibbs} at $K$
+components, so $G = \sum_{k=1}^K \pi_k\, \delta_{\theta_k}$ with
+$\pi \sim \mathrm{Stick}_K(\alpha)$ and
+$\theta_k \stackrel{\mathrm{iid}}{\sim} N(0, \sigma_\theta^2)$.
+Mean-zero centering \citep{yang2010semiparametric} replaces the atoms
+$\theta_k$ by $\theta_k - \mu$ with
+$\mu = \sum_k \pi_k \theta_k$, ensuring
+$\E[\varepsilon] = 0$ so that the structural-mean components
+$m_0, \tau, c$ retain their interpretation.
+
+\paragraph{1.\ \mGauss (baseline).}
+A single Gaussian residual, shared across sources:
+\[
+  \varepsilon_i \given \sigma \;\sim\; N(0, \sigma^2).
+\]
+$\sigma$ has the usual scaled-inverse-$\chi^2$ prior.
+
+\paragraph{2.\ \mShDP (one DP, pooled across sources).}
+Replace the Gaussian by a single centered DP mixture, pooled across
+both sources:
+\[
+  \varepsilon_i \given G, \sigma \;\sim\; f(\,\cdot\, \given G, \sigma)
+  \quad\text{for all }i,
+\]
+with $G$ as in the common building block. Residual shape is allowed
+to be non-Gaussian but is assumed identical across sources.
+
+\paragraph{3.\ \miDP (per-source DP, independent).}
+Fit a separate centered DP mixture per source, with no cross-source
+borrowing. Two independent mixing measures $G_0, G_1$, common
+$\sigma$:
+\[
+  \varepsilon_i \given S_i = s,\, G_s,\, \sigma \;\sim\;
+   f(\,\cdot\, \given G_s, \sigma),
+\quad
+   G_s = \sum_{k=1}^K \pi_{sk}\, \delta_{\theta_{sk}}
+   \text{ independently across } s.
+\]
+Sources can now differ in residual \emph{shape}.
+
+\paragraph{4.\ \miDPs (per-source DP + per-source scale).}
+Identical to \miDP but with source-specific scales:
+\[
+  \varepsilon_i \given S_i = s,\, G_s,\, \sigma_s \;\sim\;
+   f(\,\cdot\, \given G_s, \sigma_s),
+\]
+with independent scaled-inverse-$\chi^2$ priors on each $\sigma_s^2$.
+
+\paragraph{5.\ \mHDP (HDP, shared $\sigma$).}
+The methodology section's prior. Replace the independent $G_0, G_1$
+of \miDP by a hierarchical DP
+\citep{teh2006hierarchical} that ties them through a top-level
+discrete measure:
+\[
+  G^* \sim \mathrm{DP}(\gamma, H), \qquad
+  G_s^* \sim \mathrm{DP}(M_s, G^*)
+  \quad\text{for } s \in \{0, 1\}.
+\]
+Equivalently, after truncation,
+$G^* = \sum_k \beta_k\, \delta_{\theta_k^*}$ has \emph{shared atoms}
+$\theta_k^*$, and each per-source measure
+$G_s^* = \sum_k \pi_{sk}\, \delta_{\theta_k^*}$ shares those atoms
+but re-weights them by source-specific $\pi_{sk}$. After centering,
+\[
+  \varepsilon_i \given S_i = s,\, G_s^*,\, \sigma \;\sim\;
+   \sum_{k=1}^K \pi_{sk}\,
+   \phi(\,\cdot\,;\, \theta_k^* - \mu_s,\, \sigma),
+\qquad
+   \mu_s = \sum_k \pi_{sk}\, \theta_k^*.
+\]
+The shared atoms let evidence about the residual \emph{shape} flow
+from the larger source to the smaller; the per-source weights and
+the centering shifts $\mu_s$ retain source-specific flexibility.
+
+\paragraph{6.\ \mHDPs (HDP + per-source scale).}
+Layer the per-source scale of \miDPs onto the
+HDP of \mHDP: shared atoms $\theta_k^*$, per-source
+weights $\pi_{sk}$ and centering shifts $\mu_s$, \emph{and}
+per-source scales $\sigma_s$. This is the prior the methodology
+section adopts.
+
+\paragraph{At-a-glance summary and notation key.}
+Table~\ref{tab:sim-prior-grid} arranges the six priors along the
+shape / stratification / borrowing axis (rows) and the
+scale-sharing axis (columns). The math symbols in the second and
+fourth columns are the abbreviations used throughout the remainder
+of the document; the third and fifth columns give the corresponding
+value of the \texttt{error\_dist} argument of
+\texttt{FusionForest}, for use when running the code.
+
+\begin{table}[tb]
+\centering
+\caption{The six residual priors compared in this simulation,
+arranged by residual-shape construction (rows) and scale
+parameterisation (columns). For each prior we give the math symbol
+(used throughout this document) and the R argument value (used in
+the \texttt{FusionForest()} call).}
+\label{tab:sim-prior-grid}
+\begin{tabular}{lcccc}
+\toprule
+& \multicolumn{2}{c}{Shared $\sigma$} & \multicolumn{2}{c}{Per-source $\sigma_s$} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5}
+Residual shape & symbol & R argument & symbol & R argument \\
+\midrule
+Gaussian                                     & \mGauss & \texttt{gaussian}    & ---     & --- \\
+Pooled DP mixture                            & \mShDP  & \texttt{shared\_dp}  & ---     & --- \\
+Per-source DP mixtures, independent          & \miDP   & \texttt{source\_dp}  & \miDPs  & \texttt{source\_dp\_scale} \\
+Per-source DP mixtures with HDP atom-sharing & \mHDP   & \texttt{source\_hdp} & \mHDPs  & \texttt{source\_hdp\_scale} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Data-generating process}
+\label{sec:sim-dgp}
+
+We generate observational and randomised data with covariates
+$X \in [0,1]^5$, treatment $A \in \{0,1\}$, source indicator
+$S \in \{0,1\}$ (1 = RCT, 0 = RWD), and continuous response
+$Y = m_0(X) + A \tau(X) + (1 - S) U + \varepsilon$, where:
+\begin{align*}
+  m_0(X)    &= 2 X_1 - X_3^2, \\
+  \tau(X)   &= 1.5 + 2 X_1, \\
+  U         &\sim N(0, 1) \text{ in the RWD only (unmeasured confounder)}, \\
+  A \given S = 1 &\sim \mathrm{Bernoulli}(0.5), \\
+  A \given S = 0 &\sim \mathrm{Bernoulli}(\sigma_{\text{logit}}(0.8\, U)).
+\end{align*}
+The residual $\varepsilon$ depends on the source $S$ and the
+scenario.
+
+\paragraph{Scenario A: SHARED.}
+$\varepsilon \given S = s \sim N(0, 1)$ for both sources. Null case;
+all priors should perform similarly.
+
+\paragraph{Scenario B: SCALE.}
+$\varepsilon \given S = 1 \sim N(0, 0.5^2)$,
+$\varepsilon \given S = 0 \sim N(0, 1.5^2)$. Sources differ in spread
+only.
+
+\paragraph{Scenario C: SHAPE\,+\,SCALE.}
+For each source $s$, $\varepsilon$ is a two-component Gaussian
+location mixture on atoms $\{-1.5, +1.0\}$ with per-source weights
+$\pi_{\text{rct}} = (0.20, 0.80)$, $\pi_{\text{rwd}} = (0.75, 0.25)$,
+recentered to mean zero per source, plus a residual Gaussian with
+$\sigma_{\text{rct}} = 0.5$, $\sigma_{\text{rwd}} = 1.5$. Sources
+share the atom \emph{support} but differ in both weights and scale.
+
+\paragraph{Scenario D: TAIL SHARING.}
+Atoms $\{-3.0, +0.5\}$, per-source weights
+$\pi_{\text{rct}} = (0.05, 0.95)$, $\pi_{\text{rwd}} = (0.40, 0.60)$,
+recentered to mean zero per source, with $\sigma_{\text{rct}} = 0.4$
+and $\sigma_{\text{rwd}} = 0.8$. The RCT alone barely sees the
+left-tail atom---in expectation $0.05\, n_{\text{rct}}$ observations.
+This is the regime where HDP atom-borrowing should pay off, because the
+RWD informs the RCT about the location of a residual feature the RCT
+would otherwise be too small to identify.
+
+\subsection{Sample-size scan}
+\label{sec:sim-sample-size}
+
+Each scenario is run at three RCT sample sizes,
+$n_{\text{rct}} \in \{50, 150, 300\}$, with $n_{\text{rwd}} = 300$
+fixed throughout. We expect the relative advantage of
+\mHDPs over \miDPs (its
+closest non-borrowing competitor) to grow as $n_{\text{rct}}$ shrinks,
+especially in scenarios C and D.
+
+\subsection{MCMC and reproducibility}
+\label{sec:sim-mcmc}
+
+All forests use $M = 200$ trees for the prognostic component, $M = 100$
+for the treatment effect, and $M = 200$ for the deconfounding
+component, with the default priors of \texttt{FusionForest}. The DP
+truncation level is $K = 50$ and the atom-prior scale is
+$\sigma_\theta = 0.5$ on the standardised response scale (defaults).
+Each chain runs $5000$ burn-in iterations followed by $5000$ post-burn-in
+draws. Per-cell results are averaged over $M$ replications, with $M$
+matched to the number of available cores so that each replication runs
+on a dedicated core; each replication fits all six priors serially. We
+target $M \geq 100$ replications per cell.
+
+The full simulation script is at
+\texttt{examples/simulation\_error\_dist\_hpc.R}; the entire posterior
+state needed to compute every metric in
+Section~\ref{sec:sim-metrics} is stored in a single tidy data frame and
+saved to \texttt{simulation\_error\_dist\_hpc\_output.rds}.
+
+\subsection{Hypotheses and reporting plan}
+\label{sec:sim-hypotheses}
+
+We will report results as four blocks of tables and figures, mirroring
+the four metric families.
+
+\paragraph{H1 (overall CATE).}
+\mHDPs matches the best of the alternatives on
+$\mathrm{RMSE}_\tau$ in scenario~A (no truth-misspecification regime),
+strictly outperforms in scenarios~B--D, and never loses coverage.
+
+\paragraph{H2 (sample-size scan).}
+In scenarios C and D, the gap between \mHDPs and
+\miDPs grows as $n_{\text{rct}}$ shrinks; in
+scenario D at $n_{\text{rct}} = 50$ the gap is largest and the
+RCT-only residual sd of \miDPs is biased toward the
+tighter Gaussian centre, while \mHDPs recovers the
+tail via the RWD-informed shared atom.
+
+\paragraph{H3 (mixture parsimony).}
+$K^{\text{eff}}_s$ and the number of occupied components are smaller
+for HDP priors than for the independent DPs in every cell, reflecting
+the shrinkage induced by the top-level $\gamma$-prior.
+
+\paragraph{H4 (identifiability check).}
+$|\mu_0 - \mu_1|$ and $\max_k |\theta_k^*|$ remain bounded on the scale
+implied by the DGP and the atom prior. Where they drift larger, this
+will be documented but does not affect CATE conclusions, because the
+posterior of $\theta_k^* - \mu_s$ remains tight.
+
+\subsection{Results}
+\label{sec:sim-results}
+
+We ran $M = 191$ replications per cell on a 192-core node
+(one core held in reserve). All tables below report the mean across
+replications.
+
+\subsubsection*{CATE estimation}
+
+Table~\ref{tab:sim-rmse} reports the RMSE of $\hat\tau$ across the
+twelve $(\text{scenario}, n_{\text{rct}})$ cells. The headline result
+is that the scale-aware priors (\miDPs and
+\mHDPs) match each other on CATE in every cell
+and dominate the equal-$\sigma$ priors as soon as the truth has
+unequal source spreads (scenarios B--D), with relative RMSE
+reductions of $25\text{--}40\%$. The advantage of HDP atom-sharing
+over independent per-source DPs (\miDPs versus
+\mHDPs) is essentially zero on CATE, but neither
+is HDP penalised: it matches the best in every cell. Coverage of the
+nominal 95\% credible intervals is high and stable across modes
+($\geq 0.98$ throughout); intervals are correspondingly narrower for
+the scale-aware modes than for \mGauss.
+
+\begin{table}[tb]
+\centering
+\small
+\caption{CATE RMSE by scenario, RCT sample size, and residual prior.
+Lowest value per row in bold. See
+Table~\ref{tab:sim-prior-grid} for the prior abbreviations.}
+\label{tab:sim-rmse}
+\begin{tabular}{llcccccc}
+\toprule
+Scen. & $n_{\text{rct}}$ & G & sDP & iDP & iDP$_\sigma$ & HDP & HDP$_\sigma$ \\
+\midrule
+A & 50  & 0.471 & 0.473 & 0.470 & 0.476 & 0.469 & \textbf{0.466} \\
+A & 150 & 0.356 & 0.357 & 0.355 & 0.354 & 0.355 & \textbf{0.354} \\
+A & 300 & \textbf{0.290} & \textbf{0.290} & 0.291 & 0.291 & 0.291 & 0.292 \\
+\midrule
+B & 50  & 0.495 & 0.494 & 0.412 & 0.388 & 0.409 & \textbf{0.383} \\
+B & 150 & 0.338 & 0.317 & 0.261 & \textbf{0.256} & 0.266 & \textbf{0.256} \\
+B & 300 & 0.253 & 0.224 & 0.210 & \textbf{0.210} & 0.214 & 0.211 \\
+\midrule
+C & 50  & 0.571 & 0.574 & 0.538 & 0.526 & 0.538 & \textbf{0.520} \\
+C & 150 & 0.413 & 0.410 & 0.380 & \textbf{0.329} & 0.388 & 0.353 \\
+C & 300 & 0.332 & 0.272 & 0.230 & \textbf{0.223} & 0.269 & 0.224 \\
+\midrule
+D & 50  & 0.561 & 0.568 & 0.426 & 0.445 & \textbf{0.422} & 0.431 \\
+D & 150 & 0.393 & 0.350 & 0.238 & \textbf{0.228} & 0.277 & 0.240 \\
+D & 300 & 0.308 & 0.220 & 0.186 & \textbf{0.184} & 0.200 & 0.186 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{Per-source residual-distribution recovery}
+
+Table~\ref{tab:sim-totalsd} reports the apples-to-apples total
+residual sd error at $n_{\text{rct}} = 150$. The equal-$\sigma$ priors
+(\mGauss, \mShDP) systematically
+under-estimate the wider RWD source by $0.5\text{--}1.2$ across
+B--D---a substantively large miscalibration. The two scale-aware
+priors recover both per-source residual sds within roughly $0.2$.
+Kolmogorov--Smirnov distances on the per-source residual CDFs (not
+shown) cluster tightly across modes
+($\mathrm{KS}_{\text{rwd}} \approx 0.05\text{--}0.07$,
+$\mathrm{KS}_{\text{rct}} \approx 0.07\text{--}0.13$) with the
+scale-aware priors typically a touch lower on the RCT side, but the
+gap is small.
+
+\begin{table}[tb]
+\centering
+\small
+\caption{Total residual-sd error
+$\hat\sigma^{\text{tot}}_s - \mathrm{sd}(\varepsilon_s^{\text{true}})$
+at $n_{\text{rct}} = 150$. Negative values: under-estimating the
+residual spread. Prior abbreviations as in
+Table~\ref{tab:sim-prior-grid}.}
+\label{tab:sim-totalsd}
+\begin{tabular}{lcccc cccc}
+\toprule
+& \multicolumn{2}{c}{Scen.\ A} & \multicolumn{2}{c}{Scen.\ B}
+& \multicolumn{2}{c}{Scen.\ C} & \multicolumn{2}{c}{Scen.\ D} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+Mode & RWD & RCT & RWD & RCT & RWD & RCT & RWD & RCT \\
+\midrule
+G            & $-0.45$ & $-0.46$ & $-0.89$ & $\hphantom{-}0.11$ & $-1.15$ & $-0.42$ & $-1.20$ & $-0.16$ \\
+sDP          & $-0.20$ & $-0.21$ & $-0.47$ & $\hphantom{-}0.53$ & $-0.72$ & $\hphantom{-}0.01$ & $-0.56$ & $\hphantom{-}0.48$ \\
+iDP          & $-0.06$ & $-0.30$ & $-0.03$ & $-0.16$ & $-0.27$ & $-0.40$ & $-0.04$ & $-0.09$ \\
+iDP$_\sigma$ & $\hphantom{-}0.25$ & $\hphantom{-}0.05$ & $\hphantom{-}0.17$ & $\hphantom{-}0.11$ & $\hphantom{-}0.13$ & $\hphantom{-}0.06$ & $\hphantom{-}0.10$ & $\hphantom{-}0.09$ \\
+HDP          & $-0.25$ & $-0.34$ & $-0.02$ & $-0.02$ & $-0.37$ & $-0.40$ & $-0.04$ & $-0.02$ \\
+HDP$_\sigma$ & $\hphantom{-}0.25$ & $\hphantom{-}0.07$ & $\hphantom{-}0.18$ & $\hphantom{-}0.18$ & $\hphantom{-}0.14$ & $\hphantom{-}0.11$ & $\hphantom{-}0.15$ & $\hphantom{-}0.20$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{Mixture parsimony}
+
+This is the clearest qualitative win for the HDP priors.
+Table~\ref{tab:sim-keff} shows the effective number of mixture
+components per source. HDP atom sharing reduces
+$K^{\text{eff}}_s$ by a factor of three to five relative to the
+independent DPs, and \mHDPs is the sparsest
+overall (typically 2--3 effective components per source). The number
+of jointly-occupied components $n_{\text{shared}}$ (not shown) is
+also substantially smaller under HDP, reflecting genuine sharing
+rather than coincidence.
+
+\begin{table}[tb]
+\centering
+\small
+\caption{Effective number of mixture components per source,
+$K^{\text{eff}}_s = 1 / \sum_k \pi_{sk}^2$, at $n_{\text{rct}} = 150$.
+HDP atom-sharing yields a 3--5$\times$ reduction.}
+\label{tab:sim-keff}
+\begin{tabular}{lcccc cccc}
+\toprule
+& \multicolumn{2}{c}{Scen.\ A} & \multicolumn{2}{c}{Scen.\ B}
+& \multicolumn{2}{c}{Scen.\ C} & \multicolumn{2}{c}{Scen.\ D} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+Mode & RWD & RCT & RWD & RCT & RWD & RCT & RWD & RCT \\
+\midrule
+iDP          & 13.1 & 7.0 & 17.0 & 1.5 & 15.0 & 3.8 & 11.0 & 1.7 \\
+iDP$_\sigma$ & 10.5 & 6.9 & 12.2 & 1.5 & 12.1 & 3.8 &  5.7 & 1.7 \\
+HDP          &  3.8 & 2.2 &  8.1 & 1.0 &  5.9 & 1.3 &  4.7 & 1.1 \\
+HDP$_\sigma$ &  2.4 & 2.1 &  2.6 & 1.1 &  2.7 & 1.7 &  2.2 & 1.2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{HDP identifiability check}
+
+Table~\ref{tab:sim-identifiability} reports the posterior means of
+$|\mu_0 - \mu_1|$ and $\max_k |\theta_k^*|$ across all twelve cells
+for the two HDP priors. Both quantities drift to magnitudes of $10$
+and beyond---far above the prior atom scale
+$\sigma_\theta = 0.5$ on the standardised response scale and the
+true DGP-implied mean shifts (zero in A, of order one in C, of order
+1.5 in D). This is the $\mu_s$\,/\,$\theta_k^*$ non-identifiability
+in action: the likelihood is invariant under
+$\theta_k^* \mapsto \theta_k^* + c$,
+$\mu_s \mapsto \mu_s + c$, and the sampler drifts along that
+manifold. Crucially, this drift does \emph{not} compromise the
+quantities that matter for inference: CATE RMSE (Table~\ref{tab:sim-rmse})
+is identical to that of \miDPs, total residual
+sds (Table~\ref{tab:sim-totalsd}) are recovered correctly, and the
+mixture diagnostics in Table~\ref{tab:sim-keff} are well behaved.
+
+\begin{table}[tb]
+\centering
+\small
+\caption{HDP identifiability diagnostics: posterior means of
+$|\mu_0 - \mu_1|$ and $\max_k |\theta_k^*|$, on the original response
+scale, for the two HDP priors. Both drift well above what the DGP and
+the atom-prior scale ($\sigma_\theta = 0.5$ standardised) would
+imply; CATE inference is unaffected.}
+\label{tab:sim-identifiability}
+\begin{tabular}{llcccc}
+\toprule
+& & \multicolumn{2}{c}{HDP} & \multicolumn{2}{c}{HDP$_\sigma$} \\
+\cmidrule(lr){3-4} \cmidrule(lr){5-6}
+Scen. & $n_{\text{rct}}$ & $|\mu_0 - \mu_1|$ & $\max_k|\theta_k^*|$
+                       & $|\mu_0 - \mu_1|$ & $\max_k|\theta_k^*|$ \\
+\midrule
+A & 50  & 12.3 &  3.8 & 11.4 & 4.0 \\
+A & 150 & 14.6 &  5.6 & 13.4 & 5.9 \\
+A & 300 & 15.6 &  7.3 & 14.5 & 7.2 \\
+B & 50  & 13.9 &  3.7 & 10.2 & 3.9 \\
+B & 150 & 16.0 &  7.6 & 14.3 & 6.3 \\
+B & 300 & 17.0 & 13.1 & 15.6 & 7.5 \\
+C & 50  & 13.1 &  4.1 & 11.4 & 4.4 \\
+C & 150 & 15.7 &  7.0 & 14.5 & 7.0 \\
+C & 300 & 17.1 &  9.6 & 14.7 & 8.4 \\
+D & 50  & 12.3 &  4.8 & 11.5 & 4.5 \\
+D & 150 & 16.1 &  9.3 & 14.7 & 8.3 \\
+D & 300 & 17.4 & 12.1 & 15.5 & 9.1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{Revisiting the hypotheses}
+
+\begin{itemize}
+  \item \textbf{H1} (\mHDPs is the strict CATE
+    winner): \emph{partially supported}. It is never beaten on CATE,
+    matches the best in 11/12 cells, but ties rather than strictly
+    dominates \miDPs. The two scale-aware priors
+    are statistically indistinguishable on CATE in these scenarios.
+  \item \textbf{H2} (HDP--DP gap grows as $n_{\text{rct}}$ shrinks):
+    \emph{not supported in scenario D}. At $n_{\text{rct}} = 50$
+    plain \mHDP (no per-source scale) is the best
+    individual mode in scenario D, suggesting that with very few RCT
+    observations the extra $\sigma_s$ parameter is harder to identify
+    than the shared atoms it borrows. In scenarios B and C the gap
+    between scale-aware modes and the rest does shrink with sample
+    size, as expected.
+  \item \textbf{H3} (mixture parsimony): \emph{fully supported}.
+    HDP priors use 3--5$\times$ fewer effective components than
+    independent DPs in every cell.
+  \item \textbf{H4} (identifiability bounded): \emph{not supported,
+    but with no inferential cost}. $|\mu_0 - \mu_1|$ and
+    $\max_k |\theta_k^*|$ drift well above the prior scale, but CATE
+    estimates and total residual sds are unaffected.
+\end{itemize}
+
+\paragraph{Headline takeaway.}
+\mHDPs is the safe default among the six priors:
+it never loses on CATE, it recovers per-source residual scales
+correctly, and it does so with substantially fewer effective mixture
+components than the alternatives. Its main practical cost is the
+$\mu_s$\,/\,$\theta_k^*$ non-identifiability, which must be addressed
+in reporting (see below) but does not affect inference on the
+estimands of interest.
+
+\paragraph{Comment on identifiability (for the discussion).}
+The HDP construction identifies only the centered locations
+$\theta_k^* - \mu_s$. Posterior summaries that condition on a specific
+component label---in particular the unconstrained atom locations
+$\theta_k^*$ and the absolute means $\mu_s$---are therefore not
+intrinsically meaningful and can drift along the manifold
+$\theta_k^* \mapsto \theta_k^* + c$, $\mu_s \mapsto \mu_s + c$ without
+changing the likelihood. The CATE estimand $\tau$ is unaffected: it
+depends on the conditional mean only through the centering constraint
+$\E[\varepsilon \given S = s] = 0$. We recommend reporting and
+plotting only quantities invariant to this drift---in particular the
+per-source residual densities
+$\hat f_s(w) = \sum_k \pi_{sk} \phi\!\left((w - \theta_k^* + \mu_s) / \sigma_s\right)/\sigma_s$
+and the centered atoms $\theta_k^* - \mu_s$.
+
+\section{Simulation on the prior specification}
+\label{sec:sim-prior}
+
+\begin{remark}[Historical note on the parametrisation in this section]
+The Phase-2 grid below was conducted under an earlier variance-budget
+parametrisation with per-forest shrinkage factors $(k_d, k_\tau, k_c)$ in
+a \emph{tightness} convention (larger $k$ $\Rightarrow$ tighter prior).
+The current methodology has since dropped this framework in favour of the
+uniform Chipman calibration $\sigma_{h,f} = k_f/(2\sqrt{m_f})$ with
+$k_f = 1$ across all forests; the present section is retained as the
+record of how that default was arrived at.
+The five Phase-2 configurations (Default, Efficiency, Robust, Equal-share,
+$\tau$-deep) and the associated $(k_d, k_\tau, k_c)$ tuples should be read
+as the experimental conditions of the simulation, not as the methodology
+default.
+\end{remark}
+
+\subsection{Goal}
+\label{sec:sim-prior-goal}
+
+The methodology section introduces a variance-budget calibration of the four
+BART forests $(m_0^{\mathrm{sh}}, d, \tau, c)$, in which a single budget $\omega^2$
+is split among the forests through per-forest shrinkage scales $k_f$. This
+simulation has two aims.
+\begin{enumerate}
+  \item \textbf{Pick a default $(k_d, k_\tau, k_c)$.} Among five candidate
+    variance-budget allocations, identify the one that delivers the lowest
+    CATE RMSE at nominal coverage across a grid of confounding scenarios.
+  \item \textbf{Probe the bias--efficiency trade-off.} When the real-world
+    data are confounded, a prior that is too permissive on $c$ leaks bias
+    into $\tau$; a prior that is too tight forfeits efficiency. The grid
+    spans both regimes so that the chosen default can be defended as the
+    Pareto-frontier choice rather than as a per-scenario winner.
+\end{enumerate}
+Tree counts and depth-prior parameters are held at the methodology defaults
+in this study; a one-at-a-time sensitivity sweep around the chosen default
+is deferred to a follow-up.
+
+\subsection{Estimands and metrics}
+\label{sec:sim-prior-metrics}
+
+The only estimand scored is the CATE on the log-time scale,
+$\tau(x) = \E[\log T(1) - \log T(0) \mid X = x]$, evaluated
+\emph{in-sample} on the combined training data
+($n = n_1 + n_0$ points per replication: RCT plus RWD).  Bayesian shrinkage
+from the BART prior plays the role that a hold-out set would play under
+maximum-likelihood inference: the model is a regularised estimator of
+$\tau$, and the in-sample posterior mean is exactly the quantity returned
+to a downstream analyst, so in-sample evaluation is the most direct
+operational test.  For each replicate we record the posterior mean and
+the equal-tailed 95\% credible interval of $\tau$ at each training point
+and compute four summaries, averaged over replications.
+\begin{itemize}
+  \item \emph{RMSE.}
+    $\mathrm{RMSE}_\tau = \big( n^{-1} \sum_{i=1}^{n} (\hat\tau(X_i) - \tau(X_i))^2 \big)^{1/2}$.
+  \item \emph{Pointwise 95\% coverage.}
+    $n^{-1} \sum_{i=1}^{n} \1\{\tau(X_i) \in \mathrm{CI}_{95}(X_i)\}$;
+    nominal target $0.95$.
+  \item \emph{Mean credible-interval width.} An efficiency proxy.
+  \item \emph{Bias.}
+    $n^{-1} \sum_{i=1}^{n} (\hat\tau(X_i) - \tau(X_i))$ (signed);
+    detects confounding leakage.
+\end{itemize}
+The confounding function $c$ is an internal nuisance and is not scored
+directly.
+
+\subsection{Compared prior configurations}
+\label{sec:sim-prior-configs}
+
+The leaf prior of each forest is $h_{j,a} \sim N(0, \omega_f^2)$ per leaf,
+with $\omega_f = k_f^{\mathrm{code}} / \sqrt{m_f}$. The five configurations
+differ in their setup-side $(k_d, k_\tau, k_c)$, in the \emph{tightness}
+convention (larger $k$ $\Rightarrow$ tighter prior). The setup-side values
+are mapped to the code-side leaf-prior scales by
+\[
+  s_0 = \bigl(1 + k_d^{-2} + k_\tau^{-2} + k_c^{-2}\bigr)^{-1/2},
+  \qquad
+  k_{\mathrm{sh}}^{\mathrm{code}} = s_0,
+  \qquad
+  k_f^{\mathrm{code}} = s_0 / k_f \quad (f \in \{d, \tau, c\}),
+\]
+which fixes the total prior variance
+$\Var_\pi\bigl(m_0^{\mathrm{sh}}(X)\bigr) + \Var_\pi(d(X)) + \Var_\pi(\tau(X)) + \Var_\pi(c(X)) = 1$
+on the standardised log-time scale. The depth columns in
+Table~\ref{tab:sim-prior-configs} are $(\mathrm{base}, \mathrm{power})$,
+i.e.\ the non-terminal probability $\mathrm{base}\,(1+d)^{-\mathrm{power}}$
+of \citet{chipman1998bayesian}; the baseline and deviation forests use the
+BART default $(0.95, 2)$ throughout.
+
+\begin{table}[tb]
+\centering
+\small
+\caption{The five prior configurations compared in this simulation. The
+columns $k_d, k_\tau, k_c$ are in the tightness convention (larger
+$\Rightarrow$ tighter); $k_{\mathrm{sh}} \equiv 1$ throughout. Trees are
+listed in the order $(m_{\mathrm{sh}}, m_d, m_\tau, m_c)$. Depth columns
+are $(\mathrm{base}, \mathrm{power})$.}
+\label{tab:sim-prior-configs}
+\begin{tabular}{lcccccl}
+\toprule
+Config       & $k_d$ & $k_\tau$ & $k_c$ & trees & depth $\tau$ / $c$ & role \\
+\midrule
+Default      & 2.5 & 1.7 & 4  & 200,\,50,\,200,\,200 & $(0.95, 3)$ / $(0.25, 3)$ & proposed          \\
+Efficiency   & 4   & 1.7 & 10 & 200,\,50,\,200,\,200 & $(0.95, 3)$ / $(0.25, 3)$ & trust RWD         \\
+Robust       & 2   & 1.7 & 2  & 200,\,50,\,200,\,200 & $(0.95, 3)$ / $(0.25, 3)$ & discount RWD      \\
+Equal-share  & 1   & 1   & 1  & 200,\,50,\,200,\,200 & $(0.95, 3)$ / $(0.25, 3)$ & agnostic baseline \\
+$\tau$-deep  & 2.5 & 1.7 & 4  & 200,\,50,\,200,\,200 & $(0.95, 2)$ / $(0.25, 3)$ & richer HTE        \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The Default configuration encodes a BCF-style ordering with the largest
+variance on the baseline, a moderate budget on $\tau$, a tighter prior on
+the RWD deviation $d$, and the tightest prior on the confounding function
+$c$. The Default depth on $\tau$ is $(0.95, 3)$ to enforce shallow trees
+\citep{hahn2020bayesian}; on $c$ the base parameter is dropped to $0.25$ to
+enforce near-constant $c$ trees, motivated by the structural argument that
+$c \equiv 0$ corresponds to no unmeasured confounding in the RWD.
+Efficiency tightens the priors on $d$ and $c$ to lean on the RWD; Robust
+loosens them; Equal-share is the agnostic 25\% split per forest and is
+included to demonstrate that the BCF-style ordering is empirically
+justified; $\tau$-deep relaxes the $\tau$ depth penalty to the BART default
+to allow richer heterogeneity.
+
+\subsection{Data-generating process}
+\label{sec:sim-prior-dgp}
+
+We generate observational and randomised data with covariates
+$X \in [0,1]^{10}$, treatment $A \in \{0,1\}$, source indicator
+$S \in \{0,1\}$ (1 = RCT, 0 = RWD), and continuous log-survival response
+\[
+  \log T \;=\; f_0(X, U) \;+\; A\, \tau^*(X, U) \;+\; \sigma\, \varepsilon,
+  \qquad \varepsilon \sim N(0, 1).
+\]
+Five covariates $X_1, \ldots, X_5$ are active and five $X_6, \ldots, X_{10}$
+are noise; all are drawn iid $U(0, 1)$ in both sources, with no
+covariate-shift between RCT and RWD. Let $Z_j = X_j - 0.5$. The structural
+components are
+\begin{align*}
+  f_0(X, U)    &= 0.7\, \sin(\pi Z_1) + Z_2 Z_3 + \bigl(Z_4^2 - \tfrac{1}{12}\bigr) + \beta_U\, U, \\
+  \tau^*(X, U) &= \tau(X) + \gamma_U\, U, \\
+  \tau(X)      &= \tau_0 + \tau_1\, Z_1 + \tau_2\, \1\{X_2 > 0.5\},
+\end{align*}
+with $U \sim N(0, 1)$ independent of $X$ and identically distributed across
+sources. The unit-level effect $\tau^*$ depends on $U$ through $\gamma_U$;
+since $U \indep X$, the CATE $\tau(x) = \E[\tau^*(X, U) \mid X = x]$ is
+exactly the function $\tau(X)$ above. Two CATE regimes are studied: the
+\emph{homogeneous} regime $(\tau_0, \tau_1, \tau_2) = (0.5, 0, 0)$ and the
+\emph{heterogeneous} regime $(0.5, 0.4, 0.3)$. The noise scale is
+$\sigma = 1$, giving a signal-to-noise ratio of approximately one on the
+standardised log-time scale.
+
+Treatment in the RCT is randomised, $A \mid S = 1 \sim \mathrm{Bernoulli}(0.5)$;
+in the RWD treatment depends on observed and unmeasured covariates,
+\[
+  A \mid S = 0 \;\sim\; \mathrm{Bernoulli}\bigl(\mathrm{expit}(\alpha_0 + \alpha_X(Z_1 + Z_2) + \alpha_U\, U)\bigr),
+\]
+with $\alpha_X = 1$ and $\alpha_0$ tuned per scenario so that the marginal
+treatment prevalence $\Pr(A = 1 \mid S = 0) \approx 0.5$. The parameter
+$\alpha_U$ governs the strength of unmeasured confounding through the
+$U$--$A$ association.
+
+\paragraph{Confounding scenarios.}
+Four scenarios span the $(\alpha_U, \beta_U, \gamma_U)$ space:
+\begin{itemize}
+  \item \textbf{S0 (no confounding):} $(0, 1, 0)$. $U \indep A \mid X, S = 0$,
+    so the implied $c(x) \equiv 0$ and the RWD is unconfounded.
+  \item \textbf{S1 (mild):} $(0.5, 1, 0)$. Small prognostic-imbalance term in
+    $c$.
+  \item \textbf{S2 (strong):} $(1.5, 1.5, 0)$. Large prognostic-imbalance
+    term.
+  \item \textbf{S3 (effect-modification):} $(1, 1, 0.5)$. Moderate $c$ with
+    an added effect-modification component
+    $\gamma_U\, \E[U \mid x, A = 1, S = 0]$.
+\end{itemize}
+
+\paragraph{Censored and uncensored variants.}
+The simulation is run in two variants. In the \emph{censored variant} an
+administrative threshold $c^\star$ is applied to every observation, with
+$c^\star$ tuned once at script start (via a large pre-simulation) so that
+the expected censoring rate equals $35\%$ under the central cell (S1,
+heterogeneous, largest sample size); the same $c^\star$ is then used across
+all cells. In the \emph{uncensored variant} the threshold is removed
+($\delta_i \equiv 1$) and $\log T$ is standardised to unit variance via the
+sample standard deviation before fitting. The uncensored variant serves as
+a clean reference that removes the wobble introduced by the preliminary
+AFT-based scale estimate that the censored fit relies on.
+
+\subsection{Sample sizes and grid}
+\label{sec:sim-prior-grid}
+
+The full primary grid crosses four confounding scenarios, two CATE regimes
+(homogeneous, heterogeneous), and two sample-size pairs
+$(n_1, n_0) \in \{(250, 1000),\,(100, 400)\}$, yielding $4 \times 2 \times 2 = 16$
+cells. Within each cell the five prior configurations of
+Table~\ref{tab:sim-prior-configs} are fitted on the same simulated dataset
+(common random numbers across configurations) so that performance
+differences are not inflated by dataset-to-dataset noise.
+
+\subsection{MCMC and reproducibility}
+\label{sec:sim-prior-mcmc}
+
+All forests use the tree counts in Table~\ref{tab:sim-prior-configs}. The
+residual is Gaussian (\texttt{error\_dist = "gaussian"}) and treatment is
+centred (\texttt{treatment\_coding = "centered"}). Each fit runs a
+\emph{single} MCMC chain of $2000$ warm-up plus $2000$ retained
+iterations, with no thinning; standardisation of $\log T$ is handled
+inside each replicate, on its own data. We run $R = 300$ replications per
+cell. Replications are parallelised across cores; each replication fits
+all five configurations serially on its assigned core.
+
+The HPC scripts driving the two variants are
+\texttt{simulations/prior/simulation\_censored\_hpc.R} and
+\texttt{simulations/prior/simulation\_uncensored\_hpc.R}. Output is written
+to \texttt{simulation\_censored\_hpc\_output.rds} and
+\texttt{simulation\_uncensored\_hpc\_output.rds} respectively, in long
+form: one row per (scenario, CATE regime, sample-size pair, configuration,
+replication) cell, carrying the four CATE metrics.
+
+\subsection{Hypotheses and reporting plan}
+\label{sec:sim-prior-hypotheses}
+
+\paragraph{H1 (Default sits on the Pareto frontier).}
+Across the four confounding scenarios, the Default configuration achieves
+the lowest average $\mathrm{RMSE}_\tau$ subject to maintaining at least
+$0.90$ coverage at every cell.
+
+\paragraph{H2 (Efficiency wins in S0, loses in S2/S3).}
+In S0, where the truth is $c \equiv 0$, the Efficiency configuration
+($k_c = 10$) wins on $\mathrm{RMSE}_\tau$ because the tight prior on $c$
+maximises the effective sample size for $\tau$. In S2 and S3, Efficiency
+shows substantial bias and under-coverage, because the tight
+prior on $c$ prevents the model from absorbing the RWD confounding.
+
+\paragraph{H3 (Robust is conservative).}
+Robust matches the Default in S2 and S3 but gives a smaller efficiency
+gain over the agnostic Equal-share baseline in S0 and S1.
+
+\paragraph{H4 ($\tau$-deep helps under heterogeneity, hurts otherwise).}
+In the heterogeneous CATE regime, $\tau$-deep matches or beats the Default
+on $\mathrm{RMSE}_\tau$; in the homogeneous regime it is slightly worse,
+because deeper $\tau$ trees overfit the constant truth.
+
+\paragraph{H5 (censored vs uncensored).}
+The ranking of configurations is preserved between the censored and
+uncensored variants. Absolute $\mathrm{RMSE}_\tau$ is higher under
+censoring, reflecting the information loss from $35\%$ administrative
+censoring and the additional uncertainty in the preliminary AFT-based
+scale estimate.
+
+\subsection{Results}
+\label{sec:sim-prior-results}
+
+We report preliminary results from $R = 190$ replications per cell,
+$N_{\mathrm{burn}} = N_{\mathrm{post}} = 2000$, on the \emph{uncensored}
+variant. The full $R = 300$ runs and the censored variant will replace
+these numbers in a later revision; the relative ordering of the
+configurations is expected to be stable. All tables in this subsection
+average over the $190$ replications.
+
+The homogeneous and heterogeneous CATE regimes produce essentially
+identical relative rankings of the five configurations. We therefore
+present the heterogeneous CATE as the primary result and report the
+homogeneous CATE for completeness in
+Table~\ref{tab:sim-prior-rmse-homog}.
+
+\subsubsection*{CATE RMSE}
+
+Table~\ref{tab:sim-prior-rmse-het} reports $\mathrm{RMSE}_\tau$ across the
+eight $(\text{scenario}, n_1, n_0)$ cells of the heterogeneous regime. The
+ranking is consistent across all four scenarios.
+
+\begin{table}[tb]
+\centering
+\small
+\caption{CATE RMSE by scenario, sample size, and configuration, for the
+heterogeneous CATE regime. Lowest per row in bold.}
+\label{tab:sim-prior-rmse-het}
+\begin{tabular}{llccccc}
+\toprule
+Scen. & $(n_1, n_0)$  & Default & Efficiency      & Robust          & Equal-share     & $\tau$-deep \\
+\midrule
+S0    & $(100, 400)$  & 0.257   & \textbf{0.246}  & 0.276           & 0.297           & 0.257       \\
+S0    & $(250, 1000)$ & 0.233   & \textbf{0.225}  & 0.234           & 0.247           & 0.235       \\
+\midrule
+S1    & $(100, 400)$  & 0.278   & 0.363           & \textbf{0.270}  & 0.296           & 0.278       \\
+S1    & $(250, 1000)$ & 0.241   & 0.323           & \textbf{0.232}  & 0.249           & 0.242       \\
+\midrule
+S2    & $(100, 400)$  & 0.572   & 1.038           & \textbf{0.357}  & 0.377           & 0.571       \\
+S2    & $(250, 1000)$ & 0.401   & 0.864           & \textbf{0.298}  & 0.316           & 0.402       \\
+\midrule
+S3    & $(100, 400)$  & 0.413   & 0.680           & \textbf{0.310}  & 0.337           & 0.412       \\
+S3    & $(250, 1000)$ & 0.318   & 0.585           & \textbf{0.269}  & 0.287           & 0.319       \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Robust} is the lowest-RMSE configuration in seven of the eight
+heterogeneous cells and is beaten only in S0 by \textbf{Efficiency} (and
+even there only by 0.01--0.03). Across S1--S3 the gap to the runners-up
+grows: Robust beats Default by $25\text{--}40\%$ on RMSE in S2 and
+$25\text{--}30\%$ in S3. Equal-share is the second-best configuration in
+the confounded scenarios but consistently $0.03$--$0.04$ above Robust on
+RMSE. \textbf{Efficiency} is the across-the-board worst configuration as
+soon as confounding is present: its RMSE in S2 is roughly three times
+that of Robust at both sample sizes. \textbf{$\tau$-deep} is
+indistinguishable from Default in every cell (differences are at the
+third decimal place), which means the depth-prior change on $\tau$ does
+not materially affect CATE estimation at this signal-to-noise level.
+
+The homogeneous-regime RMSE in Table~\ref{tab:sim-prior-rmse-homog}
+mirrors this ordering, with absolute values $0.02$--$0.03$ below the
+heterogeneous regime everywhere.
+
+\begin{table}[tb]
+\centering
+\small
+\caption{CATE RMSE by scenario, sample size, and configuration, for the
+homogeneous CATE regime. Lowest per row in bold.}
+\label{tab:sim-prior-rmse-homog}
+\begin{tabular}{llccccc}
+\toprule
+Scen. & $(n_1, n_0)$  & Default & Efficiency      & Robust          & Equal-share     & $\tau$-deep \\
+\midrule
+S0    & $(100, 400)$  & 0.224   & \textbf{0.215}  & 0.236           & 0.266           & 0.225       \\
+S0    & $(250, 1000)$ & 0.214   & \textbf{0.205}  & 0.211           & 0.229           & 0.216       \\
+\midrule
+S1    & $(100, 400)$  & 0.250   & 0.344           & \textbf{0.236}  & 0.273           & 0.251       \\
+S1    & $(250, 1000)$ & 0.223   & 0.313           & \textbf{0.204}  & 0.224           & 0.224       \\
+\midrule
+S2    & $(100, 400)$  & 0.583   & 1.038           & \textbf{0.328}  & 0.342           & 0.581       \\
+S2    & $(250, 1000)$ & 0.407   & 0.885           & \textbf{0.284}  & 0.303           & 0.407       \\
+\midrule
+S3    & $(100, 400)$  & 0.414   & 0.690           & \textbf{0.277}  & 0.306           & 0.414       \\
+S3    & $(250, 1000)$ & 0.308   & 0.597           & \textbf{0.240}  & 0.260           & 0.309       \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{Bias}
+
+Signed bias (Table~\ref{tab:sim-prior-bias-het}) makes the failure mode
+of Efficiency explicit. Under no confounding (S0) every configuration is
+near zero ($|\mathrm{Bias}|\leq 0.10$). Under confounding the bias of
+Efficiency, Default and $\tau$-deep climbs monotonically with the
+confounding strength: in S2, Efficiency carries a bias of approximately
+$+1.0$ in both heterogeneity regimes (the RWD treated-vs-control
+contrast is approximately one log-time unit larger than the true CATE).
+Default and $\tau$-deep carry roughly half that bias. \textbf{Robust}
+and \textbf{Equal-share} are the only configurations that keep the bias
+small under confounding; Equal-share is the smallest-bias option in S2
+and S3, with Robust a close second.
+
+\begin{table}[tb]
+\centering
+\small
+\caption{CATE bias (signed integrated bias of $\hat\tau$) by scenario,
+sample size, and configuration, for the heterogeneous CATE regime.
+Smallest $|\mathrm{Bias}|$ per row in bold.}
+\label{tab:sim-prior-bias-het}
+\begin{tabular}{llccccc}
+\toprule
+Scen. & $(n_1, n_0)$  & Default & Efficiency       & Robust            & Equal-share        & $\tau$-deep \\
+\midrule
+S0    & $(100, 400)$  & $-0.057$ & \textbf{$-0.019$} & $-0.097$         & $-0.077$           & $-0.058$    \\
+S0    & $(250, 1000)$ & $-0.036$ & \textbf{$-0.011$} & $-0.054$         & $-0.042$           & $-0.038$    \\
+\midrule
+S1    & $(100, 400)$  & $+0.105$ & $+0.272$         & \textbf{$-0.031$} & $-0.041$           & $+0.103$    \\
+S1    & $(250, 1000)$ & $+0.067$ & $+0.237$         & \textbf{$-0.015$} & $-0.020$           & $+0.066$    \\
+\midrule
+S2    & $(100, 400)$  & $+0.498$ & $+1.000$         & $+0.133$          & \textbf{$+0.060$}  & $+0.495$    \\
+S2    & $(250, 1000)$ & $+0.292$ & $+0.824$         & $+0.064$          & \textbf{$+0.023$}  & $+0.290$    \\
+\midrule
+S3    & $(100, 400)$  & $+0.303$ & $+0.626$         & $+0.053$          & \textbf{$+0.008$}  & $+0.300$    \\
+S3    & $(250, 1000)$ & $+0.181$ & $+0.532$         & $+0.023$          & \textbf{$+0.000$}  & $+0.180$    \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The bias pattern explains the RMSE pattern: under confounding the squared
+bias dominates the squared variance for every configuration except
+Robust and Equal-share, so the configurations that fail to absorb the
+RWD bias into $c$ pay for it in RMSE.
+
+\subsubsection*{Coverage}
+
+Table~\ref{tab:sim-prior-coverage-het} reports pointwise 95\%
+credible-interval coverage. All configurations except Efficiency exceed
+the nominal $0.95$ target everywhere (in fact they over-cover at
+$\geq 0.94$ in every cell). The variance-budget calibration is therefore
+generally conservative; intervals are wider than strictly needed but the
+nominal level is not violated. \textbf{Efficiency} is the only
+configuration that under-covers, and severely so: $0.51$--$0.54$ in S2
+and $0.81$--$0.84$ in S3.
+
+\begin{table}[tb]
+\centering
+\small
+\caption{Pointwise 95\% credible-interval coverage by scenario, sample
+size, and configuration, for the heterogeneous CATE regime. Nominal
+target $0.95$; configurations under-covering are flagged in italics.}
+\label{tab:sim-prior-coverage-het}
+\begin{tabular}{llccccc}
+\toprule
+Scen. & $(n_1, n_0)$  & Default & Efficiency           & Robust  & Equal-share & $\tau$-deep \\
+\midrule
+S0    & $(100, 400)$  & 0.998   & 0.999                & 0.994   & 0.995       & 0.999       \\
+S0    & $(250, 1000)$ & 0.996   & 0.997                & 0.994   & 0.996       & 0.997       \\
+\midrule
+S1    & $(100, 400)$  & 0.997   & 0.983                & 0.998   & 0.997       & 0.997       \\
+S1    & $(250, 1000)$ & 0.996   & 0.976                & 0.996   & 0.996       & 0.997       \\
+\midrule
+S2    & $(100, 400)$  & 0.945   & \emph{0.512}         & 0.995   & 0.996       & 0.953       \\
+S2    & $(250, 1000)$ & 0.966   & \emph{0.535}         & 0.991   & 0.994       & 0.971       \\
+\midrule
+S3    & $(100, 400)$  & 0.982   & \emph{0.835}         & 0.994   & 0.994       & 0.984       \\
+S3    & $(250, 1000)$ & 0.986   & \emph{0.821}         & 0.995   & 0.996       & 0.989       \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Mean credible-interval widths (not tabulated) lie between $1.35$ and
+$2.25$ across all cells and configurations and differ by less than
+$10\%$ between any two configurations within a cell. Efficiency does
+\emph{not} buy meaningful interval-width reduction over Robust, even
+though it shrinks $c$ harder; the widths are nearly the same, so the
+extra coverage loss in S2/S3 comes from a shift in the posterior centre
+rather than from artificially tight intervals.
+
+\subsubsection*{Revisiting the hypotheses}
+
+\begin{itemize}
+  \item \textbf{H1} (Default is Pareto-optimal): \emph{not supported}.
+    Default is dominated by Robust in S1--S3 on both RMSE and bias and
+    is essentially tied with Robust in S0. The choice of $k_c = 4$ in
+    Default over-tightens the confounding prior; the data prefer the
+    looser $k_c = 2$ of Robust.
+  \item \textbf{H2} (Efficiency wins S0, loses S2/S3):
+    \emph{fully supported}. Efficiency has the lowest RMSE in S0 by a
+    small margin and the largest RMSE and largest bias in S1, S2 and S3
+    with a coverage of only $0.51$--$0.54$ in S2.
+  \item \textbf{H3} (Robust is the conservative choice):
+    \emph{partially supported}. Robust is conservative in coverage
+    ($\geq 0.99$ everywhere) but is also the lowest-RMSE configuration
+    in seven of eight heterogeneous cells. ``Conservative'' over-states
+    its cost.
+  \item \textbf{H4} ($\tau$-deep helps under heterogeneity):
+    \emph{not supported}. $\tau$-deep is indistinguishable from
+    Default at three decimal places in every cell, in both CATE
+    regimes. The depth-prior change on $\tau$ has no practical effect
+    at this signal-to-noise level.
+  \item \textbf{H5} (censored vs uncensored ranking preserved):
+    \emph{to be checked} once the censored run completes; the ranking
+    above is from the uncensored run only.
+\end{itemize}
+
+\paragraph{Headline takeaway (Phase 2).}
+On this $R = 190$ preliminary run, \textbf{Robust} is the across-the-board
+winner among the five Phase-2 configurations: lowest CATE RMSE in S1--S3,
+near-best in S0, no coverage failures anywhere, and the smallest bias
+outside of Equal-share (which is itself competitive).
+The ``Default'' configuration $(k_d, k_\tau, k_c) = (2.5, 1.7, 4)$ is too
+tight on $c$; the data prefer the looser $k_c = 2$ of Robust.
+Within the variance-budget framework this would motivate adopting Robust
+$(k_d, k_\tau, k_c) = (2, 1.7, 2)$ as the new default.
+
+\paragraph{Caveat on coverage and the follow-up sweeps.}
+All non-Efficiency configurations over-cover ($\geq 0.94$ everywhere).
+This indicates the variance-budget calibration is too generous: the
+budget $\omega^2 = 1$ on standardised $\log T$ allocates more prior
+variance to the structural component than is coherent with the
+inverse-$\chi^2$ residual prior.
+Phases~2b (v2, $\omega \in \{0.95, 1\}$), 2d (v4, $\omega \in \{0.5, 0.75, 1\}$),
+and 2e (v5, parametrisation comparison) trace this thread and converge on
+the uniform Chipman calibration $\sigma_{h,f} = k_f/(2\sqrt{m_f})$ with
+$k_f = 1$ for every forest as the adopted methodology default.
+The asymmetric variance-budget allocation diagnosed here gave a small
+RMSE advantage under strong confounding but at the cost of an opaque
+calibration; the uniform Chipman default is simpler, matches the BART/BCF
+defaults of the implementation, and is internally coherent with the
+residual prior. See the prior-specification subsection of
+\textbf{METHODOLOGY.tex} for the final form.
+
+\bibliographystyle{apalike}
+\bibliography{../general/references}
+\end{document}

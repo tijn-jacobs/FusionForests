@@ -1,0 +1,23 @@
+BJ-ELM competitor simulation
+finished         : 2026-07-29 13:23:00
+censoring design : right (both sources right-censored)
+replications (M) : 10
+bootstrap (B)    : 10
+n_rct / n_rwd    : 150 / 350
+nhid / nbase     : 20 / 25
+grid cells       : 1
+mean censoring   : RCT 37.5%, RWD 35.1%
+
+ lambda_d lambda_u population         method rmse    bias bias_var    sd coverage width postvar
+        1        1        RCT bjelm-Pooled-S 1.28  0.2590   0.0462 0.215    0.216 0.693  0.0587
+        1        1        RCT bjelm-Pooled-T 1.11  0.4009   0.1004 0.317    0.777 2.488  0.7909
+        1        1        RCT    bjelm-RCT-S 1.28 -0.0841   0.0550 0.234    0.343 1.108  0.1536
+        1        1        RCT    bjelm-RCT-T 1.60  0.2475   0.1602 0.400    0.842 4.559  2.7806
+        1        1        RWD bjelm-Pooled-S 1.30  0.3040   0.0305 0.175    0.238 0.697  0.0597
+        1        1        RWD bjelm-Pooled-T 1.16  0.4528   0.0919 0.303    0.762 2.450  0.7726
+        1        1        RWD    bjelm-RCT-S 1.30 -0.0458   0.0765 0.277    0.356 1.103  0.1526
+        1        1        RWD    bjelm-RCT-T 1.58  0.2626   0.1816 0.426    0.842 4.594  2.7594
+        1        1        All bjelm-Pooled-S 1.29  0.2905   0.0328 0.181    0.231 0.696  0.0594
+        1        1        All bjelm-Pooled-T 1.15  0.4372   0.0932 0.305    0.766 2.461  0.7781
+        1        1        All    bjelm-RCT-S 1.29 -0.0573   0.0678 0.260    0.352 1.104  0.1529
+        1        1        All    bjelm-RCT-T 1.59  0.2581   0.1692 0.411    0.842 4.583  2.7658

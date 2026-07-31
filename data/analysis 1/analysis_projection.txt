@@ -1,0 +1,72 @@
+         model                         target            coef      mean
+ M1 (RCT only)                CATE (log time)     (Intercept)  5.20e-01
+ M1 (RCT only)                CATE (log time)             age  6.46e-04
+ M1 (RCT only)                CATE (log time)             cd4 -1.66e-04
+ M1 (RCT only)                CATE (log time)             cd8  2.07e-04
+ M1 (RCT only)                CATE (log time)     anchor_year  5.01e-02
+ M1 (RCT only)                CATE (log time)            race -1.36e-02
+ M1 (RCT only)                CATE (log time) prior_art_years -2.46e-02
+   M2 (Fusion)                CATE (log time)     (Intercept)  4.98e-01
+   M2 (Fusion)                CATE (log time)             age  1.60e-03
+   M2 (Fusion)                CATE (log time)             cd4  2.59e-05
+   M2 (Fusion)                CATE (log time)             cd8  1.20e-04
+   M2 (Fusion)                CATE (log time)     anchor_year -1.62e-02
+   M2 (Fusion)                CATE (log time)            race -4.60e-02
+   M2 (Fusion)                CATE (log time) prior_art_years -7.01e-03
+ M1 (RCT only)            AF (multiplicative)     (Intercept)  1.97e+00
+ M1 (RCT only)            AF (multiplicative)             age  3.52e-03
+ M1 (RCT only)            AF (multiplicative)             cd4 -2.01e-04
+ M1 (RCT only)            AF (multiplicative)             cd8  3.67e-04
+ M1 (RCT only)            AF (multiplicative)     anchor_year  8.71e-02
+ M1 (RCT only)            AF (multiplicative)            race  2.48e-02
+ M1 (RCT only)            AF (multiplicative) prior_art_years -2.11e-02
+   M2 (Fusion)            AF (multiplicative)     (Intercept)  1.68e+00
+   M2 (Fusion)            AF (multiplicative)             age  2.88e-03
+   M2 (Fusion)            AF (multiplicative)             cd4  3.84e-05
+   M2 (Fusion)            AF (multiplicative)             cd8  2.01e-04
+   M2 (Fusion)            AF (multiplicative)     anchor_year -2.83e-02
+   M2 (Fusion)            AF (multiplicative)            race -6.77e-02
+   M2 (Fusion)            AF (multiplicative) prior_art_years -1.00e-02
+   M2 (Fusion) Deviation g(x) (log time, RWD)     (Intercept)  1.70e+00
+   M2 (Fusion) Deviation g(x) (log time, RWD)             age -2.78e-03
+   M2 (Fusion) Deviation g(x) (log time, RWD)             cd4  6.09e-04
+   M2 (Fusion) Deviation g(x) (log time, RWD)             cd8  5.22e-05
+   M2 (Fusion) Deviation g(x) (log time, RWD)     anchor_year -3.23e-02
+   M2 (Fusion) Deviation g(x) (log time, RWD)            race  7.07e-02
+   M2 (Fusion) Deviation g(x) (log time, RWD) prior_art_years  2.69e-01
+        lo       hi
+  4.01e-01 0.639564
+ -1.24e-02 0.012926
+ -1.16e-03 0.000816
+ -1.62e-05 0.000442
+ -9.07e-02 0.199054
+ -3.04e-01 0.271965
+ -1.11e-01 0.062486
+  3.54e-01 0.640133
+ -7.65e-03 0.011206
+ -7.78e-04 0.000786
+ -7.43e-05 0.000317
+ -1.63e-01 0.138308
+ -3.01e-01 0.208406
+ -9.07e-02 0.076952
+  1.74e+00 2.234362
+ -2.50e-02 0.031810
+ -1.98e-03 0.001653
+ -5.07e-05 0.000835
+ -1.91e-01 0.335467
+ -5.16e-01 0.642209
+ -1.97e-01 0.163768
+  1.45e+00 1.929594
+ -1.23e-02 0.019355
+ -1.27e-03 0.001335
+ -1.20e-04 0.000545
+ -2.85e-01 0.209118
+ -4.73e-01 0.378848
+ -1.50e-01 0.136933
+  1.31e+00 2.099113
+ -2.04e-02 0.014656
+ -6.39e-04 0.001891
+ -1.94e-04 0.000319
+ -2.56e-01 0.193975
+ -3.04e-01 0.443134
+ -7.89e-03 0.550463

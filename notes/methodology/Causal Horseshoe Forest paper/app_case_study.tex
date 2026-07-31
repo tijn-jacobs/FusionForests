@@ -1,0 +1,35 @@
+\section{Extra information on the PDAC analysis}
+\label{appendix:clinical_covariates}
+\raggedbottom
+
+
+Although the main manuscript focuses on conditional treatment effects, we also report the average treatment effect (ATE) in the PDAC case study to facilitate comparison with existing clinical and methodological work. 
+The ATE is defined as the population-level estimand:
+\begin{equation}
+\mathrm{ATE} := \E\!\left[\log T(1) - \log T(0)\right] = \E\left[\tau(x)\right],
+\end{equation}
+where the expectation is taken with respect to the covariate distribution in the target population.
+
+
+
+We approximate this expectation by integrating the conditional average treatment effect over the empirical distribution of the observed covariates:
+\begin{equation}
+\widehat{\mathrm{ATE}}
+= \frac{1}{n}\sum_{i=1}^n\widehat{\tau}(x_i).
+\end{equation}
+This plug-in estimator corresponds to averaging the posterior draws of the CATE over the observed covariate values and is standard in Bayesian tree-based causal models, including Bayesian causal
+forests \citep{hahn2020bayesian}. 
+The approach conditions on the observed covariates and therefore does not require specifying a probabilistic model for the covariate distribution.
+This is also known as the MATE, or mixed average treatment effect \citep{Li2023BayesianCausal}.
+
+
+Because the empirical covariate distribution is treated as fixed, this approximation does not explicitly propagate uncertainty in the covariate distribution itself.
+More fully Bayesian alternatives, such as Bayesian bootstrap weighting of the covariate distribution, could be used to account for this additional source of uncertainty \citep{Oganisian2025Untangling}, but we do not
+pursue these extensions here. 
+Since our primary inferential focus is on heterogeneous treatment effects rather than average effects.
+
+
+
+\input{TableClinical}
+\input{PDAC_CV_results}
+\input{PDAC_evaluation}
