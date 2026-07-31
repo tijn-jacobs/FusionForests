@@ -6,18 +6,20 @@
 **data fusion** and **causal inference**. The flagship model,
 `FusionForest()`, combines data from a randomised controlled trial (RCT)
 and an observational study (real-world data, RWD) in a single Bayesian
-framework, using a commensurate prior for adaptive information borrowing.
+framework. Crucially, the observational data are **not** assumed to be
+unconfounded.
 
 The model targets heterogeneous treatment effects on continuous and
 (interval-)censored survival outcomes. The outcome is decomposed over
 separate tree forests:
 
-$$Y = \mu(X) + (1-S)\ g(X) + A\ \tau(X) + (1-S)\ A\ c(X) + \sigma\varepsilon,$$
+$$Y = \mu(X) + (1-S)\ g(X) + A\ \tau(X) + (1-S)\ A\ c(X) + \varepsilon,$$
 
 where $Y$ is the log survival time (accelerated failure time
-formulation) or a continuous outcome, $A$ is the treatment and $S$
-indicates the source ($S = 1$ for the RCT, $S = 0$ for the RWD). Each
-term is modelled by its own forest:
+formulation) or a continuous outcome, $A$ is the treatment, $S$
+indicates the source ($S = 1$ for the RCT, $S = 0$ for the RWD), and
+$\varepsilon$ is a mean-zero error term — Gaussian or a flexible
+Dirichlet-process mixture. Each term is modelled by its own forest:
 
 - $\mu(X)$ — **control forest**: the prognostic surface under control;
 - $g(X)$ — **deconfounding forest**: an RWD-only shift that absorbs
@@ -27,9 +29,9 @@ term is modelled by its own forest:
 - $c(X)$ — **deviation forest**: how the RWD treatment effect deviates
   from the RCT one.
 
-A commensurate prior shrinks the deviation forest towards zero, so the
-RWD sharpens the RCT treatment effect estimate without importing its
-confounding.
+Because the RWD-specific terms $g(X)$ and $c(X)$ absorb confounding,
+the RCT anchors identification of $\tau(X)$ while the observational
+data add precision — without assuming the RWD is unconfounded.
 
 ## Installation
 
@@ -42,16 +44,32 @@ remotes::install_github("tijn-jacobs/FusionForests")
 
 ## Quick example
 
+A small RCT (n = 200) is combined with a larger RWD cohort (n = 800)
+in which treatment assignment depends on an **unobserved confounder**
+`U` that also affects survival:
+
 ```r
 library(FusionForests)
 
-# Simulated fusion data: an RCT and an RWD cohort
-set.seed(1)
-n <- 500
+set.seed(42)
+n_rct <- 200
+n_rwd <- 800
+n <- n_rct + n_rwd
+
 X <- matrix(rnorm(n * 3), n, 3)
-s <- rbinom(n, 1, 0.5)  # 1 = RCT, 0 = RWD
-a <- rbinom(n, 1, 0.5)  # treatment
-true_time <- exp(1 + X[, 1] + 0.5 * a + 0.3 * rnorm(n))
+U <- rnorm(n)                        # unobserved confounder
+s <- rep(c(1, 0), c(n_rct, n_rwd))   # 1 = RCT, 0 = RWD
+
+# Treatment: randomised in the RCT, driven by U in the RWD
+a <- ifelse(s == 1,
+            rbinom(n, 1, 0.5),
+            rbinom(n, 1, plogis(1.5 * U)))
+
+# True heterogeneous effect on log survival time
+tau <- 0.4 + 0.4 * X[, 1]
+
+log_t <- 1 + X[, 1] + 0.5 * X[, 2] + a * tau + 0.7 * U + 0.3 * rnorm(n)
+true_time <- exp(log_t)
 cens_time <- rexp(n, rate = 1 / (2 * mean(true_time)))
 time   <- pmin(true_time, cens_time)
 status <- as.integer(true_time <= cens_time)
@@ -63,25 +81,35 @@ fit <- FusionForest(
   X_test_control = X, X_test_treat = X,
   treatment_indicator_test = a, source_indicator_test = s,
   outcome_type = "right-censored",
+  N_post = 2000, N_burn = 2000,
   store_posterior_sample = TRUE
 )
-print(fit)
 
-# Posterior draws of causal survival estimands at the test points
-af   <- fusion_estimand(fit, estimand = "AF")            # acceleration factor
-rmst <- fusion_estimand(fit, estimand = "RMST", time = 5) # RMST difference
+# Posterior draws of the treatment effect (log-time scale) per subject
+cate <- log(fusion_estimand(fit, estimand = "AF"))
+cate_mean <- colMeans(cate)
+cate_lo   <- apply(cate, 2, quantile, 0.025)
+cate_hi   <- apply(cate, 2, quantile, 0.975)
 
-# Interpretable linear projection of the treatment effect surface
-colnames(X) <- paste0("x", 1:3)
-proj <- fusion_projection(fit, basis = ~ x1 + x2 + x3,
-                          X_eval = as.data.frame(X))
+plot(tau, cate_mean, pch = 19, cex = 0.45, col = "#2a78d6",
+     xlab = "True treatment effect (log-time scale)",
+     ylab = "Posterior treatment effect")
+segments(tau, cate_lo, tau, cate_hi, col = adjustcolor("#2a78d6", 0.12))
+abline(0, 1, lty = 2, col = "grey40")
 ```
+
+<img src="man/figures/README-example.png" width="700"/>
+
+Even though treatment assignment in the RWD is driven by an unobserved
+confounder, the fitted treatment effects track the truth (correlation
+0.89) and the 95% credible intervals cover the true effect for 94% of
+subjects.
 
 ## The FusionForest model
 
 `FusionForest()` is the heart of the package. It fits the decomposition
 above with standard BART priors on each forest and returns posterior
-draws of every component, so treatment effects, borrowing strength and
+draws of every component, so treatment effects, source deviations and
 uncertainty are all available directly from one fit. Right-censored and
 interval-censored survival outcomes are handled through data
 augmentation, and the error distribution can be Gaussian or a
