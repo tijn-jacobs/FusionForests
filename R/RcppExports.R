@@ -17,11 +17,3 @@ SimpleBCF_cpp <- function(nSEXP, p_progSEXP, p_treatSEXP, X_train_progSEXP, X_tr
     .Call(`_FusionForests_SimpleBCF_cpp`, nSEXP, p_progSEXP, p_treatSEXP, X_train_progSEXP, X_train_treatSEXP, ySEXP, treatment_indicatorSEXP, n_testSEXP, X_test_progSEXP, X_test_treatSEXP, treatment_indicator_testSEXP, no_trees_progSEXP, no_trees_treatSEXP, powerSEXP, baseSEXP, p_growSEXP, p_pruneSEXP, omega_progSEXP, omega_treatSEXP, sigma_knownSEXP, sigmaSEXP, lambdaSEXP, nuSEXP, N_postSEXP, N_burnSEXP, verboseSEXP, irsSEXP, store_posterior_sampleSEXP)
 }
 
-SimpleBART_cpp <- function(nSEXP, pSEXP, X_trainSEXP, ySEXP, n_testSEXP, X_testSEXP, no_treesSEXP, powerSEXP, baseSEXP, p_growSEXP, p_pruneSEXP, omegaSEXP, sigma_knownSEXP, sigmaSEXP, lambdaSEXP, nuSEXP, N_postSEXP, N_burnSEXP, verboseSEXP, irsSEXP, store_posterior_sampleSEXP) {
-    .Call(`_FusionForests_SimpleBART_cpp`, nSEXP, pSEXP, X_trainSEXP, ySEXP, n_testSEXP, X_testSEXP, no_treesSEXP, powerSEXP, baseSEXP, p_growSEXP, p_pruneSEXP, omegaSEXP, sigma_knownSEXP, sigmaSEXP, lambdaSEXP, nuSEXP, N_postSEXP, N_burnSEXP, verboseSEXP, irsSEXP, store_posterior_sampleSEXP)
-}
-
-SimpleBCF_cpp <- function(nSEXP, p_progSEXP, p_treatSEXP, X_train_progSEXP, X_train_treatSEXP, ySEXP, treatment_indicatorSEXP, n_testSEXP, X_test_progSEXP, X_test_treatSEXP, treatment_indicator_testSEXP, no_trees_progSEXP, no_trees_treatSEXP, powerSEXP, baseSEXP, p_growSEXP, p_pruneSEXP, omega_progSEXP, omega_treatSEXP, sigma_knownSEXP, sigmaSEXP, lambdaSEXP, nuSEXP, N_postSEXP, N_burnSEXP, verboseSEXP, irsSEXP, store_posterior_sampleSEXP) {
-    .Call(`_FusionForests_SimpleBCF_cpp`, nSEXP, p_progSEXP, p_treatSEXP, X_train_progSEXP, X_train_treatSEXP, ySEXP, treatment_indicatorSEXP, n_testSEXP, X_test_progSEXP, X_test_treatSEXP, treatment_indicator_testSEXP, no_trees_progSEXP, no_trees_treatSEXP, powerSEXP, baseSEXP, p_growSEXP, p_pruneSEXP, omega_progSEXP, omega_treatSEXP, sigma_knownSEXP, sigmaSEXP, lambdaSEXP, nuSEXP, N_postSEXP, N_burnSEXP, verboseSEXP, irsSEXP, store_posterior_sampleSEXP)
-}
-

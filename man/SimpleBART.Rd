@@ -50,13 +50,9 @@ If \code{NULL}, test predictions are returned at the column means.}
 \item{irs}{Integer IRS mode: 0 = off (default), 1 = skip-then-draw
 (NaN obs excluded from MH ratio, routed after acceptance),
 2 = draw-then-decide (routing drawn before MH, all obs in ratio),
-<<<<<<< HEAD
-3 = uniform random routing (P=0.5, ablation baseline).}
-=======
 3 = uniform random routing (P=0.5, ablation baseline).
 Modes 4-6 = same as 1-3 but NaN-routed observations are excluded
 from the leaf mean (mu) posterior draw.}
->>>>>>> borrow
 
 \item{store_posterior_sample}{Logical; if \code{TRUE}, return the full
 \code{N_post x n_test} matrix of posterior test predictions
@@ -79,8 +75,6 @@ Matrix of dimension \code{N_post x n_test} with per-iteration test predictions.}
 Standard single-forest BART model: \eqn{Y = f(X) + \sigma\varepsilon}.
 A clean entry point for benchmarking and development (e.g., testing IRS).
 }
-<<<<<<< HEAD
-=======
 \examples{
 set.seed(1)
 n <- 100
@@ -91,4 +85,3 @@ fit <- SimpleBART(y = y, X_train = X, N_post = 50, N_burn = 25,
 cor(y, fit$train_predictions)
 
 }
->>>>>>> borrow

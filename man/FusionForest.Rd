@@ -243,11 +243,7 @@ all component forests.}
 A named list with components:
 \describe{
 \item{train_predictions, test_predictions}{Posterior mean of the total
-<<<<<<< HEAD
-fitted values \eqn{\hat{y} = m_0 + (1-S)\eta + b[\tau + (1-S)c]}.}
-=======
 fitted values.}
->>>>>>> borrow
 \item{train_predictions_control, test_predictions_control}{Posterior mean
 of the shared baseline \eqn{\mu(X)}.}
 \item{train_predictions_treat, test_predictions_treat}{Posterior mean of
@@ -267,14 +263,6 @@ acceptance_ratio_deconf}{Tree-update acceptance rates.}
 }
 \description{
 Bayesian data-fusion model combining an RCT and an observational study to
-<<<<<<< HEAD
-estimate heterogeneous treatment effects.  Three BART ensembles are fitted
-jointly under an AFT decomposition:
-\deqn{\log(T) = m_0(X,S) + A\,\tau(X) + A\,(1-S)\,c(X) + \sigma\varepsilon}
-where \eqn{m_0} is the prognostic function, \eqn{\tau} is the CATE,
-\eqn{c} is the confounding function (active only in the OS treated arm),
-and \eqn{\eta = 0} (sources share a common baseline; no commensurate shift).
-=======
 estimate heterogeneous treatment effects.
 }
 \details{
@@ -318,5 +306,4 @@ fit <- FusionForest(
 print(fit)
 summary(fit)
 
->>>>>>> borrow
 }
