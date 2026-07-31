@@ -6,7 +6,7 @@
 #' posterior of the projection, i.e.\ the pushforward of \eqn{\tau(\cdot)}
 #' (or \eqn{\exp\tau(\cdot)}) under the projection map of Woody, Carvalho
 #' and Murray (2020).  Uncertainty is inherited exactly from the original
-#' posterior without refitting; see \code{notes/linear_projection.tex}.
+#' posterior without refitting.
 #'
 #' @details
 #' At iteration \eqn{r} the coefficient vector solves

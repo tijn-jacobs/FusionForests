@@ -9,10 +9,9 @@ randomised controlled trial (RCT) and real-world data (RWD).
 
 The outcome (continuous, or log survival time) is decomposed over
 separate tree forests: a control forest, a treatment forest, a
-deconfounding forest and, in four-forest mode, a deviation forest that
-captures how the treatment effect in the RWD deviates from the RCT.
-A **commensurate prior** controls the strength of borrowing from the
-real-world data.
+deconfounding forest and a deviation forest that captures how the
+treatment effect in the RWD deviates from the RCT. The observational
+data are not assumed to be unconfounded.
 
 Continuous, right-censored and interval-censored outcomes are
 supported via an accelerated failure time formulation, with Gaussian
@@ -21,7 +20,7 @@ or Dirichlet-process mixture error distributions (`error_dist`).
 ## Posterior summaries
 
 - `fusion_estimand()` — posterior draws of causal survival estimands:
-  survival difference, RMST difference and acceleration factor.
+  survival difference and acceleration factor.
 - `fusion_projection()` — interpretable linear projections of the
   posterior treatment effect surface.
 - `print()` and `summary()` methods for `FusionForest` fits.

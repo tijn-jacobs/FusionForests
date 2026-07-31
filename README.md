@@ -117,9 +117,8 @@ Dirichlet-process mixture (`error_dist`) for added robustness.
 
 Two companion functions summarise a fit: `fusion_estimand()` returns
 posterior draws of causal survival estimands (survival difference,
-RMST difference, acceleration factor), and `fusion_projection()`
-projects the treatment effect surface onto an interpretable linear
-basis.
+acceleration factor), and `fusion_projection()` projects the treatment
+effect surface onto an interpretable linear basis.
 
 The single-study causal and survival models from the
 [ShrinkageTrees](https://cran.r-project.org/package=ShrinkageTrees)

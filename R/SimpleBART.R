@@ -1,6 +1,6 @@
 #' SimpleBART
 #'
-#' Standard single-forest BART model: \eqn{Y = f(X) + \sigma\varepsilon}.
+#' Standard single-forest BART model: \eqn{Y = f(X) + \varepsilon}.
 #' A clean entry point for benchmarking and development (e.g., testing IRS).
 #'
 #' @param y Numeric vector of outcomes (length n).

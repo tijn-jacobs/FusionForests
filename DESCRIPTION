@@ -9,11 +9,11 @@ Authors@R: c(person("Tijn", "Jacobs", role = c("aut", "cre"),
 Maintainer: Tijn Jacobs <t.jacobs@vu.nl>
 Description: Bayesian tree ensemble models for data fusion and causal inference.
   The flagship model FusionForest() combines data from a randomised controlled
-  trial and an observational study using separate tree forests with a
-  commensurate prior for adaptive borrowing, supporting continuous and
-  (interval-)censored survival outcomes. Posterior summaries of treatment
-  effect estimands and interpretable linear projections are provided.
-  Single-study causal and survival models are re-exported from the
+  trial and an observational study using separate tree forests, without
+  assuming the observational data are unconfounded. Continuous and
+  (interval-)censored survival outcomes are supported. Posterior summaries of
+  treatment effect estimands and interpretable linear projections are
+  provided. Single-study causal and survival models are re-exported from the
   'ShrinkageTrees' package.
 URL: https://github.com/tijn-jacobs/FusionForests
 BugReports: https://github.com/tijn-jacobs/FusionForests/issues

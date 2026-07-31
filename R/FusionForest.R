@@ -5,9 +5,11 @@
 #'
 #' The model uses a MAP-prior four-forest decomposition:
 #' \deqn{\log(T) = \mu(X) + (1-S)\,g(X) + b\,[\tau(X) + (1-S)\,c(X)] +
-#'   \sigma\varepsilon,}
-#' where \eqn{\mu(X)} is a shared baseline fit to all data and \eqn{g(X)}
-#' captures the RWD-specific deviation.  Each forest has a Gaussian leaf
+#'   \varepsilon,}
+#' where \eqn{\mu(X)} is a shared baseline fit to all data, \eqn{g(X)}
+#' captures the RWD-specific deviation, and \eqn{\varepsilon} is a
+#' mean-zero error term (Gaussian or a Dirichlet-process mixture; see
+#' \code{error_dist}).  Each forest has a Gaussian leaf
 #' prior \eqn{N(0, \omega^2)} parameterised uniformly as
 #' \deqn{\omega_X \;=\; k_X / \sqrt{m_X},}
 #' where \eqn{m_X} is the number of trees in forest \eqn{X} and the
@@ -15,12 +17,6 @@
 #' (smaller \eqn{k_X} \eqn{\Rightarrow} stronger shrinkage toward zero).
 #' The deviation forest's scale \code{k_deviation} sets the strength of the
 #' MAP-prior borrowing between RCT and RWD.
-#'
-#' The earlier three-forest decomposition with a single prognostic
-#' \eqn{m_0(X)} is deprecated in this R interface but the underlying
-#' \code{FusionForest_cpp} backend remains in the package and can be
-#' re-exposed by accepting \code{"three-forest"} again in the
-#' \code{decomposition} argument.
 #'
 #' @param y Numeric vector of outcomes (survival times or continuous responses).
 #' @param status Integer vector of event indicators (\code{1} = event observed,
@@ -71,8 +67,7 @@
 #' @param timescale Character; \code{"time"} (raw survival times, will be
 #'   log-transformed internally) or \code{"log"} (already on log scale).
 #' @param decomposition Character; must be \code{"four-forest"} (the
-#'   default and currently the only option exposed in this R interface).
-#'   The three-forest path is deprecated; see the description above.
+#'   default and currently the only option).
 #' @param number_of_trees_control,number_of_trees_treat,number_of_trees_deconf
 #'   Number of trees in each BART ensemble.  Defaults: 200 (control), 100
 #'   (treat), 50 (deconf).
