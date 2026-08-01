@@ -8,7 +8,7 @@
 Inference}
 \description{
 Bayesian tree ensemble models for data fusion and causal inference.
-The flagship model \code{\link[=FusionForest]{FusionForest()}} combines data from a randomised
+The main model \code{\link[=FusionForest]{FusionForest()}} combines data from a randomised
 controlled trial and an observational study using separate tree
 forests, without assuming the observational data are unconfounded.
 Posterior summaries of treatment effect estimands are available via

@@ -8,12 +8,12 @@ Authors@R: c(person("Tijn", "Jacobs", role = c("aut", "cre"),
                     comment = c(ORCID = "0009-0003-6188-9296")))
 Maintainer: Tijn Jacobs <t.jacobs@vu.nl>
 Description: Bayesian tree ensemble models for data fusion and causal inference.
-  The flagship model FusionForest() combines data from a randomised controlled
-  trial and an observational study using separate tree forests, without
-  assuming the observational data are unconfounded. Continuous and
+  The main model FusionForest() combines data from a randomised controlled
+  trial and an observational study using separate tree forests, allowing for
+  unmeasured confounding in the observational data. Continuous and
   (interval-)censored survival outcomes are supported. Posterior summaries of
   treatment effect estimates and interpretable linear projections are
-  provided. 
+  provided.
 URL: https://github.com/tijn-jacobs/FusionForests
 BugReports: https://github.com/tijn-jacobs/FusionForests/issues
 License: MIT + file LICENSE

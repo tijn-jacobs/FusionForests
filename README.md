@@ -3,7 +3,7 @@
 <img src="sticker/FusionForests_hex.png" align="right" width="150"/>
 
 **FusionForests** is an R package for Bayesian tree ensemble models for
-**data fusion** and **causal inference**. The flagship model,
+**data fusion** and **causal inference**. The main model,
 `FusionForest()`, combines data from a randomised controlled trial (RCT)
 and an observational study (real-world data, RWD) in a single Bayesian
 framework. Crucially, the observational data are **not** assumed to be
