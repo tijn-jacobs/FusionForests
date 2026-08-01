@@ -1,32 +1,22 @@
-// This file serves as the "prerequisites" header, bringing together key includes
-// and common constants used throughout the codebase. It provides standard C++
-// headers for functionality such as input/output, mathematical operations, random
-// number generation, and data structures like vectors and maps. It also includes
-// the external Random library (which may be replaced by Rcpp Armadillo in future)
-// and the GSL library for specific statistical functions, like chi-square quantiles.
-// Additionally, some important mathematical constants, such as Pi, are defined here.
+// This file serves as the "prerequisites" header, bringing together key
+// includes and common constants used throughout the codebase.  All random
+// number generation goes through R's RNG (see Random.h) and all console
+// output goes through Rcpp::Rcout, as required by CRAN policy.
 
 #ifndef GUARD_Prerequisites_h
 #define GUARD_Prerequisites_h
 
-#include <iostream>    // Standard input/output operations (e.g., cout, endl)
 #include <vector>      // Vector data structure from the STL
 #include <cmath>       // Common math functions (e.g., sqrt, pow)
-#include <random>      // C++ random number generation library
 #include <cstddef>     // Definitions for size_t
 #include <algorithm>   // Algorithms like std::min, std::max, std::sort
-#include <iomanip>     // Input/output manipulators (e.g., for formatting output)
 #include <map>         // Associative containers (e.g., map)
 #include <unordered_map> // Hash-based associative containers
-#include <fstream>     // File stream operations for input/output with files
-#include <ctime>       // Time functions (e.g., clock, time)
-#include <stdexcept>   // 
-#include <memory>      // For dynamic memory management (e.g., std::shared_ptr)
+#include <ctime>       // Time functions (e.g., time)
+#include <stdexcept>   // Standard exception types
+#include <memory>      // For dynamic memory management (e.g., std::unique_ptr)
 #include <limits>      // for std::numeric_limits<size_t>::max()
-
-// New dependencies
-#include <cstdint>   // for uint8_t (integers 0 to 255)
-#include <algorithm> // for std::find
+#include <cstdint>     // for uint8_t and fixed-width integer types
 
 #include "Rcpp.h"
 
@@ -39,8 +29,6 @@ double LogSumExp(std::vector<double>& v);
 using namespace Rcpp;
 using std::endl;
 using std::string;
-#define cout Rcpp::Rcout
-#define printf Rprintf
 
 // Define commonly used mathematical constants for convenience
 #define PI 3.141592653589793238462643383280

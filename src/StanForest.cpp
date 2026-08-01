@@ -181,20 +181,20 @@ bool StanForest::Draw(double sigma, Random& random, bool* accept)
 
 void StanForest::Print()
 {
-  cout << "*****StanForest object:\n";
-  cout << "num_trees: " << num_trees << std::endl;
-  cout << "prior and mcmc info:\n";
+  Rcpp::Rcout << "*****StanForest object:\n";
+  Rcpp::Rcout << "num_trees: " << num_trees << std::endl;
+  Rcpp::Rcout << "prior and mcmc info:\n";
   if (use_dart) {
-    cout << "*****dart prior (On):\n";
-    cout << "dart_a: "   << dart_a   << std::endl;
-    cout << "dart_b: "   << dart_b   << std::endl;
-    cout << "dart_rho: " << dart_rho << std::endl;
-    cout << "use_augmentation: " << use_augmentation << std::endl;
+    Rcpp::Rcout << "*****dart prior (On):\n";
+    Rcpp::Rcout << "dart_a: "   << dart_a   << std::endl;
+    Rcpp::Rcout << "dart_b: "   << dart_b   << std::endl;
+    Rcpp::Rcout << "dart_rho: " << dart_rho << std::endl;
+    Rcpp::Rcout << "use_augmentation: " << use_augmentation << std::endl;
   } else {
-    cout << "*****dart prior (Off):\n";
+    Rcpp::Rcout << "*****dart prior (Off):\n";
   }
-  if (p) cout << "data set: n, p: " << n << ", " << p << std::endl;
-  else   cout << "data not set\n";
+  if (p) Rcpp::Rcout << "data set: n, p: " << n << ", " << p << std::endl;
+  else   Rcpp::Rcout << "data not set\n";
 }
 
 void StanForest::UpdateGlobalScaleParameters(string prior_type,

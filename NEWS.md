@@ -1,3 +1,10 @@
+# FusionForests 1.0.1
+
+- Internal cleanup of the C++ layer for CRAN portability: removed
+  unused standard-library includes, routed all console output
+  explicitly through `Rcpp::Rcout`, and restricted the shared
+  library's symbol visibility to the registered entry points.
+
 # FusionForests 1.0.0
 
 First release of **FusionForests**.

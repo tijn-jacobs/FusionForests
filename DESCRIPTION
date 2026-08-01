@@ -1,8 +1,8 @@
 Package: FusionForests
 Type: Package
 Title: Bayesian Tree Ensembles for Data Fusion and Causal Inference
-Version: 1.0.0
-Date: 2026-07-31
+Version: 1.0.1
+Date: 2026-08-01
 Authors@R: c(person("Tijn", "Jacobs", role = c("aut", "cre"), 
                     email = "t.jacobs@vu.nl", 
                     comment = c(ORCID = "0009-0003-6188-9296")))
