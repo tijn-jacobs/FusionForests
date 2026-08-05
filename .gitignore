@@ -17,6 +17,8 @@ CLAUDE.md
 src/*.so
 src/*.dll
 src/*.o
+src/*.o.tmp
+src/*.d
 # NOTE: src/RcppExports.cpp must be tracked — the package cannot be
 # installed from GitHub without it.
 

@@ -18,6 +18,9 @@
 ^src/deprecated$
 ^\.vscode$
 
+## Compiler scratch files that R CMD build's cleanup does not know
+^src/.*\.o\.tmp$
+
 ## Stray files at the repo root
 ^\.RDataTmp$
 ^\.Rhistory$

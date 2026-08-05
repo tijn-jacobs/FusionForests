@@ -33,6 +33,14 @@ Because the RWD-specific terms $g(X)$ and $c(X)$ absorb confounding,
 the RCT anchors identification of $\tau(X)$ while the observational
 data add precision — without assuming the RWD is unconfounded.
 
+## Reference
+
+The methodology is described in:
+
+> _Bayesian fusion forests for heterogeneous treatment effects on survival from randomised and real-world data_
+> T. Jacobs, S.L. van der Pas, W.N. van Wieringen
+> https://arxiv.org/abs/2607.29295
+
 ## Installation
 
 The development version can be installed from GitHub:
@@ -124,14 +132,6 @@ The single-study causal and survival models from the
 [ShrinkageTrees](https://cran.r-project.org/package=ShrinkageTrees)
 package are re-exported, so `library(FusionForests)` provides every
 model from the accompanying paper in one namespace.
-
-## Reference
-
-The methodology is described in:
-
-> _Bayesian fusion forests for heterogeneous treatment effects on survival from randomised and real-world data_
-> T. Jacobs, S.L. van der Pas, W.N. van Wieringen
-> arXiv preprint (2026)
 
 ## License
 
