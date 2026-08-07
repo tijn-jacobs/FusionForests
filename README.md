@@ -10,28 +10,30 @@ framework. Crucially, the observational data are **not** assumed to be
 unconfounded.
 
 The model targets heterogeneous treatment effects on continuous and
-(interval-)censored survival outcomes. The outcome is decomposed over
-separate tree forests:
+(interval-)censored survival outcomes. Using an accelerated failure
+time specification, the outcome is decomposed over separate tree
+forests:
 
-$$Y = \mu(X) + (1-S)\ g(X) + A\ \tau(X) + (1-S)\ A\ c(X) + \varepsilon,$$
+$$\log T = m_0(X) + (1-S)\,d(X) + A\,\tau(X) + (1-S)\,A\,c(X) + \varepsilon,$$
 
-where $Y$ is the log survival time (accelerated failure time
-formulation) or a continuous outcome, $A$ is the treatment, $S$
-indicates the source ($S = 1$ for the RCT, $S = 0$ for the RWD), and
+where $T$ is the survival time (for a continuous outcome, $\log T$ is
+replaced by the outcome itself), $A$ is the treatment, $S$ indicates
+the source ($S = 1$ for the RCT, $S = 0$ for the RWD), and
 $\varepsilon$ is a mean-zero error term — Gaussian or a flexible
 Dirichlet-process mixture. Each term is modelled by its own forest:
 
-- $\mu(X)$ — **control forest**: the prognostic surface under control;
-- $g(X)$ — **deconfounding forest**: an RWD-only shift that absorbs
-  confounding in the observational data;
-- $\tau(X)$ — **treatment forest**: the heterogeneous treatment effect,
-  identified by the RCT;
-- $c(X)$ — **deviation forest**: how the RWD treatment effect deviates
-  from the RCT one.
+- $m_0(X)$ — **baseline forest**: the baseline log survival time under
+  control, shared across both sources (`control` arguments);
+- $d(X)$ — **deviation forest**: how the baseline in the RWD deviates
+  from the one in the RCT (`deviation` arguments);
+- $\tau(X)$ — **treatment forest**: the heterogeneous treatment effect
+  (`treat` arguments);
+- $c(X)$ — **confounding forest**: the bias in the RWD treatment
+  contrast caused by unmeasured confounding (`deconf` arguments).
 
-Because the RWD-specific terms $g(X)$ and $c(X)$ absorb confounding,
-the RCT anchors identification of $\tau(X)$ while the observational
-data add precision — without assuming the RWD is unconfounded.
+The real-world data alone identify only the sum $\tau(x) + c(x)$. The
+trial anchors $\tau$, so the observational data add precision without
+their confounding leaking into the treatment effect estimate.
 
 ## Reference
 

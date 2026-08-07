@@ -1,5 +1,10 @@
 # Simulations
 
+`hpc_simulation_skeleton.R` + `hpc_job_skeleton.sh` are reusable templates for
+new HPC simulation scripts (also for other projects): they document the shared
+section layout and the `<base_name>.R` → `<base_name>_output.rds` naming
+contract that the SLURM job script relies on.
+
 Four experiments behind the simulation study (`notes/simulation/SIMULATION.tex`).
 Each folder holds its R script(s), `*_output.rds`, and `figures/`.
 
