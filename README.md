@@ -1,4 +1,4 @@
-# FusionForests <img src="https://img.shields.io/badge/R%3E%3D-3.5-blue" alt="R >= 3.5"> ![License: MIT](https://img.shields.io/badge/license-MIT-green) ![Lifecycle: stable](https://img.shields.io/badge/lifecycle-stable-brightgreen) [![](https://cranlogs.r-pkg.org/badges/grand-total/ShrinkageTrees)](https://cran.r-project.org/package=FusionForests)
+# FusionForests <img src="https://img.shields.io/badge/R%3E%3D-3.5-blue" alt="R >= 3.5"> ![License: MIT](https://img.shields.io/badge/license-MIT-green) ![Lifecycle: stable](https://img.shields.io/badge/lifecycle-stable-brightgreen) [![](https://cranlogs.r-pkg.org/badges/grand-total/FusionForests)](https://cran.r-project.org/package=FusionForests)
 
 <img src="sticker/FusionForests_hex.png" align="right" width="150"/>
 
