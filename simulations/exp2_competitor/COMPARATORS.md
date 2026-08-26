@@ -1,6 +1,6 @@
 # Comparator methods — simulation experiment 2
 
-Status overview for the machine-learning comparison in `notes/simulation/SIMULATION.tex`,
+Status overview for the machine-learning comparison in `manuscripts/manuscript_v2/simulation/SIMULATION.tex`,
 experiment 2. Last updated 29 July 2026.
 
 **Scope.** Experiment 2 compares the Bayesian fusion forest with flexible machine-learning

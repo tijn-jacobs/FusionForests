@@ -1,7 +1,7 @@
 # Review notes — simulation study (`sim_surv_v12.R`)
 
 Concerns and observations from reviewing the main simulation study against the
-manuscript (`notes/simulation/SIMULATION.tex` and `notes/methodology/`).
+manuscript (`manuscripts/manuscript_v2/simulation/SIMULATION.tex` and `manuscripts/manuscript_v2/methodology/`).
 Recorded for later; nothing here has been changed in the code or the text.
 
 Assume **the code is the source of truth** unless noted otherwise.

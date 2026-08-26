@@ -1622,7 +1622,7 @@ cat("All results successfully saved in one file.\n")
 # # print(cens_tbl, row.names = FALSE, digits = 3)
 # 
 # # Figures are exploratory (not manuscript figures yet), so they go in a local
-# # sub-folder rather than notes/general/figures.
+# # sub-folder rather than manuscripts/manuscript_v2/general/figures.
 # fig_dir <- "simulations/exp3_covariate_dimension/figures"
 # dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
 # 

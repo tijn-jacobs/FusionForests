@@ -13,7 +13,7 @@
 ^archive$
 ^backups$
 ^data$
-^notes$
+^manuscripts$
 ^inst/AFTrees-master$
 ^src/deprecated$
 ^\.vscode$

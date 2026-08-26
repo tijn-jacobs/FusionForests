@@ -8,11 +8,11 @@
 #                 single cell lambda_d = lambda_u = 1.
 #   * SM        : the full 3x3 lambda grid, one figure per metric.
 #
-# Base R only.  Run from the repo root.  Writes PDFs to notes/general/figures/.
+# Base R only.  Run from the repo root.  Writes PDFs to manuscripts/manuscript_v2/general/figures/.
 # ──────────────────────────────────────────────────────────────────────────────
 
 res_dir <- "simulations/exp2_competitor"
-fig_dir <- "notes/general/figures"   # write straight to the manuscript figures dir
+fig_dir <- "manuscripts/manuscript_v2/general/figures"   # write straight to the manuscript figures dir
 dir.create(fig_dir, showWarnings = FALSE, recursive = TRUE)
 
 res <- rbind(
