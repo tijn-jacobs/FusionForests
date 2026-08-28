@@ -1,7 +1,7 @@
 # Combine the four high-dimensional sweep outputs (sim_hd_v1a..v1d) into one
 # data set and produce the paper figures for the covariate-dimension experiment:
-#   manuscripts/manuscript_v2/general/figures/sim_hd_metrics_vs_p.pdf  (main text, Figure sim-highdim)
-#   manuscripts/manuscript_v2/general/figures/sim_hd_ratio_vs_p.pdf    (supplementary, Figure sim-hd-ratio)
+#   manuscripts/manuscript_v2/figures/sim_hd_metrics_vs_p.pdf  (main text, Figure sim-highdim)
+#   manuscripts/manuscript_v2/figures/sim_hd_ratio_vs_p.pdf    (supplementary, Figure sim-hd-ratio)
 #
 # Each input is the per-replication `res` data frame saved by the corresponding
 # sim_hd_v1*.R run; together v1a..v1d tile the full p grid (5 ... 500), disjointly.
@@ -66,7 +66,7 @@ print(summary_tbl[ord, c("p", "population", "method",
       row.names = FALSE, digits = 3)
 
 # ── Figures (written to the manuscript figures directory) ─────────────────────
-fig_dir <- "manuscripts/manuscript_v2/general/figures"   # write straight to the manuscript figures dir
+fig_dir <- "manuscripts/manuscript_v2/figures"   # write straight to the manuscript figures dir
 dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
 
 meth        <- c("Fusion", "Fusion-oracle", "RCT-only", "RWD-only")

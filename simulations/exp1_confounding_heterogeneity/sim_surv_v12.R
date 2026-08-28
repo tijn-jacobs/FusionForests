@@ -1596,7 +1596,7 @@ metrics  <- c("rmse", "bias", "coverage", "postvar")
 metric_labs <- c(rmse = "RMSE", bias = "Bias", coverage = "Coverage",
                  width = "CI width", postvar = "Posterior variance")
 
-fig_dir <- "manuscripts/manuscript_v2/general/figures"   # write straight to the manuscript figures dir
+fig_dir <- "manuscripts/manuscript_v2/figures"   # write straight to the manuscript figures dir
 dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
 # Draws the 2x2 metric grid to the active device (so it shows in the RStudio
 # plot pane) and, when `file` is given, also writes the same figure to PDF.
@@ -1668,7 +1668,7 @@ ylims <- setNames(lapply(metrics, function(m) {
 }), metrics)
 
 # Plot 1: vary lambda_u, holding lambda_d = 1.  Shown in-session and saved.
-# File names match the \includegraphics calls in manuscripts/manuscript_v2/simulation/SIMULATION.tex.
+# File names match the \includegraphics calls in manuscripts/manuscript_v2/SIMULATION.tex.
 plot_panel_grid(a[a$lambda_d == 1, ], "lambda_u", expression(lambda[u]),
                 file = file.path(fig_dir, "sim_vary_lambda_u.pdf"), ylims = ylims)
 # Plot 2: vary lambda_d, holding lambda_u = 1.  Shown in-session and saved.

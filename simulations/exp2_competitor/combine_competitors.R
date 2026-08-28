@@ -12,7 +12,7 @@
 # Base R only. Run from the repository root.
 # ──────────────────────────────────────────────────────────────────────────────
 
-setwd("~/Library/CloudStorage/OneDrive-VrijeUniversiteitAmsterdam/Documents/GitHub/FusionForests")
+# Run from the repository root (no setwd; paths below are repo-relative).
 res_dir <- "simulations/exp2_competitor"
 
 files <- c(

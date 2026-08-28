@@ -234,7 +234,7 @@ cat("All results successfully saved in one file.\n")
 # # Figures: write straight to the manuscript figures directory so a re-run
 # # updates the paper.  Okabe-Ito colours, shared across all paper figures:
 # #   Fusion #E69F00 | RCT-only #009E73 | RWD-only #D55E00
-# # fig_dir <- "manuscripts/manuscript_v2/general/figures"
+# # fig_dir <- "manuscripts/manuscript_v2/figures"
 # # dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
 # # pdf(file.path(fig_dir, "<figure>.pdf"), width = 18, height = 10,
 # #     family = "Times")
