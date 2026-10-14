@@ -1,0 +1,65 @@
+
+
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{0.9}
+\begin{tabular}{clccc}
+\toprule
+$p$ & Method & RMSE & Coverage & Length \\
+\midrule
+100 & Causal Horseshoe Forest & 0.803 & 0.836 & 2.234 \\
+  & AFT-BCF & 0.715 & 0.984 & 3.615 \\
+  & AFT-Shrinkage BCF & 1.171 & 0.628 & 2.149 \\
+  & AFT-BART & 1.036 & 0.291 & 0.874 \\
+  & AFT-DART & 1.061 & 0.256 & 0.794 \\
+\midrule
+1000 & Causal Horseshoe Forest & 0.687 & 0.879 & 2.161 \\
+  & AFT-BCF & 0.730 & 0.990 & 3.876 \\
+  & AFT-Shrinkage BCF & 1.317 & 0.588 & 2.203 \\
+  & AFT-BART & 1.150 & 0.220 & 0.824 \\
+  & AFT-DART & 1.307 & 0.150 & 0.846 \\
+\midrule
+5000 & Causal Horseshoe Forest & 0.625 & 0.910 & 2.159 \\
+  & AFT-BCF & 0.717 & 0.992 & 3.968 \\
+  & AFT-Shrinkage BCF & 1.364 & 0.578 & 2.242 \\
+  & AFT-BART & 1.075 & 0.172 & 0.617 \\
+  & AFT-DART & 1.153 & 0.103 & 0.552 \\
+\bottomrule
+\end{tabular}
+\caption{CATE performance for the linear scenario. Reported are RMSE, coverage, and average 95\% credible interval length across methods and dimensions.}
+\label{tab:main_linear}
+\end{table}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{0.9}
+\begin{tabular}{clccc}
+\toprule
+$p$ & Method & RMSE & Coverage & Length \\
+\midrule
+100 & Causal Horseshoe Forest & 0.564 & 0.896 & 1.814 \\
+  & AFT-BCF & 0.484 & 0.998 & 2.863 \\
+  & AFT-Shrinkage BCF & 0.493 & 0.838 & 1.421 \\
+  & AFT-BART & 0.746 & 0.339 & 0.702 \\
+  & AFT-DART & 0.776 & 0.433 & 0.952 \\
+\midrule
+1000 & Causal Horseshoe Forest & 0.563 & 0.881 & 1.764 \\
+  & AFT-BCF & 0.575 & 0.997 & 3.202 \\
+  & AFT-Shrinkage BCF & 0.792 & 0.701 & 1.689 \\
+  & AFT-BART & 1.158 & 0.195 & 0.671 \\
+  & AFT-DART & 1.277 & 0.275 & 1.070 \\
+\midrule
+5000 & Causal Horseshoe Forest & 0.482 & 0.926 & 1.727 \\
+  & AFT-BCF & 0.576 & 0.999 & 3.605 \\
+  & AFT-Shrinkage BCF & 1.111 & 0.614 & 1.989 \\
+  & AFT-BART & 1.584 & 0.206 & 1.062 \\
+  & AFT-DART & 1.851 & 0.236 & 1.455 \\
+\bottomrule
+\end{tabular}
+\caption{CATE performance for the nonlinear scenario. Reported are RMSE, coverage, and average 95\% credible interval length across methods and dimensions.}
+\label{tab:main_nonlinear}
+\end{table}
+

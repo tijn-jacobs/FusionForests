@@ -1,0 +1,37 @@
+\begin{algorithm}[tb]
+\caption{Outer Gibbs sampler -- $(t+1)$-th iteration}
+\label{OuterGibbs}
+\KwIn{Previous $\big(\mathcal{T}_j^f, \mathcal{H}_j^f\big)^{(t)}$ for $j=1,\ldots,m^f$, $\big(\mathcal{T}_j^\tau, \mathcal{H}_j^\tau\big)^{(t)}$ for $j=1,\ldots,m^\tau$, $T_i^o$ for $i=1,\ldots,n$, $\sigma^2{}^{(t)}$}
+
+\vspace{1ex}
+
+
+\For{$j = 1$ \KwTo $m^f$}{
+    Compute prognostic residuals $\mathcal{R}^f_j{}^{(t)}$ using Eq.~\eqref{Residuals_f}\;
+    Sample $\big(\mathcal{T}_j^f, \mathcal{H}_j^f\big)^{(t+1)}$ from $\big(\mathcal{T}_j, \mathcal{H}_j\big) \mid \mathcal{R}_j^{f(t)}, \sigma^2$\;
+}
+
+\vspace{1ex}
+
+\For{$j = 1$ \KwTo $m^\tau$}{
+    Compute treatment effect residuals $\mathcal{R}_j^{\tau(t)}$ using Eq.~\eqref{Residuals_tau}\;
+    Sample $\big(\mathcal{T}_j^\tau, \mathcal{H}_j^\tau\big)^{(t+1)}$ from $\big(\mathcal{T}_j, \mathcal{H}_j\big) \mid \mathcal{R}_j^{\tau(t)}, \sigma^2$\;
+}
+
+\vspace{1ex}
+
+
+\For{$i = 1$ \KwTo $n$}{
+
+    \eIf{$\delta_i = 0$}{
+        Compute survival time prediction $\widehat{T}^{(t)}_i$using Eq.~\eqref{model}\;
+        Sample $T^o_i{}^{(t+1)}$ from $T^o_i \mid Y_i, \widehat{T}^{(t)}_i, \sigma^2{}^{(t)}$\;
+    }{
+        Set $T^o_i{}^{(t+1)} = Y_i$\;
+    }
+}
+
+\vspace{1ex}
+
+Sample $\sigma^2{}^{(t+1)}$ from $\sigma^2 \mid \Big\{\big(\mathcal{T}_j^f, \mathcal{H}_j^f\big)^{(t+1)} \Big\}_{j=1}^{m^f}, \Big\{\big(\mathcal{T}_j^\tau, \mathcal{H}_j^\tau\big)^{(t+1)}\Big\}_{j=1}^{m^\tau}, \Big\{T^o_i{}^{(t+1)}\Big\}_{i=1}^n$.
+\end{algorithm}

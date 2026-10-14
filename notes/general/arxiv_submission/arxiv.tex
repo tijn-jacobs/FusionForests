@@ -1,0 +1,229 @@
+%% arXiv version: the main article and the Supplementary Materials in one
+%% document, in that order. Like main.tex and sm.tex this file is only an
+%% overview: all content lives in the section files it inputs.
+%%
+%% Two differences from main.tex and sm.tex:
+%%   1. Cross-references resolve for real. Those two files are each
+%%      self-contained and hardcode the other document's numbers through
+%%      \@namedef; here both halves are present, so \ref works and no
+%%      hardcoding is needed.
+%%   2. The supplement switches to "S" numbering part-way through the
+%%      document rather than in the preamble (see below).
+%%
+%% The preamble is the union of the main.tex and sm.tex preambles.
+
+\documentclass[11pt]{article}
+
+%% Page geometry
+\usepackage[a4paper, margin=1in]{geometry}
+
+%% Core math + fonts
+\usepackage{amsthm,amsmath,amsfonts,amssymb}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+%% Citations
+\usepackage[authoryear, round]{natbib}
+
+%% Colour
+\usepackage{xcolor}
+
+%% Hyperlinks
+\usepackage[colorlinks, citecolor=blue, urlcolor=blue, linkcolor=blue]{hyperref}
+\usepackage{xurl}
+
+%% Graphics & figures
+\usepackage{graphicx}
+\graphicspath{{figures/}{./figures/}}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{rotating}   % sidewaystable, used in the supplement
+
+%% Float placement: every float carries [!tb], so figures and tables sit at
+%% the top or the bottom of a page and never on a page of their own.
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.9}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.9}
+\setcounter{topnumber}{3}
+\setcounter{totalnumber}{4}
+\usepackage[section]{placeins}  % keep floats within their section
+
+%% Algorithms
+\usepackage[linesnumbered, ruled, vlined]{algorithm2e}
+
+%% TikZ for diagrams
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,fit,calc,positioning}
+\tikzset{box/.style={draw, diamond, thick, text centered, minimum height=0.5cm, minimum width=1cm}}
+\tikzset{line/.style={draw, thick, -latex'}}
+
+%% Misc
+\usepackage{comment}
+\usepackage{dsfont}
+\usepackage{enumitem}
+\usepackage{changepage}
+\usepackage{bm}
+
+%% Theorem environments
+\theoremstyle{plain}
+\newtheorem{axiom}{Axiom}
+\newtheorem{claim}[axiom]{Claim}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{assumption}{Assumption}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem*{example}{Example}
+\newtheorem*{fact}{Fact}
+
+\theoremstyle{remark}
+\newtheorem{case}{Case}
+\newtheorem{remark}{Remark}
+
+%% Custom math commands
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\1}{\mathds{1}}
+\newcommand{\p}{\mathbb{P}}
+\renewcommand{\H}{\mathcal{H}}
+\newcommand{\T}{\mathcal{T}}
+\newcommand{\ind}{\perp\!\!\!\perp}
+\newcommand{\RCT}{\mathrm{RCT}}
+\newcommand{\RWD}{\mathrm{RWD}}
+\newcommand{\AF}{\mathrm{AF}}
+\newcommand{\expit}{\operatorname{expit}}
+
+%% Switch to the supplement's numbering. Called once, where the supplement
+%% begins: every counter restarts and every number gains an "S" prefix, so
+%% the supplement reads as it does in sm.tex while the main article above
+%% keeps ordinary numbering.
+\newcommand{\startsupplement}{%
+  \clearpage
+  \setcounter{section}{0}%
+  \setcounter{equation}{0}%
+  \setcounter{figure}{0}%
+  \setcounter{table}{0}%
+  \setcounter{proposition}{0}%
+  \setcounter{corollary}{0}%
+  \setcounter{algocf}{0}%
+  \renewcommand{\thesection}{S.\arabic{section}}%
+  \renewcommand{\thesubsection}{\thesection.\arabic{subsection}}%
+  \renewcommand{\theequation}{S\arabic{equation}}%
+  \renewcommand{\thefigure}{S\arabic{figure}}%
+  \renewcommand{\thetable}{S\arabic{table}}%
+  \renewcommand{\theproposition}{S\arabic{proposition}}%
+  \renewcommand{\thecorollary}{S\arabic{corollary}}%
+  \renewcommand{\thealgocf}{S\arabic{algocf}}%
+}
+
+
+\title{Bayesian fusion forests for heterogeneous treatment effects on survival from randomised and real-world data}
+
+%% Affiliations and email addresses as footnotes at the foot of the title
+%% page. The journal version cannot use \thanks, so main.tex sets them as a
+%% numbered block instead; arXiv has no such restriction.
+\author{
+  Tijn Jacobs\thanks{Department of Mathematics, Vrije Universiteit Amsterdam. \texttt{t.jacobs@vu.nl}} \and
+  St\'ephanie L.\ van der Pas\thanks{Department of Mathematics, Vrije Universiteit Amsterdam. \texttt{s.l.vander.pas@vu.nl}} \and
+  Wessel N.\ van Wieringen\thanks{Department of Epidemiology and Data Science, Amsterdam University Medical Centre; and Department of Mathematics, Vrije Universiteit Amsterdam. \texttt{w.n.van.wieringen@vu.nl}}
+}
+
+\date{\today}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.8em}
+
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We develop the \emph{Bayesian fusion forest}, a nonparametric framework to estimate heterogeneous treatment effects on survival outcomes by combining a randomised controlled trial and real-world data.
+The framework relaxes the unconfoundedness assumption on the real-world data by assuming instead that the treatment effect transports across the two sources.
+Our method opens up right- and interval-censored outcomes to data fusion.
+We model the survival time with an accelerated failure time decomposition into a shared baseline prognosis, a source-specific deviation, a treatment effect, and a confounding function.
+The confounding function absorbs the confounding bias in the real-world data.
+Each component receives a Bayesian tree ensemble prior.
+The shared baseline prognosis borrows strength across sources, while the deviation captures between-source heterogeneity.
+A hierarchical Dirichlet process mixture models the error distribution nonparametrically.
+A simulation study shows efficiency gains over a trial-only analysis across varying levels of confounding and between-source heterogeneity.
+We combine the ACTG~175 trial with the Multicenter AIDS Cohort Study to estimate the effect of combination antiretroviral therapy for HIV.
+The fusion identifies a benefit for nearly every patient whereas the trial alone is inconclusive.
+
+\medskip
+\noindent\textbf{Keywords:} Bayesian additive regression trees; data fusion; heterogeneous treatment effects; real-world evidence; survival analysis; unmeasured confounding.
+\end{abstract}
+
+
+%% ------------------------------------------------------------------
+%% Main article
+%% ------------------------------------------------------------------
+
+\input{../introduction/INTRODUCTION}
+
+\input{../methodology/METHODOLOGY}
+
+\input{../simulation/SIMULATION}
+
+\input{../data_analysis/ANALYSIS}
+
+\input{DISCUSSION}
+
+%% Set here rather than in DISCUSSION.tex, which is shared with the journal
+%% version: that one carries the shortened wording the journal prescribes and
+%% sets it on the title page. Below is the original ERC and SURF text.
+\section*{Funding}
+This project has received funding from the European Research Council (ERC)
+under the European Union's Horizon Europe program under Grant agreement
+No.~101074802.
+Views and opinions expressed are however those of the author(s) only and do not
+necessarily reflect those of the European Union or the European Research
+Council Executive Agency.
+Neither the European Union nor the granting authority can be held responsible
+for them.
+This work used the Dutch national e-infrastructure with the support of the SURF
+Cooperative using grant no.~EINF-18803.
+
+\section*{Acknowledgements}
+The authors used generative artificial intelligence tools in support of
+developing and debugging the accompanying software.
+All such output was reviewed and verified by the authors, who take full
+responsibility for the content of this work.
+
+\section*{Conflict of interest}
+None declared.
+
+
+%% \FloatBarrier rather than \clearpage: it still keeps floats from surfacing
+%% inside the reference list, but lets the references follow on the same page
+%% instead of starting a new one. The bibliography covers both halves: BibTeX
+%% collects citations from the supplement as well, wherever the list is set.
+\FloatBarrier
+\bibliographystyle{apalike}
+\bibliography{references}
+
+
+%% ------------------------------------------------------------------
+%% Supplementary Materials
+%% ------------------------------------------------------------------
+
+\startsupplement
+
+\begin{center}
+  {\Large\bfseries Supplementary Materials}
+\end{center}
+
+\medskip
+
+\input{../methodology/METHODOLOGY_SM}
+
+\input{../simulation/SIMULATION_SM}
+
+\input{../data_analysis/ANALYSIS_SM}
+
+\end{document}

@@ -1,0 +1,91 @@
+\section{Introduction}
+
+% Opening 
+Modelling heterogeneous treatment effects is challenging, especially with survival outcomes and high-dimensional covariates that may confound or modify treatment effects.
+We propose a Bayesian regression tree ensemble approach that uses a horseshoe prior to shrink tree step heights.
+This framework flexibly captures complex non-linear effects and interactions while providing adaptive shrinkage suited to high-dimensional causal inference with survival outcomes.
+
+% Causal inference in high-dimensions
+
+The conditional average treatment effect (CATE) quantifies how treatment effects vary across covariate profiles and is a central object in modelling heterogeneous treatment effects \citep{Caron2022CATE}.
+Estimating the CATE requires careful adjustment for confounding variables.
+This task becomes particularly challenging in high-dimensional settings with many covariates and complex interactions. 
+In contrast, the average treatment effect (ATE) is low-dimensional and has been widely studied in high-dimensional contexts \citep{Farrell2015RobustATE, Antonelli2018DRMatching, Antonelli2020Averaging, Ning2020HDPS, Antonelli2022HighDimCausal}.
+Researchers can treat high-dimensional components as nuisance terms when estimating the ATE, which simplifies inference.
+CATE estimation is fundamentally more difficult because the parameter of interest is high-dimensional and depends directly on covariates \citep{Alaa2018LimitsHTE}.
+Recent work has proposed flexible and robust methods for estimating heterogeneous treatment effects in high-dimensional covariate spaces \citep{Powers2018HTE, Fan2020CATE, Shin2023DRInference}.
+Despite this progress, a gap remains in extending these high-dimensional causal inference methods to survival data, where censoring and time-to-event outcomes introduce additional complexity.
+
+% Tree-based method for causal inference
+Tree-based methods are widely used for causal inference in both frequentist and Bayesian frameworks. 
+On the frequentist side, the causal forest algorithm of \citet{Wager2018CausalForest} extends the sample-splitting approach of \citet{Athey2016CausalTrees} to estimate heterogeneous treatment effects non-parametrically. 
+This approach has been adapted to survival data by \citet{Cui2023CausalSurvivalForest}. 
+In the Bayesian setting, the Bayesian causal forest approach of \citet{hahn2020bayesian} extends earlier work by \citet{Hill2011}. 
+Hill applied Bayesian additive regression trees (BART) \citep{BARToriginal} to estimate treatment effect heterogeneity.
+BART-based methods have demonstrated strong empirical performance and often outperform alternative estimators in benchmarking studies \citep{Dorie2019CausalCompetition, Thal2023ACIC}. 
+Researchers have adapted these models to survival data to estimate conditional average treatment effects \citep{Bonato2011BayesianEnsemble, henderson2020individualized, Hu2023FlexibleCausal, Sun2025AFTCure}.
+Recent work shows that AFT-BART \citep{henderson2020individualized} outperforms other causal machine learning approaches in survival settings \citep{Hu2021HeterogeneousSurvival}.
+
+% Adaptation of BART to high-dimensional settings
+We adapt Bayesian additive regression trees to high-dimensional data by placing a global--local shrinkage prior on the step heights.
+In the original BART formulation, regularisation is imposed primarily through constraints on the tree structure, such as limiting tree depth or controlling the likelihood of node splits \citep{BARToriginal}.
+More recent extensions, such as the Dirichlet additive regression trees (DART) of \citet{linero2018dirichlet}, introduced Dirichlet priors on splitting proportions to encourage sparsity in the covariate space.
+\citet{caron2022shrinkage} further extended this idea to causal inference. 
+Our approach departs from this line of work by shifting the focus of regularisation away from the tree structure and onto the leaf node parameters.
+This approach preserves the flexibility of BART to model complex non-linear relationships. 
+At the same time, it introduces adaptive shrinkage that suits high-dimensional causal inference. 
+Rather than enforcing exact sparsity, our method applies continuous shrinkage that down-weights weak effects while still allowing strong signals to be detected when supported by the data.
+
+
+% Importance of unconfoundedness in causal modelling
+Causal inference typically relies on the \textit{unconfoundedness} assumption to identify treatment effects from observational data \citep{ImbensRubin2015}.
+It requires that, conditional on observed covariates $X$, treatment assignment $A$ is independent of the potential outcomes $T(a)$:
+\begin{equation}\label{unconfoundedness}
+T(a) \ind A \mid X = x \quad \text{for } a \in \{0, 1\}.
+\end{equation}
+Valid causal inference is possible by adjusting for the relevant covariates if this condition holds.
+Violating unconfoundedness may lead to biased estimates \citep{Chernozhukov2022OVBCML}.
+
+In high-dimensional settings such adjustment is inherently affected by regularisation, as the estimand itself is a function of $X$.
+Although treatment effect heterogeneity may be complex, it is typically assumed to be driven by an unknown low-dimensional structure in the covariates, such as a small subset of effect modifiers and confounders.
+When $p$ is large relative to $n$, effective adjustment may benefit from regularisation to control model
+complexity and to distinguish signal from noise.
+
+
+
+\cite{hahn2018regularization} show that regularisation can induce bias even when the outcome model is correctly specified and all confounders are observed. 
+This phenomenon, termed \textit{regularisation-induced confounding} (RIC), arises when shrinkage attenuates adjustment for covariates associated with treatment assignment, thereby distorting the estimated treatment effect. 
+The risk in high-dimensional settings is particularly pronounced for weak confounders that strongly predict treatment but are only weakly associated with the outcome.
+We adopt a modelling strategy that retains all covariates and controls complexity through adaptive shrinkage rather than variable exclusion.
+We investigate the resulting bias empirically in simulation settings designed to exhibit RIC \citep{hahn2020bayesian}.
+Motivated by this interaction between regularisation and confounding, we employ global--local shrinkage priors for adaptive regularisation of treatment effect heterogeneity.
+
+
+% Bayesian shrinkage priors
+% Bayesian shrinkage priors
+Global--local shrinkage priors provide a fully Bayesian and computationally attractive alternative to exact sparsity-inducing methods \citep{Mitchell1988SpikeSlab, Liu2021ABC}. 
+Originally developed for sparse regression problems \citep{OriginalHorseshoe}, these priors are now used across a wide range of contexts \citep{Kowal2019DynamicShrinkage, Li2019GraphicalHorseshoe, Louizos2017BayesianCompression} and admit many formulations \citep{tipping2001, johnstone2004, Bhadra2019}\citep{park2008}. 
+Among these, the horseshoe prior has emerged as a particularly attractive choice because of its strong theoretical properties and empirical performance in high-dimensional settings \citep{vdPas2017Horseshoe, hahn2020bayesian, DattaGhosh2013, vdPas2014, vdPas2017, bhadra2019lasso}. 
+We focus on the horseshoe prior to introduce continuous shrinkage directly on the tree step heights.
+This approach retains all covariates while adaptively shrinking their contributions. 
+The proposed methodology is readily extendable to other global--local shrinkage priors that allow Gibbs sampling and could be further generalised to incorporate different shrinkage strategies with additional computational effort.
+
+% Our ocntributions
+Our work contributes to the literature in several ways:
+\begin{enumerate}
+    \item We introduce a novel regularisation strategy for Bayesian Additive Regression Trees based on the step-height prior, where we use the horseshoe prior to induce continuous shrinkage rather than relying solely on regularisation via the tree structure.
+    \item We develop a computational framework for fitting these models via reversible jump Metropolis-Hastings. The implementation is publicly available in the \texttt{R} package \texttt{ShrinkageTrees} \citep{ShrinkageTreesR}.
+    \item We demonstrate how this framework can be effectively applied to estimate heterogeneous treatment effects in survival data, with a particular focus on high-dimensional covariates.
+\end{enumerate}
+
+% Organisation of the paper
+The remainder of this paper is organised as follows.
+In Section~\ref{sec:context} we describe the causal framework and notation.
+In Section~\ref{section:Model} we introduce the model formulation and prior specification. 
+In Section~\ref{sec:sampling} we describe the computational strategy and posterior inference procedure. 
+We present the simulation results in Section~\ref{section:Simulations}.
+Section~\ref{section:PDAC} provides a detailed case study of pancreatic cancer data. 
+We conclude with a discussion in Section~\ref{section:Discussion}.
+
+
+

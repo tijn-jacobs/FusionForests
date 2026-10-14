@@ -1,0 +1,976 @@
+\documentclass[11pt]{report}
+
+%% Page geometry
+\usepackage[a4paper, margin=1in]{geometry}
+
+%% Core math + fonts
+\usepackage{amsthm,amsmath,amsfonts,amssymb}
+\usepackage{microtype}
+
+%% Citations
+\usepackage[authoryear, round]{natbib}
+
+%% Hyperlinks
+\usepackage[colorlinks, citecolor=blue, urlcolor=blue, linkcolor=blue]{hyperref}
+\usepackage{xurl}
+
+%% Graphics & figures
+\usepackage{graphicx}
+\graphicspath{{./images/}}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{booktabs}
+
+%% Algorithms
+\usepackage[linesnumbered, ruled, vlined]{algorithm2e}
+
+%% TikZ for diagrams
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,fit,calc,positioning}
+\tikzset{box/.style={draw, diamond, thick, text centered, minimum height=0.5cm, minimum width=1cm}}
+\tikzset{line/.style={draw, thick, -latex'}}
+
+%% Misc
+\usepackage{comment}
+\usepackage{dsfont}
+
+%% Theorem environments (numbered within chapter for report class)
+\theoremstyle{plain}
+\newtheorem{axiom}{Axiom}
+\newtheorem{claim}[axiom]{Claim}
+\newtheorem{theorem}{Theorem}[chapter]
+\newtheorem{lemma}[theorem]{Lemma}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem*{example}{Example}
+\newtheorem*{fact}{Fact}
+
+\theoremstyle{remark}
+\newtheorem{case}{Case}
+
+%% Custom math commands
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\1}{\mathds{1}}
+\newcommand{\p}{\mathbb{P}}
+\renewcommand{\H}{\mathcal{H}}
+\newcommand{\T}{\mathcal{T}}
+
+%% File-specific additions
+\usepackage{bm}
+\usepackage{enumitem}
+
+\theoremstyle{plain}
+\newtheorem{proposition}[theorem]{Proposition}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\Var}{\mathrm{Var}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\given}{\,\vert\,}
+\newcommand{\data}{\mathcal{D}}
+\newcommand{\X}{\mathcal{X}}
+\newcommand{\af}{\mathrm{AF}}
+\newcommand{\vte}{\mathrm{VTE}}
+\newcommand{\vcf}{\mathrm{VCF}}
+\newcommand{\half}{\mathcal{C}^{+}}
+\newcommand{\ind}[1]{\mathbf{1}\{#1\}}
+
+\title{Posterior Inference for Treatment Effects}
+\author{Tijn Jacobs}
+\date{\today}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.8em}
+
+
+\begin{document}
+
+\chapter{Posterior Inference for Treatment Effects}
+\label{ch:posterior-inference}
+
+\section{Overview}
+\label{sec:pi-overview}
+
+The preceding chapters established a structural decomposition of the observed
+outcome into a prognostic baseline, a causal treatment effect, and a
+confounding bias term, together with a Bayesian nonparametric prior over the
+component functions. That development concerns \emph{how the model is fitted}.
+The present chapter concerns \emph{what is done with the fit}: how the posterior
+distribution of the component functions is converted into causal conclusions
+about treatment effects, how the contribution of the real-world data is
+controlled and measured, and how the heterogeneity of both the treatment effect
+and the confounding bias is summarised in an interpretable way.
+
+Two estimands are the focus throughout: the conditional average treatment
+effect (CATE) and the acceleration factor, its exponential. Both are functionals
+of a single component of the decomposition, the treatment-effect function, and
+this makes posterior inference for them direct.
+
+The chapter is organised around four tasks. Section~\ref{sec:pi-estimands}
+defines the CATE and the acceleration factor from the fitted decomposition and
+fixes the target population. Section~\ref{sec:pi-summaries} describes posterior
+summaries of conditional and population-averaged effects, including the
+treatment of covariate-distribution uncertainty through the Bayesian bootstrap.
+Section~\ref{sec:pi-borrowing} introduces the adaptive borrowing architecture:
+two scalar parameters that govern, respectively, how strongly the prognostic
+surfaces of the two sources are pooled and how strongly the real-world treatment
+data are allowed to inform the causal effect.
+Section~\ref{sec:pi-diagnostics} develops a suite of diagnostics that report how
+much information was borrowed and where. Finally, Section~\ref{sec:pi-vim}
+introduces variable importance measures for treatment effect heterogeneity and,
+exploiting the decomposition, a novel variable importance measure for the
+confounding function itself.
+
+\section{Causal Estimands: the CATE and the Acceleration Factor}
+\label{sec:pi-estimands}
+
+\subsection{The decomposition and its parameterisation}
+
+We work with the structural model for the log-survival outcome
+$Y = \log T$,
+\begin{equation}
+\label{eq:decomposition}
+Y_i \;=\; m_0(X_i, S_i) \;+\; \tau(X_i)\,A_i \;+\; (1 - S_i)\,A_i\, c(X_i)
+        \;+\; \sigma\,\varepsilon_i ,
+\end{equation}
+where $A \in \{0,1\}$ is the treatment indicator, $S \in \{0,1\}$ is the
+data-source indicator with $S = 1$ for the randomized controlled trial (RCT)
+and $S = 0$ for the real-world data (RWD), and $X \in \X \subseteq
+\mathbb{R}^p$ is a vector of baseline covariates. Here $m_0(\cdot,\cdot)$ is the
+baseline (control) outcome surface, $\tau(\cdot)$ is the treatment-effect
+function, and $c(\cdot)$ is the confounding function, which enters only for
+treated observational units. The residual $\varepsilon$ has a mean-zero,
+unit-variance distribution with cumulative distribution function $\Phi$, itself
+assigned a nonparametric prior, and $\sigma > 0$ is a scale parameter.
+
+Two modelling choices, used throughout this chapter, refine
+\eqref{eq:decomposition}. First, the baseline surface is parameterised as
+\begin{equation}
+\label{eq:m0-split}
+m_0(x, s) \;=\; f(x) \;+\; (1 - s)\, g(x),
+\end{equation}
+so that $f$ is a baseline surface common to both sources --- interpretable as
+the baseline of the RCT population, $s = 1$ --- and $g$ is an RWD-specific
+deviation. Second, the confounding function is split into a
+covariate-homogeneous intercept and a covariate-varying remainder, in
+scale-separated form,
+\begin{equation}
+\label{eq:c-scale}
+c(x) \;=\; c_0 \;+\; \sigma_c\,\tilde c(x),
+\end{equation}
+where $c_0 \in \mathbb{R}$ is an unshrunk intercept, $\tilde c$ carries a
+standard ensemble prior centred at zero, and $\sigma_c \ge 0$ is a global scale.
+The intercept $c_0$ absorbs any uniform component of the confounding bias, while
+$\sigma_c$ controls the magnitude of its variation across covariate values; the
+rationale for this split is given in Section~\ref{subsec:c-interpret}. The
+parameters $\sigma_g$ (the leaf scale of $g$) and $\sigma_c$ are the borrowing
+controls and are the subject of Section~\ref{sec:pi-borrowing}.
+
+\subsection{The conditional average treatment effect and the acceleration factor}
+
+The primary conditional estimand is the CATE on the log-time scale,
+\begin{equation}
+\label{eq:cate}
+\tau(x) \;=\; \E\bigl[Y(1) - Y(0) \given X = x\bigr]
+        \;=\; \E\bigl[\log T(1) - \log T(0) \given X = x\bigr].
+\end{equation}
+Under the decomposition \eqref{eq:decomposition}, $\tau(x)$ is the
+treatment-effect function itself: it is a component of the model rather than a
+derived functional, and it does not depend on the baseline surface, the scale
+$\sigma$, or the error distribution $\Phi$.
+
+Because the model is of accelerated failure time form, exponentiating the
+log-scale effect yields the natural multiplicative estimand. We define the
+acceleration factor
+\begin{equation}
+\label{eq:af}
+\af(x) \;=\; \exp\{\tau(x)\}.
+\end{equation}
+The acceleration factor is the factor by which treatment multiplies survival
+time: $\af(x) > 1$ indicates that treatment prolongs survival at covariate value
+$x$, and $\af(x) < 1$ that it shortens it. It is reported on the time scale on
+which clinical conclusions are usually framed and, like the CATE, is a function
+of $\tau$ alone.
+
+\begin{remark}[Robustness to the error model]
+\label{rem:phi-free}
+Neither \eqref{eq:cate} nor \eqref{eq:af} involves the error distribution
+$\Phi$. The nonparametric prior on $\Phi$ governs the shape of the survival
+curves and contributes to the efficiency of the fit, but the target estimands
+are pure functionals of the treatment-effect function. Conclusions about the
+CATE and the acceleration factor are therefore insensitive to the specification
+of the error distribution. Should survival-probability contrasts or
+restricted-mean survival differences be required as secondary summaries, they
+are recovered from the full model through $\Phi$; they are not pursued in this
+chapter.
+\end{remark}
+
+\subsection{Target population and the role of confounding}
+\label{subsec:target-pop}
+
+The causal estimand is the treatment effect in the observational (target)
+population. By the cross-source exchangeability assumption the treatment-effect
+function $\tau$ does not depend on the data source, so the CATE and the
+acceleration factor are common to both populations; what is specific to the
+target population is the covariate distribution over which conditional effects
+are averaged, addressed in Section~\ref{sec:pi-summaries}.
+
+The confounding function does not enter the causal estimands, but it governs
+the relationship between the causal effect and what is \emph{observed} in the
+real-world data. In the treated real-world data arm the conditional mean
+implied by \eqref{eq:decomposition} is
+\[
+\E[Y \given X = x, A = 1, S = 0] \;=\; m_0(x, 0) + \tau(x) + c(x),
+\]
+so the observed treated--control contrast in the real-world data identifies
+$\tau(x) + c(x)$, not $\tau(x)$. An analysis of the real-world data alone
+would therefore report a confounded CATE $\tau(x) + c(x)$ and, on the
+multiplicative scale, a confounded acceleration factor
+\[
+\exp\{\tau(x) + c(x)\} \;=\; \af(x)\cdot\exp\{c(x)\}.
+\]
+The confounding thus acts \emph{additively} on the CATE scale and
+\emph{multiplicatively} on the acceleration-factor scale, with $\exp\{c(x)\}$
+the factor by which the naive observational acceleration factor is inflated. The
+role of the decomposition, and of the borrowing architecture of
+Section~\ref{sec:pi-borrowing}, is to isolate $\tau(x)$ from $c(x)$ so that the
+reported CATE and acceleration factor are the de-confounded, causal quantities.
+
+\subsection{Interpretation of the confounding function}
+\label{subsec:c-interpret}
+
+The confounding function is modelled as a function of the observed covariates
+$x$, whereas the confounding itself originates in unmeasured covariates $U$ that
+are by definition absent from $x$. This invites a natural objection: in giving
+$c$ a prior over functions of $x$ alone, is some assumption being smuggled in
+about the relationship between $U$ and $X$? The answer is that no such
+assumption is being made --- the dependence of $c$ on $x$ is forced by its
+definition --- but the structure of $U$ does control how the function behaves,
+and this is worth making explicit.
+
+\paragraph{The confounding function is a function of $x$ by construction.}
+As defined in the preceding chapter, the confounding function is a contrast of
+conditional expectations taken \emph{given} $X = x$; the unmeasured covariates
+have already been integrated out in forming those expectations. The result is
+therefore necessarily a function of $x$, and modelling it with an ensemble prior
+over functions of $x$ is exact rather than approximate. Equivalently, the bias
+of the observational treated--control contrast, viewed as a function of $x$, is
+\emph{by definition} equal to $c(x)$: the entire confounding bias present in the
+conditional mean projects onto a function of the observed covariates, and no
+component of it escapes into a direction orthogonal to $x$. The framework does
+not assume the confounding to be small, or to be explained by $x$; it represents
+it exactly.
+
+\paragraph{The shape of $c$ is governed by interaction between $U$ and $X$.}
+What the unmeasured structure controls is not whether $c$ depends on $x$, but
+how. Consider the prognostic component of the bias, and write the structural
+prognostic function as $f_0(x,u)$ (the prognostic function of the underlying
+structural model, distinct from the surface $f$ in \eqref{eq:m0-split}). Let
+\[
+\Delta(u \given x) \;=\;
+  p(u \given x, A{=}1, S{=}0) - p(u \given x, A{=}0, S{=}0)
+\]
+denote the difference between the treated and control conditional densities of
+the unmeasured covariates at covariate value $x$; this difference integrates to
+zero over $u$. The prognostic confounding is then
+$\int f_0(x,u)\,\Delta(u \given x)\,du$. If the prognostic surface is additive,
+$f_0(x,u) = a(x) + b(u)$, the $a(x)$ term integrates against $\Delta$ to zero
+and the expression reduces to $\int b(u)\,\Delta(u \given x)\,du$, which depends
+on $x$ only through the tilt $\Delta(u \given x)$. If, in addition, that tilt
+does not depend on $x$, the confounding is a \emph{constant}. The covariate
+dependence of $c(x)$ therefore arises precisely from interaction between $U$ and
+$X$ --- either through non-additivity of the prognostic surface in $(x,u)$, or
+through covariate dependence of the treatment-assignment mechanism --- and not
+from mere marginal association between the two. This is the rationale for the
+intercept--remainder split \eqref{eq:c-scale}: the intercept $c_0$ carries the
+covariate-homogeneous bias that survives under additive structure, while the
+shrunk remainder $\sigma_c \tilde c(x)$ carries the interaction-driven
+variation, which is often plausibly small and is therefore an appropriate target
+for regularisation.
+
+\paragraph{What the unmeasured covariates still cost.}
+Although modelling $c$ as a function of $x$ is exact, three consequences of the
+unmeasured confounding remain and should be borne in mind. First, the ensemble
+prior and the scale $\sigma_c$ encode a belief that $c$ is regular and ideally
+small or smoothly varying; whether that belief holds is itself governed by the
+$U$--$X$ interaction structure above, and a confounding mechanism with complex
+interaction will be captured poorly, allowing residual bias to leak into $\tau$.
+Second, the confounding function conflates two sources of bias: an imbalance in
+the baseline prognostic surface across treatment arms, and --- when the
+treatment effect itself depends on $U$ --- an imbalance in effect modification.
+These two are not separately identified, so $c$ is properly read as the total
+observable footprint of confounding rather than as prognostic imbalance alone.
+Third, and most consequentially, the separation of $\tau$ from $c$ rests on the
+cross-source transportability assumption, which is itself a condition on $U$.
+
+\begin{remark}[Transportability is the binding assumption on $U$]
+\label{rem:transport-U}
+Identification of $\tau$ and $c$ requires that the conditional law of the
+potential outcomes given $X$ be common to the two sources, which in turn
+requires the conditional distribution of $U$ given $X$ to be comparable across
+the trial and the real-world data. If the two populations differ on an
+unmeasured axis, so that $U \given X$ is not transportable, then $\tau(x)$ is no
+longer common to the sources and the confounding function will absorb both
+genuine within-source confounding and cross-source non-transportability, with no
+internal means of distinguishing them. This is the assumption the framework
+cannot diagnose from the observed data, and it is where the relationship of the
+unmeasured covariates to the data \emph{sources}, rather than to $X$, becomes
+critical. Sensitivity analysis with respect to this assumption is an essential
+companion to the analysis.
+\end{remark}
+
+\section{Posterior Summaries of Treatment Effects}
+\label{sec:pi-summaries}
+
+Posterior inference proceeds from $R$ draws of the Markov chain Monte Carlo
+sampler. Each draw $r = 1, \dots, R$ supplies a complete set of component
+functions and scale parameters,
+\[
+\bigl\{\, f^{(r)},\; g^{(r)},\; \tau^{(r)},\; c^{(r)},\; \sigma^{(r)},\;
+\Phi^{(r)} \,\bigr\},
+\]
+with $m_0^{(r)}(x, s) = f^{(r)}(x) + (1-s) g^{(r)}(x)$. For the estimands of this
+chapter only the draws of $\tau$ are needed.
+
+\subsection{Conditional estimands}
+
+For a fixed covariate value $x$, the posterior of the CATE is read directly off
+the treatment-effect draws, $\{\tau^{(r)}(x)\}_{r=1}^{R}$, and the posterior of
+the acceleration factor is obtained by the monotone transform
+$\af^{(r)}(x) = \exp\{\tau^{(r)}(x)\}$. The posterior mean and equal-tailed
+credible intervals follow from the empirical summaries of these draws; because
+the transform \eqref{eq:af} is monotone, a credible interval for the
+acceleration factor is the exponential of the credible interval for the CATE.
+
+\subsection{Population-averaged estimands}
+
+The population estimand is the average of the conditional effect over the
+covariate distribution of the observational population. The population CATE is
+\begin{equation}
+\label{eq:pop-cate}
+\bar\tau \;=\; \E\bigl[\tau(X) \given S = 0\bigr].
+\end{equation}
+The corresponding population acceleration factor requires a choice, because
+exponentiation does not commute with averaging. We define the population
+acceleration factor as the exponential of the population CATE,
+\begin{equation}
+\label{eq:pop-af}
+\overline{\af} \;=\; \exp\{\bar\tau\}
+              \;=\; \exp\bigl\{\E[\tau(X)\given S=0]\bigr\},
+\end{equation}
+the geometric mean of the conditional acceleration factors. This is the coherent
+multiplicative counterpart of the population CATE and is the summary reported
+below. The arithmetic-mean alternative $\E[\exp\{\tau(X)\}\given S=0]$ is also
+available from the same draws; it exceeds \eqref{eq:pop-af} by a Jensen gap and
+is the appropriate summary only when an average over individuals of the
+multiplicative effect itself is the quantity of interest.
+
+\subsection{Covariate-distribution uncertainty}
+
+A plug-in estimate of \eqref{eq:pop-cate} averages $\tau^{(r)}$ over the observed
+covariate values $\{x_i : S_i = 0\}$, treating them as fixed. For a model
+\emph{parameter} this is appropriate, but $\bar\tau$ is a \emph{functional of the
+covariate distribution}, and the observational sample is itself only a finite
+draw from the target population; conditioning on the empirical covariate
+distribution understates the posterior uncertainty of $\bar\tau$ and of
+$\overline{\af}$.
+
+We propagate this additional uncertainty with the Bayesian bootstrap
+\citep{Rubin1981}, following its use for causal functionals by
+\citet{Antonelli2019}. A noninformative Dirichlet posterior is placed on the
+target covariate distribution: at draw $r$, weights
+\[
+w^{(r)} = \bigl(w_1^{(r)}, \dots, w_{n_0}^{(r)}\bigr)
+\;\sim\; \mathrm{Dirichlet}(1, \dots, 1)
+\]
+are drawn over the $n_0$ observational units, and the population CATE is formed
+as the reweighted average
+\begin{equation}
+\label{eq:bb-cate}
+\bar\tau^{(r)} \;=\; \sum_{i : S_i = 0} w_i^{(r)}\, \tau^{(r)}(x_i),
+\qquad
+\overline{\af}^{(r)} \;=\; \exp\{\bar\tau^{(r)}\}.
+\end{equation}
+The resulting posteriors reflect both model uncertainty, through the
+treatment-effect draws, and covariate-sampling uncertainty, through the
+Dirichlet weights. The procedure is summarised in
+Algorithm~\ref{alg:pop-effect}.
+
+\begin{quote}
+\noindent\textbf{Algorithm~\ref{alg:pop-effect}: Posterior inference for the
+population CATE and acceleration factor.}\refstepcounter{equation}\label{alg:pop-effect}
+\begin{enumerate}[label=\textup{(\arabic*)},leftmargin=2.4em]
+\item For each posterior draw $r = 1, \dots, R$:
+  \begin{enumerate}[label=\textup{(\alph*)},leftmargin=2.0em]
+  \item evaluate the treatment-effect function $\tau^{(r)}(x_i)$ at every
+        observational unit $i$ with $S_i = 0$;
+  \item draw Dirichlet weights $w^{(r)} \sim \mathrm{Dirichlet}(1,\dots,1)$
+        over the $n_0$ observational units;
+  \item form the reweighted population CATE $\bar\tau^{(r)}$ and the population
+        acceleration factor $\overline{\af}^{(r)}$ via \eqref{eq:bb-cate}.
+  \end{enumerate}
+\item Report the posterior means $R^{-1}\sum_r \bar\tau^{(r)}$ and
+      $R^{-1}\sum_r \overline{\af}^{(r)}$, and the empirical quantiles of
+      $\{\bar\tau^{(r)}\}_r$ and $\{\overline{\af}^{(r)}\}_r$ as credible
+      intervals.
+\end{enumerate}
+\end{quote}
+
+\section{Adaptive Borrowing of Real-World Data}
+\label{sec:pi-borrowing}
+
+The motivation for combining the two data sources is efficiency: although the
+CATE is identified from the RCT alone, the real-world data carries
+additional information that can sharpen its estimation. The amount of
+information transferred --- the \emph{borrowing} --- should not be fixed in
+advance but determined by the data. This section describes how borrowing is
+parameterised and shows that a single scalar governs how strongly the
+observational treatment data inform the causal effect.
+
+\subsection{Two channels of information sharing}
+
+The real-world data contributes to the fit through two distinct channels,
+each governed by one of the functions introduced in \eqref{eq:m0-split} and
+\eqref{eq:c-scale}.
+
+\paragraph{Prognostic channel.}
+Through \eqref{eq:m0-split}, the observational controls inform the shared
+baseline $f$, while the source-specific deviation $g$ absorbs any systematic
+difference between the two baseline surfaces. Under cross-source
+exchangeability, $g$ captures only covariate-shift and measurement-related
+discrepancies in the prognostic surface and is expected to be small and smooth.
+The leaf-scale parameter $\sigma_g$ controls its magnitude; assigning it a
+half-Cauchy prior, $\sigma_g \sim \half(0, \alpha_g)$, allows the data to
+interpolate between $\sigma_g \to 0$, under which the prognostic surfaces of the
+two sources are fully pooled, and large $\sigma_g$, under which they are
+estimated separately.
+
+\paragraph{Confounding channel.}
+Through \eqref{eq:c-scale}, the treated observational units inform the
+confounding function $c$. Its variation scale receives a half-Cauchy prior,
+$\sigma_c \sim \half(0, \alpha_c)$, with $\sigma_c = 0$ corresponding to
+confounding that is uniform across covariates --- carried entirely by the
+intercept $c_0$ --- and $c_0 = 0$ additionally to its complete absence.
+
+These two channels are deliberately separated: discrepancy in the baseline
+prognostic surface and discrepancy due to confounding are conceptually distinct
+phenomena and are assigned independent priors. The prognostic channel is where
+the real-world data is most useful and least dangerous; the confounding
+channel is where its contribution must be regulated.
+
+\subsection{Borrowing on the treatment effect is governed by the confounding scale}
+
+The central structural fact of the decomposition is that the borrowing of
+information about the \emph{treatment effect} is controlled entirely by the
+shrinkage of the confounding function.
+
+\begin{proposition}[Confounding scale as the borrowing control]
+\label{prop:borrowing}
+Consider the conditional mean of the treated real-world data arm implied by
+\eqref{eq:decomposition},
+\[
+\E[Y \given X = x, A = 1, S = 0] \;=\; m_0(x, 0) + \tau(x) + c(x).
+\]
+If $c$ is left unconstrained, the treated observational units identify only the
+sum $\tau(x) + c(x)$ and contribute no information about $\tau$ separately; the
+CATE is then identified by the RCT alone. As the prior on $c$ shrinks it
+towards the zero function, the treated observational units increasingly behave
+as unconfounded and contribute directly to the estimation of $\tau$.
+Consequently the scale $\sigma_c$ in \eqref{eq:c-scale} acts as the effective
+borrowing-strength parameter for the treatment effect: the limit
+$\sigma_c \to 0$ corresponds to full pooling of the two sources for $\tau$,
+and the limit $\sigma_c \to \infty$ corresponds to RCT-only inference.
+\end{proposition}
+
+\noindent
+The justification is an identification argument. Within the real-world data
+the treated--control contrast identifies $\tau(x) + c(x)$ but not its two
+components separately; separation requires the external information supplied by
+the RCT. A flexible, unconstrained $c$ therefore absorbs whatever the treated
+real-world data would otherwise contribute to $\tau$, leaving the RCT as the
+sole source of information about the treatment effect. Shrinking $c$ removes
+this absorptive capacity in proportion to $\sigma_c$, so that the observational
+treated arm is progressively pooled with the trial.
+
+Proposition~\ref{prop:borrowing} has a useful practical reading. Two analyses a
+practitioner might perform without a formal model --- pooling the two datasets
+and ignoring confounding, or analysing the trial in isolation --- are precisely
+the two endpoints $\sigma_c = 0$ and $\sigma_c \to \infty$. The proposed model
+does not commit to either: it places a prior over the continuum between them and
+lets the data select the operating point. It also shows why a likelihood-level
+downweighting of the real-world data, such as a power prior, is not the
+appropriate instrument here: such a device would simultaneously discount the
+prognostic channel, where the real-world data are most valuable, whereas the
+relevant control acts only on the confounding channel.
+
+\begin{remark}[Effect of the intercept on the borrowing limits]
+\label{rem:intercept-borrowing}
+Under the intercept--remainder parameterisation \eqref{eq:c-scale}, the limit
+$\sigma_c \to 0$ leaves the confounding at the constant $c_0$ rather than at
+zero. Because $c_0$ is a single scalar, it is identified from the contrast
+between the RCT and the observational treated arm and is estimated regardless of
+$\sigma_c$. In this limit the observational treated units therefore still
+contribute fully to the \emph{covariate-varying structure} of $\tau$ --- its
+heterogeneity --- while a single global offset is removed by $c_0$. The
+statement of Proposition~\ref{prop:borrowing} thus refines to: $\sigma_c$ governs
+the borrowing of treatment-effect \emph{heterogeneity}, with the
+covariate-homogeneous level handled separately by $c_0$. The limit
+$\sigma_c \to \infty$ is unchanged, and continues to correspond to RCT-only
+inference for $\tau$.
+\end{remark}
+
+\subsection{Specification of the borrowing priors}
+
+The half-Cauchy scale $\alpha_c$ encodes the analyst's prior stance on
+confounding. A small $\alpha_c$ expresses skepticism that the observational
+study is confounded and therefore encourages borrowing; this is the stance of
+the commensurate-prior tradition for historical-data borrowing
+\citep{hobbs2011}. A larger $\alpha_c$ is agnostic and lets the data determine
+the degree of borrowing, in the spirit of data-fusion estimators. Because the
+two stances can yield materially different conclusions, both should be
+implemented and contrasted, and $\alpha_c$ may be calibrated against the range
+of confounding magnitudes judged plausible --- which, on the acceleration-factor
+scale, can be elicited as a plausible range for the multiplicative bias
+$\exp\{c(x)\}$. The prognostic scale $\alpha_g$ is less delicate, since
+exchangeability makes a large prognostic discrepancy implausible, and a weakly
+informative choice is generally adequate.
+
+\begin{remark}[Finer, region-specific borrowing]
+\label{rem:spike-slab}
+A single global scale $\sigma_c$ permits only one borrowing strength for the
+whole covariate space. A finer architecture assigns each tree $t$ in the
+ensemble for $\tilde c$ an inclusion indicator $\gamma_t \sim
+\mathrm{Bernoulli}(\pi)$, with $\gamma_t = 0$ deactivating the tree and
+$\pi \sim \mathrm{Beta}(a_\pi, b_\pi)$. The posterior of $\pi$ then reports the
+fraction of trees required to represent the confounding, and the posterior of
+$\sum_t \gamma_t$ summarises the complexity of the confounding structure. This
+extension nests the global-scale specification as the special case
+$\gamma_t \equiv 1$ and yields additional diagnostics, at the cost of one
+Bernoulli update per tree.
+\end{remark}
+
+\section{Diagnostics for Borrowing}
+\label{sec:pi-diagnostics}
+
+A combined analysis of randomized and real-world data is only credible if it
+can report \emph{how much} information was borrowed, \emph{where} in the
+covariate space the borrowing occurred, and \emph{how sensitive} the conclusions
+are to that borrowing. Because the borrowing controls of
+Section~\ref{sec:pi-borrowing} are explicit model parameters, most diagnostics
+reduce to interpretable summaries of those parameters and of the functions they
+scale. We organise the suite by the question each diagnostic answers.
+
+\subsection{How much was borrowed: global scalar diagnostics}
+
+\paragraph{Posterior of the borrowing scales.}
+The posteriors of $\sigma_c$ and $\sigma_g$ are the most direct summaries. To be
+interpretable they should be reported in meaningful units. For the confounding
+channel, summarising the multiplicative bias $\exp\{c(X)\}$ --- for example its
+posterior mean and a central interval over the target population --- expresses
+the confounding on the same acceleration-factor scale as the estimand, in the
+form ``the confounding inflates the observational acceleration factor by a
+factor between $b_{\text{low}}$ and $b_{\text{high}}$''. The split
+\eqref{eq:c-scale} additionally allows the homogeneous and heterogeneous parts
+of the confounding to be reported separately: the intercept $c_0$ as a single
+uniform bias, and the posterior spread of $\sigma_c \tilde c(X)$ as the extent
+to which that bias varies across patients. The scale $\sigma_g$ is summarised
+analogously as a prognostic discrepancy between the two sources.
+
+\paragraph{Effective sample size for the treatment effect.}
+The practical value of borrowing is the variance reduction it produces. Let
+$\Var_{\text{full}}\{\tau(x) \given \data\}$ denote the posterior variance of
+the CATE under the combined model and $\Var_{\text{rct}}\{\tau(x) \given \data\}$
+the corresponding variance under a refit using the RCT alone. The borrowing is
+then expressed as an effective number of additional trial patients,
+\begin{equation}
+\label{eq:ess}
+\mathrm{ESS}_{\text{add}}(x)
+  \;=\; n_{\text{rct}}
+  \left\{
+  \frac{\Var_{\text{rct}}\{\tau(x) \given \data\}}
+       {\Var_{\text{full}}\{\tau(x) \given \data\}} - 1
+  \right\}.
+\end{equation}
+Averaged over the target covariate distribution, \eqref{eq:ess} provides a
+single headline figure --- the borrowing was equivalent to enrolling
+$\mathrm{ESS}_{\text{add}}$ additional randomized patients --- in the idiom
+established for historical-data borrowing
+\citep{neuenschwander2010,hupf2021bayesian}. Its evaluation requires one RCT-only refit
+alongside the main analysis. The effective sample size is computed on the CATE
+scale, on which the variance is naturally defined; the acceleration factor,
+being a monotone transform, inherits the same conclusion.
+
+\subsection{Where it was borrowed: functional diagnostics}
+
+Scalar summaries average over the covariate space and conceal heterogeneity in
+the borrowing. Two functional diagnostics localise it.
+
+\paragraph{Borrowing map.}
+The pointwise posterior of the confounding function --- for instance the
+posterior mean $\E\bigl[|c(x)| \given \data\bigr]$, or the exceedance
+probability $\Prob\bigl[|c(x)| > \delta \given \data\bigr]$ for a clinically
+meaningful threshold $\delta$ --- displayed over the covariate space, identifies
+the regions in which the model infers confounding. When $p$ is large the map is
+shown over the leading principal components or conditional on a small set of
+clinically salient covariates. Presenting the posterior mean alongside the
+credible-interval width separates regions of inferred confounding from regions
+of mere uncertainty.
+
+\paragraph{Local effective sample size.}
+Evaluating \eqref{eq:ess} as a function of $x$ produces a map of where the
+real-world data contributed and where it did not. Plotting
+$\mathrm{ESS}_{\text{add}}(x_i)$ against the inferred local bias $|c(x_i)|$
+exhibits the adaptive behaviour the framework is designed to deliver: regions of
+small inferred confounding receive substantial borrowing, regions of large
+inferred confounding receive little, and the scatter is itself a visual proof of
+that mechanism.
+
+\subsection{Whether to trust it: robustness checks}
+
+\paragraph{Prior--data conflict.}
+Overlaying the prior and posterior densities of $\sigma_c$, and of $\sigma_g$,
+indicates whether the data were informative about the degree of confounding.
+Near-coincident densities signal that the data carry little evidence either way;
+a posterior concentrated away from the prior indicates that the data have
+spoken. Formal prior--data conflict checks \citep{evans2006} can supplement the
+graphical comparison.
+
+\paragraph{Tipping-point analysis.}
+Refitting the model with the borrowing scale fixed at a grid of values, from
+$\sigma_c = 0$ (full pooling) through the data-driven posterior median to a large
+value approximating RCT-only inference, and tracing the population CATE or
+acceleration factor along that grid, reveals the dependence of the conclusion on
+the degree of borrowing. The data-driven fit should lie between the extremes and
+the estimand should vary smoothly; an abrupt change, or a reversal of the
+substantive conclusion in the neighbourhood of the operating point, identifies a
+fragile result.
+
+\paragraph{Cross-source posterior predictive checks.}
+Simulating treated observational outcomes from the posterior predictive
+distribution and comparing them with the observed treated observational
+outcomes --- for example through an overlay of survival curves with simulation
+envelopes \citep{gelman1996} --- provides a model-free check on the confounding
+correction. Systematic discrepancy confined to the treated arm is the signature
+of confounding that the model has failed to absorb.
+
+Table~\ref{tab:diag} collects the suite.
+
+\begin{table}[tb]
+\centering
+\caption{Borrowing diagnostics organised by the question addressed.}
+\label{tab:diag}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Question & Diagnostic & Form \\
+\midrule
+How much was borrowed?
+  & Posterior of $\sigma_c, \sigma_g$ & global scalar \\
+  & Effective sample size, Eq.~\eqref{eq:ess} & global scalar \\[2pt]
+Where was it borrowed?
+  & Borrowing map & function of $x$ \\
+  & Local effective sample size & function of $x$ \\[2pt]
+Can it be trusted?
+  & Prior--data conflict & prior vs.\ posterior \\
+  & Tipping-point analysis & estimand vs.\ $\sigma_c$ \\
+  & Cross-source predictive check & survival-curve overlay \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Variable Importance for Heterogeneity and Confounding}
+\label{sec:pi-vim}
+
+A flexible estimate of the CATE describes treatment effect heterogeneity but
+does not, on its own, identify which covariates drive it. Treatment effect
+variable importance measures \citep{hines2022} summarise the contribution of a
+subset of covariates to the heterogeneity of the CATE through a model-free,
+nonparametric quantity with an analysis-of-variance interpretation. This section
+adapts that idea to posterior inference within the present framework and, using
+the decomposition, extends it to the confounding function.
+
+\subsection{The variance of the treatment effect and the TE-VIM}
+
+All expectations and variances in this section are taken over the covariate
+distribution of the target (observational) population. The measures are computed
+on the CATE scale, $\tau$, on which the model is additive and the
+variance decomposition carries its clean analysis-of-variance interpretation;
+the same covariates govern the heterogeneity of the acceleration factor, which
+is a monotone transform of $\tau$. The global measure of heterogeneity is the
+variance of the treatment effect,
+\begin{equation}
+\label{eq:vte}
+\vte \;=\; \Var\{\tau(X)\},
+\end{equation}
+which quantifies how much the treatment effect varies across the population
+\citep{levy2021}.
+
+\begin{definition}[Treatment effect variable importance measure]
+\label{def:tevim}
+For a subset $s \subseteq \{1, \dots, p\}$ of covariate indices, let $X_{-s}$
+denote the covariates outside $s$ and define the reduced CATE
+\[
+\tau_{-s}(x_{-s}) \;=\; \E\bigl[\tau(X) \given X_{-s} = x_{-s}\bigr].
+\]
+The treatment effect variable importance measure of $s$ is
+\begin{equation}
+\label{eq:tevim}
+\theta_s \;=\; \E\bigl[\{\tau(X) - \tau_{-s}(X_{-s})\}^2\bigr]
+        \;=\; \vte - \Var\{\tau_{-s}(X_{-s})\},
+\end{equation}
+and its standardised form is the proportion $\psi_s = \theta_s / \vte$.
+\end{definition}
+
+\noindent
+The two expressions in \eqref{eq:tevim} coincide because $\tau_{-s}$ is the
+$L^2$ projection of $\tau$ onto functions of $X_{-s}$. The measure $\theta_s$ is
+the increase in mean-squared error incurred when the covariates in $s$ are
+removed from the conditioning set, equivalently the portion of treatment effect
+heterogeneity attributable to $s$; the standardised $\psi_s$ reads as the share
+of $\vte$ explained by $s$, giving the analysis-of-variance interpretation. The
+construction has been extended to censored survival outcomes by
+\citet{ziersen2024}, with which the present log-scale CATE is consistent.
+
+\subsection{Posterior inference for variable importance}
+\label{subsec:vim-posterior}
+
+The variable importance measure of Definition~\ref{def:tevim} is a functional of
+the CATE, and within the present framework its posterior is obtained directly,
+without the influence-function machinery and sample splitting required by
+semiparametric estimators. For each posterior draw $r$:
+\begin{enumerate}[label=\textup{(\arabic*)},leftmargin=2.4em]
+\item evaluate the treatment-effect function $\tau^{(r)}(x_i)$ at every target
+      unit;
+\item estimate the reduced CATE $\tau^{(r)}_{-s}(x_{-s}) =
+      \E\bigl[\tau^{(r)}(X) \given X_{-s} = x_{-s}\bigr]$, the conditional
+      expectation of the draw's treatment-effect function given the retained
+      covariates, by a flexible nonparametric regression of
+      $\{\tau^{(r)}(x_i)\}_i$ on $\{x_{-s,i}\}_i$ --- equivalently, by
+      marginalising $\tau^{(r)}$ over the conditional covariate distribution of
+      $X_s$ given $X_{-s}$;
+\item form
+      $\theta_s^{(r)} = \sum_i w_i^{(r)}
+      \bigl\{\tau^{(r)}(x_i) - \tau^{(r)}_{-s}(x_{-s,i})\bigr\}^2$,
+      with $w^{(r)}$ the Dirichlet weights of \eqref{eq:bb-cate}.
+\end{enumerate}
+The collection $\{\theta_s^{(r)}\}_r$ is the posterior of the variable
+importance measure, from which the posterior of $\psi_s$ and its credible
+interval follow. The Dirichlet weights again propagate covariate-distribution
+uncertainty, so the posterior reflects both model and sampling variability. This
+posterior-based route is also a substantive advantage: influence-function
+estimators of variable importance are known to have unreliable calibration at
+realistic sample sizes, whereas the posterior delivers uncertainty
+quantification intrinsically.
+
+\begin{remark}[The reduction is a conditional mean, not a restricted projection]
+\label{rem:cond-mean}
+The reduced function in Definition~\ref{def:tevim} is the conditional
+expectation $\E[\tau(X) \given X_{-s}]$, equivalently the $L^2$-optimal
+predictor of $\tau(X)$ among \emph{all} functions of $X_{-s}$. Step~(2) must
+therefore estimate it with a flexible learner. Restricting the reduction to a
+linear --- or otherwise low-complexity --- class would change the estimand from
+``the heterogeneity explained by $X_{-s}$'' into ``the heterogeneity explained
+by a function of $X_{-s}$ within that restricted class'', understating
+importance and potentially reordering the covariate ranking, the more so because
+the treatment-effect function is itself deliberately nonlinear. The
+conditional-mean reduction is the convention of \citet{hines2022} and of the
+multivariate-treatment importance measures of \citet{shin2024}. A deliberate
+projection of the CATE onto a linear or sparse summary is a legitimate but
+\emph{distinct} object --- the posterior projection of \citet{Woody2020}, or the
+best partially linear projection of \citet{ziersen2024} --- which answers a
+different question and is not a substitute for the conditional-mean reduction
+used here.
+\end{remark}
+
+\subsection{Strategies for estimating the variable importance measures}
+\label{subsec:vim-estimation}
+
+The variable importance measures of Definitions~\ref{def:tevim}
+and~\ref{def:cvim} are population functionals, and several estimation strategies
+for them appear in the literature. They differ along three axes: how the CATE is
+estimated, how the reduced conditional mean is obtained, and how the importance
+functional is assembled and debiased. We summarise the main options and situate
+the posterior plug-in of Section~\ref{subsec:vim-posterior} among them; the same
+options apply to the confounding measure with $c$ in place of $\tau$.
+
+\paragraph{One-step efficient-influence-curve estimator.}
+The semiparametric route of \citet{hines2022} constructs the augmented
+inverse-probability-weighted pseudo-outcome $\varphi(Z)$, which behaves in
+expectation like the unobserved individual treatment effect, and estimates
+\[
+\widehat\theta_s = n^{-1}\sum_{i=1}^n
+\Bigl[ \{\widehat\varphi(z_i) - \widehat\tau_s(x_i)\}^2
+      - \{\widehat\varphi(z_i) - \widehat\tau(x_i)\}^2 \Bigr].
+\]
+This is a one-step (estimating-equation) estimator built from the efficient
+influence curve of $\theta_s$: it is Neyman-orthogonal, supplies a closed-form
+influence-curve variance, and is paired with cross-fitting to avoid
+empirical-process (Donsker) conditions. It is not a plug-in estimator and may
+return negative values. The CATE $\widehat\tau$ may be supplied by a T-learner
+or, for robustness, by the doubly robust DR-learner, and the reduced CATE
+$\widehat\tau_s$ by regressing either $\widehat\tau$ or $\widehat\varphi$ on
+$X_{-s}$.
+
+\paragraph{Plug-in and targeted (TMLE) estimators.}
+A direct plug-in $\widehat\theta_s = \widehat{\Var}\{\widehat\tau(X)\} -
+\widehat{\Var}\{\widehat\tau_s(X)\}$ respects the parameter space but inherits
+the regularisation bias of the nuisance estimators. The debiased plug-in is the
+targeted maximum likelihood estimator, in which the nuisance fits are updated so
+that the plug-in is also efficient: \citet{levy2021} give such an estimator for
+the VTE and \citet{li2023} for the TE-VIM. Targeting $\theta_s$ is more delicate
+than targeting the VTE, because the update must move the full and reduced
+regressions compatibly.
+
+\paragraph{Bayesian posterior plug-in.}
+When a full posterior over the outcome and treatment-effect functions is
+available, as in the present framework, the importance measure is a
+deterministic functional of each posterior draw, and its posterior is obtained
+by evaluating that functional draw by draw --- the route of \citet{shin2024} and
+the one adopted in Section~\ref{subsec:vim-posterior}. Three features make it the
+natural choice here. First, uncertainty quantification comes directly from the
+posterior, with no influence curve and no cross-fitting. Second, the reduced and
+full CATE are automatically \emph{compatible} within a draw: because
+$\tau^{(r)}_{-s}$ is the conditional mean of the same drawn function
+$\tau^{(r)}$, the identity $\E\{\tau\} = \E\{\tau_{-s}\}$ holds exactly at every
+draw --- a property that \citet{hines2022} must engineer through their choice of
+reduced regression. Third, the regularisation is supplied by the model's own
+priors; in particular, the shrinkage on the heterogeneity components
+(Section~\ref{sec:pi-borrowing}) pulls the importance measures toward zero when
+heterogeneity or confounding is absent. The validity of the posterior plug-in
+rests on the outcome model being well-calibrated; \citet{shin2024} establish
+that posterior contraction for the outcome surface transfers to the importance
+measures.
+
+\paragraph{Separate-sample estimation for inference at the null.}
+At the zero-importance boundary $\theta_s = 0$ the influence curve of the
+one-step estimator degenerates and asymptotic normality fails
+(Remark~\ref{rem:null}). \citet{hines2022} restore valid inference by estimating
+$\Var\{\tau(X)\}$ and $\Var\{\tau_s(X)\}$ with efficient estimators on
+\emph{independent} subsamples and differencing them, at the cost of efficiency.
+The posterior analogue is to avoid testing $\theta_s = 0$ directly and instead
+compare importances through the posterior of a \emph{difference},
+$\psi_{\{j\}} - \psi_{\{k\}}$, which is well behaved away from the joint
+boundary; this is the testing device of \citet{shin2024} and the one we use for
+the effect-modifier-versus-confounder comparisons of
+Section~\ref{subsec:effmod}.
+
+\paragraph{Computational devices.}
+Two accelerations are worth noting. Cross-fitting (sample splitting) is required
+for the one-step estimator and optional but stabilising for the others. For the
+posterior plug-in, the bottleneck is the per-draw evaluation of the reduced
+conditional mean over all units, which amounts to an $n \times n$ evaluation of
+the treatment-effect function at each draw. The blocking scheme of
+\citet{shin2024} partitions the sample into $K$ blocks, computes the importance
+measure within each block, and averages across blocks; it is near-identical to
+the full computation in their simulations and is substantially faster. For a
+data-fusion analysis with a large observational registry, the blocking scheme is
+the practical default.
+
+\begin{remark}[Choosing the covariate subsets]
+\label{rem:vim-modes}
+Distinct from how $\theta_s$ is estimated is the choice of which subsets $s$ to
+evaluate. \citet{hines2022} identify four modes: leave-one-out ($s$ a single
+covariate), keep-one-in ($s$ all but one covariate), Shapley aggregation over all
+subsets, and covariate grouping guided by domain knowledge. When covariates are
+correlated, single-covariate (leave-one-out) importances are diluted --- two
+correlated effect modifiers each receive a small measure --- so keep-one-in or
+covariate grouping is preferable in that case.
+\end{remark}
+
+\subsection{A variable importance measure for confounding}
+
+The decomposition isolates a second heterogeneity function, the confounding
+function $c$, and the construction of Definition~\ref{def:tevim} applies to it
+verbatim. Let $\vcf = \Var\{c(X)\}$ be the total variation of the confounding
+bias across the target population, and for a subset $s$ define the reduced
+confounding function $c_{-s}(x_{-s}) = \E[c(X) \given X_{-s} = x_{-s}]$. Under
+the parameterisation \eqref{eq:c-scale} the homogeneous intercept $c_0$ cancels
+from every variance and centred contrast below, so the confounding variable
+importance measure speaks only to the covariate-varying part of the
+confounding --- which is appropriate, since a uniform bias is by construction
+not attributable to any covariate.
+
+\begin{definition}[Confounding variable importance measure]
+\label{def:cvim}
+The confounding variable importance measure of a covariate subset $s$ is
+\begin{equation}
+\label{eq:cvim}
+\theta^{c}_s \;=\; \E\bigl[\{c(X) - c_{-s}(X_{-s})\}^2\bigr]
+            \;=\; \vcf - \Var\{c_{-s}(X_{-s})\},
+\end{equation}
+with standardised form $\psi^{c}_s = \theta^{c}_s / \vcf$.
+\end{definition}
+
+\noindent
+The measure $\theta^{c}_s$ quantifies how much of the confounding bias in the
+real-world data is attributable to the covariates in $s$. It answers a
+question that has no counterpart in the standard variable importance literature
+--- which observed covariates drive the unmeasured confounding --- and is
+definable only because the decomposition exposes $c$ as an estimable function.
+Its posterior is computed exactly as in the previous subsection, with $c^{(r)}$
+in place of $\tau^{(r)}$.
+
+\subsection{Separating effect modifiers from confounding drivers}
+\label{subsec:effmod}
+
+Computing the single-covariate importances $\psi_{\{j\}}$ and $\psi^{c}_{\{j\}}$
+for each covariate $j$ and plotting them against one another classifies the
+covariates into four regimes: pure effect modifiers, important for the treatment
+effect but not for the bias; pure confounding drivers, important for the bias
+but not for the effect; covariates important for both; and covariates important
+for neither. This separation is possible only because the decomposition carries
+$\tau$ and $c$ as distinct functions, and it directly serves the applied reader:
+it distinguishes covariates that genuinely modify the treatment effect from
+covariates that merely reflect how patients were selected into treatment in the
+real-world data, a distinction that an analysis of the real-world data
+alone cannot draw.
+
+\begin{remark}[The null case]
+\label{rem:null}
+When a covariate subset has no role in the heterogeneity of interest, the
+corresponding importance measure equals zero, which lies on the boundary of the
+parameter space. Inference is delicate at this boundary for any estimator. The
+measures are therefore best reported as a ranking accompanied by posterior
+credible intervals, with values near zero treated as a boundary case rather than
+as the basis for a formal test of no effect.
+\end{remark}
+
+\subsection{Variable importance as a borrowing diagnostic}
+
+The variable importance measures also feed back into the diagnostic suite of
+Section~\ref{sec:pi-diagnostics}. Computing $\psi_{\{j\}}$ for the treatment
+effect under the RCT-only refit and under the combined fit shows whether
+borrowing sharpens the identification of effect modifiers: tighter posteriors
+under the combined fit indicate a genuine gain, while a marked change in the
+ranking of effect modifiers is a warning sign, signalling either informative
+borrowing or contamination of the trial signal by the real-world data and
+warranting closer inspection through the tipping-point analysis.
+
+\section{Summary}
+\label{sec:pi-summary}
+
+This chapter has set out how the fitted decomposition is turned into inference
+about treatment effects. The two estimands of interest, the conditional average
+treatment effect and the acceleration factor, are functionals of the
+treatment-effect function alone and are insensitive to the error model; their
+posteriors are read directly off the treatment-effect draws and summarised with
+the Bayesian bootstrap to account for covariate-distribution uncertainty. The
+contribution of the real-world data is governed by two explicit scale
+parameters, of which the confounding scale $\sigma_c$ is shown to be the
+effective borrowing control for the treatment effect, with the confounding
+acting multiplicatively on the acceleration-factor scale. A suite of diagnostics
+reports how much was borrowed, where, and how robustly; and variable importance
+measures summarise the heterogeneity of both the treatment effect and the
+confounding function, the latter being a measure made possible by the
+decomposition. Together these elements make the borrowing transparent and
+auditable, which is a precondition for the use of real-world data in
+confirmatory treatment effect estimation.
+
+% =============================================================================
+% Bibliography. When this chapter is merged into the master document, delete
+% this block and ensure the cited keys resolve against the master .bib file.
+% =============================================================================
+\bibliographystyle{apalike}
+\bibliography{../general/references}
+
+\end{document}

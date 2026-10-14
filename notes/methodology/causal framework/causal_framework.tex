@@ -1,0 +1,303 @@
+\documentclass[11pt]{article}
+
+%% Page geometry
+\usepackage[a4paper, margin=1in]{geometry}
+
+%% Core math + fonts
+\usepackage{amsthm,amsmath,amsfonts,amssymb}
+\usepackage{microtype}
+
+%% Citations
+\usepackage[authoryear, round]{natbib}
+
+%% Hyperlinks
+\usepackage[colorlinks, citecolor=blue, urlcolor=blue, linkcolor=blue]{hyperref}
+\usepackage{xurl}
+
+%% Graphics & figures
+\usepackage{graphicx}
+\graphicspath{{./images/}}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{booktabs}
+
+%% Algorithms
+\usepackage[linesnumbered, ruled, vlined]{algorithm2e}
+
+%% TikZ for diagrams
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,fit,calc,positioning}
+\tikzset{box/.style={draw, diamond, thick, text centered, minimum height=0.5cm, minimum width=1cm}}
+\tikzset{line/.style={draw, thick, -latex'}}
+
+%% Misc
+\usepackage{comment}
+\usepackage{dsfont}
+
+%% Theorem environments
+\theoremstyle{plain}
+\newtheorem{axiom}{Axiom}
+\newtheorem{claim}[axiom]{Claim}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem*{example}{Example}
+\newtheorem*{fact}{Fact}
+
+\theoremstyle{remark}
+\newtheorem{case}{Case}
+
+%% Custom math commands
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\1}{\mathds{1}}
+\newcommand{\p}{\mathbb{P}}
+\renewcommand{\H}{\mathcal{H}}
+\newcommand{\T}{\mathcal{T}}
+\newcommand{\ind}{\perp\!\!\!\perp}
+
+%% File-specific additions
+\usepackage{mathtools}
+\usepackage{bm}
+\usepackage{enumitem}
+\usepackage{setspace}
+\onehalfspacing
+
+\theoremstyle{plain}
+\newtheorem{assumption}{Assumption}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\indep}{\perp\!\!\!\!\!\perp}
+\newcommand{\eqd}{\overset{d}{=}}
+\newcommand{\CATE}{\tau}
+\newcommand{\cf}{c}
+\DeclareMathOperator{\Var}{Var}
+
+\title{Framework for Combining Randomized and\\Real-World Data under Unmeasured Confounding}
+\author{Tijn Jacobs}
+\date{\today}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.8em}
+
+
+\begin{document}
+\maketitle
+
+\subsection*{Executive summary}
+\noindent
+We develop a Bayesian nonparametric framework for estimating heterogeneous treatment effects by combining data from randomized controlled trials and real-world data sources. The approach does not require unconfoundedness of the real-world data; instead, unmeasured confounding is explicitly modeled through a confounding function. The outcome is decomposed into a prognostic baseline, a causal treatment effect, and a confounding bias, each modeled by Bayesian Additive Regression Trees. To accommodate block-wise and sporadic missing covariates arising from data fusion, we propose \emph{informed random splitting}, a novel method for handling missing data within BART that makes stochastic routing decisions at ambiguous tree nodes using posterior predictive matching. We show that informed random splitting corresponds to exact Gibbs sampling under a well-defined augmented posterior, thereby providing valid uncertainty quantification without requiring an external imputation model.
+
+%% ============================================================
+\section{Setup and notation}
+%% ============================================================
+
+Consider a setting in which data are available from two sources: a randomized controlled trial (RCT) and real-world data~(RWD). Let $S \in \{0,1\}$ denote the data-source indicator, with $S=1$ for the RCT and $S=0$ for the RWD. Let $A \in \{0,1\}$ denote the binary treatment assignment, $X \in \mathcal{X} \subseteq \R^p$ a vector of observed baseline covariates, and $U \in \mathcal{U}$ a vector of unmeasured covariates. Write $T(a)$ for the potential survival time under treatment~$a$, and define $Y(a) = \log T(a)$.
+
+%% ============================================================
+\section{Accelerated failure time model}
+%% ============================================================
+
+We posit the following structural model for the potential outcomes:
+\begin{equation}\label{eq:structural}
+  Y(a) \;=\; f_0(X, U) \;+\; a\,\CATE^*(X, U) \;+\; \sigma\,\varepsilon,
+  \qquad \varepsilon \indep (X, U, A, S),
+\end{equation}
+where $f_0(X,U)$ is the baseline (prognostic) function under control, $\CATE^*(X,U) = \E[Y(1) - Y(0) \mid X, U]$ is the unit-level treatment effect, $\sigma > 0$ is a scale parameter, and $\varepsilon$ has a mean-zero distribution with unit variance.
+
+The observed outcome is $Y = Y(A)$ under the consistency assumption below.
+
+%% ============================================================
+\section{Assumptions}
+%% ============================================================
+
+We impose the following conditions. Assumptions~\ref{as:sutva}--\ref{as:positivity_rct} concern the internal validity of the RCT. Assumption~\ref{as:transport} links the two data sources.
+
+\begin{assumption}[Consistency / SUTVA]\label{as:sutva}
+  The observed outcome satisfies $Y = A\,Y(1) + (1-A)\,Y(0)$, and there is no interference between units.
+\end{assumption}
+
+\begin{assumption}[Randomization in the RCT]\label{as:rct_unconf}
+  Within the RCT, treatment is randomized and hence independent of all pre-treatment variables:
+  \begin{equation}\label{eq:rct_unconf}
+    A \;\indep\; \bigl(Y(0),\, Y(1),\, U\bigr) \;\Big|\; X,\; S=1.
+  \end{equation}
+\end{assumption}
+
+\begin{assumption}[Positivity of the RCT]\label{as:positivity_rct}
+  For all $x$ in the support of $X \mid S=1$ and $a \in \{0,1\}$,
+  \begin{equation}
+    0 \;<\; \p(A = a \mid X = x,\, S = 1) \;<\; 1.
+  \end{equation}
+\end{assumption}
+
+\begin{assumption}[Transportability of potential outcomes]\label{as:transport}
+  The conditional distribution of potential outcomes given observed covariates is the same across data sources:
+  \begin{equation}\label{eq:transport}
+    Y(a) \mid X,\, S = 1 \;\eqd\; Y(a) \mid X,\, S = 0, \qquad a \in \{0,1\}.
+  \end{equation}
+\end{assumption}
+
+\begin{remark}[No unconfoundedness in the RWD]
+  We deliberately \emph{do not} assume unconfoundedness in the real-world data. That is, we allow
+  \begin{equation}\label{eq:confounded_rwd}
+    A \;\not\!\indep\; \bigl(Y(0),\, Y(1)\bigr) \;\Big|\; X,\; S = 0
+  \end{equation}
+  in general. This arises because treatment assignment in the RWD may depend on the unmeasured covariates $U$:
+  \begin{equation}\label{eq:rwd_treatment}
+    \p(A = 1 \mid X, U, S = 0) \;\neq\; \p(A = 1 \mid X, S = 0) \quad \text{in general}.
+  \end{equation}
+\end{remark}
+
+\begin{remark}[Covariate overlap]
+  For the data fusion to be informative, we require sufficient overlap between the covariate distributions in the two sources, i.e.\ the support of $X \mid S=1$ should cover the support of $X \mid S=0$ in regions where treatment effect estimation is desired.
+\end{remark}
+
+%% ============================================================
+\section{Causal estimands}
+%% ============================================================
+
+\begin{definition}[Conditional average treatment effect]
+  The conditional average treatment effect (CATE) is
+  \begin{equation}\label{eq:cate}
+    \CATE(x) \;:=\; \E\bigl[Y(1) - Y(0) \mid X = x\bigr].
+  \end{equation}
+\end{definition}
+
+And the acceleration factor which is derived from it.
+\begin{definition}[Acceleration factor]
+  The acceleration factor is
+  \begin{equation}\label{eq:acceleration}
+    AF(x) = \exp\bigl(\CATE(x)\bigr).
+  \end{equation}
+\end{definition}
+
+
+%% ============================================================
+\section{The confounding function}
+%% ============================================================
+
+Because unconfoundedness does not hold in the RWD, the observed treatment--control contrast in the RWD does not equal the CATE. The discrepancy is captured by the following quantity.
+
+\begin{definition}[Confounding function]\label{def:cf}
+  The confounding function is
+  \begin{equation}\label{eq:cf}
+    \cf(x) \;:=\; \E[Y \mid X = x,\, A = 1,\, S = 0]
+    \;-\; \E[Y \mid X = x,\, A = 0,\, S = 0]
+    \;-\; \CATE(x).
+  \end{equation}
+\end{definition}
+
+\noindent The confounding function admits an explicit representation in terms of the unmeasured covariates.
+
+\begin{proposition}[Structural form of the confounding function]\label{prop:cf_structural}
+  Under the structural model~\eqref{eq:structural} and Assumptions~\ref{as:sutva}--\ref{as:transport}, the confounding function satisfies
+  \begin{equation}\label{eq:cf_structural}
+    \cf(x) \;=\; \E\bigl[f_0(X,U) \mid X = x,\, A=1,\, S=0\bigr]
+    \;-\; \E\bigl[f_0(X,U) \mid X = x,\, A=0,\, S=0\bigr]
+    \;+\; \delta_\tau(x),
+  \end{equation}
+  where
+  \begin{equation}\label{eq:delta_tau}
+    \delta_\tau(x) \;=\; \E\bigl[\CATE^*(X,U) \mid X=x,\, A=1,\, S=0\bigr]
+    \;-\; \CATE(x).
+  \end{equation}
+  If the unit-level treatment effect does not depend on $U$, i.e.\ $\CATE^*(X,U) = \CATE(X)$, then $\delta_\tau(x) = 0$ and the confounding function reduces to the imbalance in the baseline prognostic function:
+  \begin{equation}\label{eq:cf_simple}
+    \cf(x) \;=\; \E\bigl[f_0(X,U) \mid X = x,\, A=1,\, S=0\bigr]
+    \;-\; \E\bigl[f_0(X,U) \mid X = x,\, A=0,\, S=0\bigr].
+  \end{equation}
+\end{proposition}
+
+\begin{proof}
+  By Assumption~\ref{as:sutva} and the structural model~\eqref{eq:structural},
+  \begin{align}
+    \E[Y \mid X{=}x, A{=}1, S{=}0] &\;=\; \E\bigl[f_0(X,U) + \CATE^*(X,U) \mid X{=}x, A{=}1, S{=}0\bigr], \label{eq:pf1}\\[4pt]
+    \E[Y \mid X{=}x, A{=}0, S{=}0] &\;=\; \E\bigl[f_0(X,U) \mid X{=}x, A{=}0, S{=}0\bigr]. \label{eq:pf2}
+  \end{align}
+  Subtracting \eqref{eq:pf2} from \eqref{eq:pf1} yields
+  \begin{multline*}
+    \E[Y \mid X{=}x, A{=}1, S{=}0] - \E[Y \mid X{=}x, A{=}0, S{=}0] \\
+    \;=\; \E\bigl[f_0(X,U) \mid X{=}x, A{=}1, S{=}0\bigr] - \E\bigl[f_0(X,U) \mid X{=}x, A{=}0, S{=}0\bigr] \\
+    +\; \E[\CATE^*(X,U) \mid X{=}x, A{=}1, S{=}0].
+  \end{multline*}
+  By definition~\eqref{eq:cf}, subtracting $\CATE(x) = \E[\CATE^*(X,U) \mid X=x]$ gives
+  \begin{equation*}
+    \cf(x) = \E\bigl[f_0(X,U) \mid X{=}x, A{=}1, S{=}0\bigr] - \E\bigl[f_0(X,U) \mid X{=}x, A{=}0, S{=}0\bigr] + \delta_\tau(x),
+  \end{equation*}
+  as claimed. When $\CATE^*(X,U) = \CATE(X)$, the conditional expectation given $(X, A, S)$ equals $\CATE(x)$, so $\delta_\tau(x) = 0$.
+\end{proof}
+
+\begin{remark}[Interpretation]
+  Equation~\eqref{eq:cf_structural} decomposes the confounding function into two sources of bias: (i)~an imbalance in the baseline prognostic function $f_0(X,U)$ across treatment arms in the RWD, arising because treated and control subjects have systematically different distributions of $U$ given $X$; and (ii)~a term $\delta_\tau(x)$ that captures effect modification by $U$, which is nonzero when the treatment effect itself depends on unobservables. Under the simplifying condition $\CATE^*(X,U) = \CATE(X)$---i.e.\ no unobserved effect modification---the confounding function reflects purely baseline prognostic imbalance.
+\end{remark}
+
+%% ============================================================
+\section{Outcome decomposition}
+%% ============================================================
+
+We now derive the key decomposition that motivates our modeling strategy.
+
+\begin{proposition}[Decomposition of the conditional outcome]\label{prop:decomp}
+  Under Assumptions~\ref{as:sutva}--\ref{as:transport}, the conditional expectation of the observed outcome admits the decomposition
+  \begin{equation}\label{eq:decomp}
+    \E[Y \mid A, X, S] \;=\; m_0(X, S) \;+\; \CATE(X)\,A \;+\; (1 - S)\,A\,\cf(X),
+  \end{equation}
+  where $m_0(X, S) := \E[Y \mid A = 0, X, S]$ is the baseline outcome model.
+\end{proposition}
+
+\begin{proof}
+  \emph{Case $A=0$.} By definition, $\E[Y \mid A{=}0, X, S] = m_0(X, S)$, and the right-hand side of~\eqref{eq:decomp} reduces to $m_0(X,S)$. \\[6pt]
+  \emph{Case $A=1$, $S=1$ (RCT).} By Assumptions~\ref{as:sutva} and~\ref{as:rct_unconf},
+  \begin{align}
+    \E[Y \mid A{=}1, X, S{=}1] &\;=\; \E[Y(1) \mid X, S{=}1] \nonumber\\
+    &\;=\; \E[Y(0) \mid X, S{=}1] + \E[Y(1) - Y(0) \mid X, S{=}1] \nonumber\\
+    &\;=\; m_0(X, 1) + \CATE(X), \label{eq:pf_rct}
+  \end{align}
+  where the last equality uses Assumption~\ref{as:rct_unconf} (so that $\E[Y(0) \mid X, S{=}1] = \E[Y \mid A{=}0, X, S{=}1] = m_0(X,1)$) and Assumption~\ref{as:transport} (so that the conditional treatment effect equals $\CATE(x)$). The right-hand side of~\eqref{eq:decomp} with $A=1$, $S=1$ gives $m_0(X,1) + \CATE(X)$, matching~\eqref{eq:pf_rct}.\\[6pt]
+  \emph{Case $A=1$, $S=0$ (RWD).} By the definition of $\cf(X)$ in \eqref{eq:cf},
+  \begin{equation*}
+    \E[Y \mid A{=}1, X, S{=}0] \;=\; m_0(X, 0) + \CATE(X) + \cf(X),
+  \end{equation*}
+  which matches the right-hand side of~\eqref{eq:decomp} with $A=1$, $S=0$.
+\end{proof}
+
+\noindent The individual-level regression model follows directly:
+\begin{equation}\label{eq:individual}
+  Y_i \;=\; m_0(X_i, S_i) \;+\; A_i\,\CATE(X_i) \;+\; A_i\,(1 - S_i)\,\cf(X_i) \;+\; \sigma\,\varepsilon_i.
+\end{equation}
+
+%% ============================================================
+\section{Identification}
+%% ============================================================
+
+\begin{proposition}[Identification of $\CATE$ and $\cf$]\label{prop:ident}
+  Under Assumptions~\ref{as:sutva}--\ref{as:transport}:
+  \begin{enumerate}
+    \item[\emph{(i)}] The CATE $\CATE(x)$ is identified from the RCT data alone:
+    \begin{equation}\label{eq:ident_tau}
+      \CATE(x) \;=\; \E[Y \mid X{=}x, A{=}1, S{=}1] - \E[Y \mid X{=}x, A{=}0, S{=}1].
+    \end{equation}
+    \item[\emph{(ii)}] Given identification of $\CATE(x)$, the confounding function $\cf(x)$ is identified from the RWD:
+    \begin{equation}\label{eq:ident_c}
+      \cf(x) \;=\; \E[Y \mid X{=}x, A{=}1, S{=}0] - \E[Y \mid X{=}x, A{=}0, S{=}0] - \CATE(x).
+    \end{equation}
+    \item[\emph{(iii)}] Neither $\CATE(x)$ nor $\cf(x)$ is identified from the RWD alone.
+  \end{enumerate}
+\end{proposition}
+
+\begin{proof}
+  Part~(i) follows from Assumptions~\ref{as:rct_unconf} and~\ref{as:transport}, as shown in~\eqref{eq:pf_rct}. Part~(ii) is immediate from Definition~\ref{def:cf}. For part~(iii), note that the RWD identify only the composite $\CATE(x) + \cf(x)$; without external information (the RCT), the two components are not separately identifiable.
+\end{proof}
+
+\begin{remark}[Role of the real-world data]
+  Although $\CATE(x)$ is identifiable from the RCT alone, joint estimation using both sources can improve efficiency. The decomposition~\eqref{eq:individual} enables the RWD to contribute to the estimation of $\CATE(x)$ through the shared baseline function $m_0(X,S)$ and through the additional treated observations, while the confounding function $\cf(x)$ absorbs the bias. The efficiency gain is largest when $\cf(x)$ is small or smoothly varying, so that few degrees of freedom are consumed by the bias correction.
+\end{remark}
+
+
+\end{document}

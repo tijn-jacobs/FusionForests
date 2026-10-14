@@ -1,0 +1,424 @@
+\documentclass[11pt]{article}
+
+%% Page geometry
+\usepackage[a4paper, margin=1in]{geometry}
+
+%% Core math + fonts
+\usepackage{amsthm,amsmath,amsfonts,amssymb}
+\usepackage{microtype}
+
+%% Citations
+\usepackage[authoryear, round]{natbib}
+
+%% Hyperlinks
+\usepackage[colorlinks, citecolor=blue, urlcolor=blue, linkcolor=blue]{hyperref}
+\usepackage{xurl}
+
+%% Graphics & figures
+\usepackage{graphicx}
+\graphicspath{{./images/}}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{booktabs}
+
+%% Algorithms
+\usepackage[linesnumbered, ruled, vlined]{algorithm2e}
+
+%% TikZ for diagrams
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,fit,calc,positioning}
+\tikzset{box/.style={draw, diamond, thick, text centered, minimum height=0.5cm, minimum width=1cm}}
+\tikzset{line/.style={draw, thick, -latex'}}
+
+%% Misc
+\usepackage{comment}
+\usepackage{dsfont}
+
+%% Theorem environments
+\theoremstyle{plain}
+\newtheorem{axiom}{Axiom}
+\newtheorem{claim}[axiom]{Claim}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem*{example}{Example}
+\newtheorem*{fact}{Fact}
+
+\theoremstyle{remark}
+\newtheorem{case}{Case}
+
+%% Custom math commands
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\1}{\mathds{1}}
+\newcommand{\p}{\mathbb{P}}
+\renewcommand{\H}{\mathcal{H}}
+\newcommand{\T}{\mathcal{T}}
+\newcommand{\ind}{\perp\!\!\!\perp}
+
+%% File-specific additions
+\usepackage{enumitem}
+
+\newcommand{\X}{X}
+\newcommand{\Y}{Y}
+\newcommand{\A}{A}
+\newcommand{\Sx}{S}
+\newcommand{\U}{U}
+\newcommand{\tauf}{\tau}
+\newcommand{\cf}{c}
+\newcommand{\gf}{g}
+\newcommand{\muf}{\mu}
+\newcommand{\mzero}{m_{0}}
+\newcommand{\Spot}{S}
+\newcommand{\RCT}{\mathrm{RCT}}
+\newcommand{\RWD}{\mathrm{RWD}}
+\newcommand{\RMST}{\mathrm{RMST}}
+
+\title{Data fusion for heterogeneous survival effects:\\
+goals, role of the HDP error, and positioning}
+\author{Tijn Jacobs}
+\date{\today}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.8em}
+
+
+\begin{document}
+\maketitle
+
+\section*{Scope}
+
+These notes accompany the proposed reframing of the project around two
+explicit goals:
+\begin{enumerate}[label=(G\arabic*),leftmargin=*]
+  \item efficiency gain for heterogeneous treatment effect (HTE) estimation by
+        combining a randomised trial (RCT, $\Sx=1$) with an observational
+        study (RWD, $\Sx=0$);
+  \item identifiable extrapolation of causal survival contrasts beyond the
+        RCT follow-up horizon $t_{\RCT}$, using the longer follow-up of the RWD.
+\end{enumerate}
+Both goals are pursued under the AFT decomposition
+\begin{equation}
+  Y_i = \mzero(\X_i, \Sx_i) + \tauf(\X_i)\,\A_i
+        + (1-\Sx_i)\,\A_i\,\cf(\X_i) + \sigma\varepsilon_i,
+  \qquad Y_i = \log T_i,
+  \label{eq:decomp}
+\end{equation}
+with $\mzero(\X,\Sx) = \muf(\X) + (1-\Sx)\gf(\X)$ in the four-forest version,
+and $\varepsilon \sim P$ with $P$ assigned a hierarchical Dirichlet process
+(HDP) prior across data sources.
+
+\section{Pros of the reframing}
+
+\paragraph{Pro 1: a clinically named problem, not just a methodological one.}
+``Better HTE precision'' is a methodologist's pitch. ``Answering the long-term
+survival question that the trial cannot answer alone'' is a clinical pitch
+that names a concrete gap routinely encountered in health technology
+assessment (HTA), oncology drug evaluation, and policy decision-making. The
+gap is well-established: pivotal RCTs typically report 2--5 years of
+follow-up, whereas registry data (NCDB, SEER, CPRD, claims databases) carry
+10--20+ years \citep{Latimer2013, Jackson2023, Guyot2017}.
+
+\paragraph{Pro 2: the AFT shift property yields a natural division of labour.}
+On the log-time scale, $\tauf(\X)$ enters \eqref{eq:decomp} as a constant
+covariate-specific shift. Once identified from short follow-up, the same
+shift applies for all $t$. This makes the two information channels conceptually
+orthogonal:
+\begin{itemize}[leftmargin=*]
+  \item the RCT identifies the \emph{shift} $\tauf(\X)$ (and protects
+        $\tauf$ against confounding via the identification result;
+        see Proposition~3 of the framework draft);
+  \item the RWD identifies the \emph{shape} of the log-time distribution at
+        long $t$ (through the error CDF $\Phi$) and the baseline $\mzero$.
+\end{itemize}
+The two sources therefore contribute complementary information, and not
+merely additional sample size.
+
+\paragraph{Pro 3: the HDP is no longer a robustness garnish; it carries
+extrapolation.} Survival extrapolation is exquisitely sensitive to the
+assumed error distribution. In a parametric AFT framework, lognormal,
+Weibull, log-logistic, Gompertz, and generalised gamma families fit
+short-term data equivalently well but yield wildly different tail behaviour,
+and consequently wildly different RMST values evaluated past the trial
+horizon. The NICE DSU TSD~14 workflow exists precisely because picking a tail
+family by AIC on RCT data alone is unsafe \citep{Latimer2013, BellGorrod2019}.
+The HDP prior on $\varepsilon$ \emph{is the mechanism} by which RWD follow-up
+informs the tail: the shared atoms accumulate mass where both sources have
+data; RWD-only mass shapes the tail; the hierarchical structure prevents
+source-specific drift from contaminating the shared body of the error
+distribution.
+
+\paragraph{Pro 4: principled uncertainty quantification.} Long-term
+extrapolations from parametric models often produce point estimates with
+spuriously narrow credible intervals, because the family is treated as known.
+A nonparametric error distribution propagates the genuine uncertainty about
+tail shape into the posterior of $\Delta_{\RMST}(t^{*},\X)$ for
+$t^{*} > t_{\RCT}$. As \citet{Jackson2023} put it: long-term estimates should
+only be confident if there are strong long-term data. The HDP makes this
+property automatic.
+
+\paragraph{Pro 5: the two goals share one estimation machinery.} The same
+posterior over $(\muf, \gf, \tauf, \cf, P, \sigma)$ yields both
+the HTE estimate and the extrapolated survival contrast. There is no
+two-stage handoff, no plug-in step where uncertainty is silently dropped,
+and the confounding correction is in place throughout.
+
+\section{Challenges that need to be addressed}
+
+\paragraph{Challenge 1: constancy of the AFT shift over time.}
+Under \eqref{eq:decomp}, $\tauf(\X)$ is a single number per covariate value;
+extrapolation assumes the shift identified from $[0, t_{\RCT}]$ applies on
+$(t_{\RCT}, \infty)$. This is a strong structural assumption. Treatments
+whose effect wanes (or grows) over time violate it, and the literature has
+explicit modelling devices for this case (waning treatment effects in
+\citet{Jackson2023}; time-varying hazard ratios more generally). Two paths
+forward:
+\begin{itemize}[leftmargin=*]
+  \item[(a)] retain constant $\tauf(\X)$ and present this as a transparent
+        assumption with sensitivity analyses;
+  \item[(b)] generalise to $\tauf(\X, t)$ via, e.g., a piecewise or
+        spline-coefficient extension. This is feasible but breaks the
+        clean ``shift'' interpretation.
+\end{itemize}
+
+\paragraph{Challenge 2: constancy of the confounding function over time.}
+The decomposition \eqref{eq:decomp} treats $\cf(\X)$ analogously to
+$\tauf(\X)$: a covariate-specific log-time shift that does not vary with $t$.
+If selection bias has a different time signature than the treatment effect
+itself --- e.g., frailty-driven early mortality differs across treatment
+arms in the RWD but long-term survival does not --- a single $\cf(\X)$ is
+mis-specified. Worth flagging, with sensitivity to time-varying confounding.
+
+\paragraph{Challenge 3: period and calendar-time effects in the RWD.}
+Long RWD follow-up necessarily mixes historical cohorts treated under earlier
+standards of care. The patients contributing to the RWD tail are
+\emph{older calendar} patients, not just \emph{older follow-up time}.
+Without adjustment, this can violate Assumption~4 (transportability) for
+reasons unrelated to unmeasured confounding. Three options:
+condition on calendar year as a covariate; restrict the RWD window;
+or model an explicit period effect alongside $\gf$.
+
+\paragraph{Challenge 4: informative censoring in the RWD.}
+Trial censoring is largely administrative and credibly non-informative;
+RWD censoring includes loss-to-follow-up that may correlate with
+prognosis. The HDP error does not fix this --- it assumes the residuals you
+observe at long times are exchangeable within source. A sensitivity analysis
+under a known censoring mechanism (or inverse-probability-of-censoring
+weighting) seems necessary.
+
+\paragraph{Challenge 5: who anchors the shared atoms?}
+With a fully pooled DP, the RWD would dominate the error distribution
+(because it is typically much larger and runs longer). With fully separate
+DPs, the borrowing that gives extrapolation its power is lost. The
+\emph{hierarchical} DP threads this needle, but the concentration parameters
+governing how aggressively the source-specific distributions deviate from
+the shared base must be either elicited or estimated. This is the
+extrapolation analogue of the commensurate-prior shrinkage on $\gf$
+controlled by $k_g$.
+
+\paragraph{Challenge 6: identification of $\cf$ relies on the RCT.}
+From Proposition~3(iii) of the framework draft, the RWD alone identifies
+$\tauf + \cf$, not the two separately; the separation is anchored by the
+RCT. With a small RCT and a large RWD, the prior on $\cf$ does substantial
+work. Combined with extrapolation, this means: the RCT is doing
+\emph{two} jobs simultaneously --- anchoring the shift and disambiguating
+$\tauf$ from $\cf$. A small RCT may not be able to do both well. Worth
+exploring via simulations that vary $n_{\RCT}/n_{\RWD}$.
+
+\paragraph{Challenge 7: covariate overlap at long times.}
+The HTE $\tauf(\X=x)$ is informative only at covariate values $x$ supported
+by both sources. For extrapolation, an additional implicit overlap is
+required: the RWD must contain survivors at long $t$ \emph{with covariate
+profiles matching the RCT}. If the RWD long-followup is dominated by, say,
+elderly patients who were not represented in the trial, the extrapolation
+for the trial-representative population is effectively pure prior.
+
+\paragraph{Challenge 8: connecting target-population definitions across goals.}
+Under (G1), the natural target is the RWD population (representativeness
+gain). Under (G2), the target is whichever population the HTA decision
+concerns --- often the trial population, projected forwards in time. The
+decomposition supports both, but the paper should be explicit about which
+target population is used in each numerical result, since the survival
+estimands in equations (23)--(26) of the framework draft contain $\cf$
+only when the target is the RWD.
+
+\section{Possible extensions}
+
+\begin{enumerate}[label=(E\arabic*), leftmargin=*]
+  \item \textbf{Time-varying treatment effect on the log-time scale.}
+        Replace $\tauf(\X)$ by $\tauf(\X, t)$ via a spline or piecewise
+        structure. This is the AFT-side analogue of waning treatment-effect
+        models \citep{Jackson2023}.
+  \item \textbf{Cure-fraction extension.}
+        For oncology and immune-therapy settings, a mixture cure component
+        is biologically motivated and is now standard in HTA extrapolation
+        practice. Combining cure modelling with the four-forest decomposition
+        is feasible and would broaden applicability.
+  \item \textbf{Relative-survival / additive-hazards formulation.}
+        Anchor the long-term hazard to known population mortality (life
+        tables), so RWD-tail information competes against a hard external
+        constraint rather than against the prior alone. Particularly natural
+        for older populations with substantial competing mortality.
+  \item \textbf{Sensitivity analysis on unmeasured confounding.}
+        Allow $\cf(\X)$ to be informed by a prior derived from negative
+        controls, or perform a tipping-point analysis over the magnitude of
+        $\cf$ consistent with observed RCT-RWD discrepancy.
+  \item \textbf{Multiple data sources.}
+        Generalise from $\Sx \in \{0,1\}$ to a categorical source indicator,
+        with the HDP base distribution shared across all sources and
+        source-specific deviations regulated hierarchically. Several
+        registries plus a trial; or a trial, an EHR cohort, and a claims
+        database.
+  \item \textbf{Aggregate external evidence.}
+        Allow inclusion of summary survival data (e.g., from published KM
+        curves reconstructed via \citet{Guyot2012}) alongside individual-level
+        data, in the spirit of survextrap. Useful when long-term IPD are
+        unavailable but published curves exist.
+  \item \textbf{Posterior projection summaries for the HTE.}
+        Map the high-dimensional posterior over $\tauf(\X)$ into an
+        interpretable summary (a CART tree, a small set of subgroup rules)
+        via the projection approach of \citet{Woody2020}, and report
+        how those subgroup summaries shift when the RWD is included.
+        This directly answers ``how did borrowing change the
+        heterogeneity story?''
+  \item \textbf{Calendar-time covariate.}
+        Adjust for cohort year inside the BART forests, mitigating
+        Challenge~3.
+  \item \textbf{Decision-analytic outputs.}
+        Pipe the posterior of $\Delta_{\RMST}(t^*, \X)$ into life-years
+        gained and (with utility weights) QALY contrasts. This is what HTA
+        agencies actually want; the method already produces it.
+\end{enumerate}
+
+\section{Related work}
+
+The reframing places the project at the intersection of three literatures
+that have historically not communicated very much: causal data fusion,
+Bayesian survival extrapolation for HTA, and flexible Bayesian survival
+modelling. We sketch each below and indicate where the proposed method sits.
+
+\subsection{Survival extrapolation for HTA}
+
+The foundational reference is NICE DSU Technical Support Document~14
+\citep{Latimer2013}, which codified the practice of fitting standard
+parametric AFT/PH families (exponential, Weibull, log-logistic, lognormal,
+Gompertz, generalised gamma) to trial data and selecting among them by
+fit and clinical plausibility. The TSD~14 process is widely followed but
+also widely criticised: fits in the observed window are nearly
+indistinguishable, while extrapolations diverge dramatically
+\citep{BellGorrod2019, Bagust2014}.
+
+External data have been used in HTA extrapolation in several distinct ways:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{General-population mortality} as a lower bound on the
+        hazard via additive-hazards (relative survival) models;
+  \item \textbf{Registry conditional survival} from cancer registry
+        databases used as external survival information for cancer
+        \citep{Guyot2017};
+  \item \textbf{Expert elicitation} treated as prior data on long-term hazard
+        \citep{Guyot2017};
+  \item \textbf{Longer-follow-up surrogate trials} such as the
+        cilta-cel/LEGEND-2 example \citep{Vyas2023}, in which a phase~I
+        study with longer follow-up informs extrapolation of a pivotal
+        phase~II trial through informative priors on shape parameters.
+\end{itemize}
+
+The most directly comparable methodological piece is \citet{Jackson2023}'s
+\texttt{survextrap}, which fits an M-spline hazard with a hierarchical prior
+on the coefficients, jointly to individual-level RCT data and external
+(possibly aggregate) data using Bayesian multi-parameter evidence synthesis.
+\texttt{survextrap} supports proportional and flexible non-proportional
+hazards, waning treatment effects, cure models, and additive-hazards
+formulations \citep{Jackson2023}. Empirical evaluations
+\citep{Timmins2025} report that the model gives accurate long-term
+extrapolations when long-term external data on the patient population of
+interest are included, and quantifies structural uncertainty appropriately
+when they are not.
+
+\paragraph{Where the proposed method differs from \texttt{survextrap}.}
+\texttt{survextrap} does not address unmeasured confounding in the external
+data; the external sources it accommodates are general-population mortality,
+registry conditional survival, and elicited beliefs --- not a confounded
+real-world data of the \emph{same} treatment. The proposed framework
+adds an explicit confounding-function correction $\cf(\X)$, allowing the
+external data to be a contemporaneous RWD subject to non-randomised
+treatment assignment, not merely a background hazard reference. The
+modelling style also differs: M-spline hazards versus BART forests on
+AFT components, and a flexible parametric error versus an HDP nonparametric
+error.
+
+\subsection{Causal data fusion under unmeasured confounding}
+
+The methodological core --- a confounding function $\cf(\X)$ correcting RWD
+contrasts that do not hold unconfoundedness --- is established in
+\citet{YangLiuZengWang2025}, who derive semiparametric efficiency bounds for
+joint estimation of $\tauf$ and $\cf$. \citet{Kallus2018} propose the
+``experimental grounding'' framework, in which an RCT supplies a bias
+function correcting an observational HTE estimator. \citet{Yao2024} extend
+data fusion to partial RWD treatment information. \citet{vanderLaan2024}
+develop adaptive TMLE for RCT--RWD fusion that adapts borrowing to detected
+bias.
+
+The closest match to the proposed work is \citet{Ye2025}, who develop an
+integrative AFT framework for high-dimensional RCT and RWD with censoring
+and hidden confounding, using Stute-weighted penalised regression with
+separate regularisation for $\tauf$ and the confounding component. The
+proposed method is essentially a Bayesian-nonparametric counterpart to
+\citet{Ye2025}: BART ensembles in place of penalised parametric models,
+nonparametric error in place of a Gaussian or assumed AFT family, and
+commensurate-prior structure on the baseline split between sources.
+
+A practical caveat from \citet{Lin2024}: bias-correction methods for
+marginal ATE estimation in this literature have not delivered
+RMSE improvements over RCT-only analysis in their simulations, and the
+methods' theoretical advantage is for the \emph{heterogeneous} effect
+function rather than its average. The proposed framing targets HTE
+plus long-term extrapolation, both of which are tasks for which RCT-only
+inference is genuinely deficient --- the latter, simply because it cannot
+be done from the trial alone.
+
+\subsection{Bayesian flexible survival modelling}
+
+The BART-based modelling of $\muf$, $\gf$, $\tauf$, $\cf$ rests on the
+Bayesian causal forest (BCF) line of work \citep{hahn2020bayesian}, which introduced
+the prognostic/treatment-effect decomposition with separate prior scales
+that the four-forest version generalises. The HDP error builds on the
+centred stick-breaking mixture of \citet{yang2010semiparametric} and the wider
+Bayesian-nonparametric survival literature; the hierarchical extension
+specifically lets the source label index the group hierarchy, with shared
+atoms across sources.
+
+\subsection{Positioning summary}
+
+\begin{table}[tb]
+\centering\small
+\begin{tabular}{lccc}
+\toprule
+& Confounding & Long-term      & Nonparametric \\
+& correction  & extrapolation  & error         \\
+\midrule
+\citet{Latimer2013} (TSD 14 workflow)        & --- & yes & ---  \\
+\citet{Guyot2017}                            & --- & yes & ---  \\
+\citet{Jackson2023} (\texttt{survextrap})    & --- & yes & flexible \\
+\citet{Ye2025}                               & yes & limited$^\dagger$ & --- \\
+\citet{YangLiuZengWang2025}                  & yes & ---       & --- \\
+\citet{Kallus2018}, \citet{Yao2024}          & yes & ---       & --- \\
+\textbf{This work}                           & \textbf{yes} & \textbf{yes} & \textbf{yes (HDP)} \\
+\bottomrule
+\end{tabular}
+\caption{Schematic positioning. $\dagger$: \citet{Ye2025} targets HTE
+estimation in the joint AFT framework; long-term extrapolation is not its
+stated goal but is in principle compatible with the AFT structure.}
+\end{table}
+
+The niche is clear: the HTA-pragmatic literature handles extrapolation
+flexibly but does not correct for confounding in the external source; the
+causal-fusion literature corrects for confounding but does not target
+extrapolation; and few methods combine the two with a fully nonparametric
+error distribution. The proposed method sits deliberately in that gap.
+
+\bibliographystyle{apalike}
+\bibliography{../general/references}
+
+\end{document}

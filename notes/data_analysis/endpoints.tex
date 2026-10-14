@@ -1,0 +1,304 @@
+\documentclass[11pt]{article}
+
+%% Page geometry
+\usepackage[a4paper, margin=1in]{geometry}
+
+%% Core math + fonts
+\usepackage{amsthm,amsmath,amsfonts,amssymb}
+\usepackage{microtype}
+
+%% Citations
+\usepackage[authoryear, round]{natbib}
+
+%% Hyperlinks
+\usepackage[colorlinks, citecolor=blue, urlcolor=blue, linkcolor=blue]{hyperref}
+\usepackage{xurl}
+
+%% Graphics & figures
+\usepackage{graphicx}
+\graphicspath{{./images/}}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{booktabs}
+
+%% Algorithms
+\usepackage[linesnumbered, ruled, vlined]{algorithm2e}
+
+%% TikZ for diagrams
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,fit,calc,positioning}
+\tikzset{box/.style={draw, diamond, thick, text centered, minimum height=0.5cm, minimum width=1cm}}
+\tikzset{line/.style={draw, thick, -latex'}}
+
+%% Misc
+\usepackage{comment}
+\usepackage{dsfont}
+
+%% Theorem environments
+\theoremstyle{plain}
+\newtheorem{axiom}{Axiom}
+\newtheorem{claim}[axiom]{Claim}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem*{example}{Example}
+\newtheorem*{fact}{Fact}
+
+\theoremstyle{remark}
+\newtheorem{case}{Case}
+
+%% Custom math commands
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\1}{\mathds{1}}
+\newcommand{\p}{\mathbb{P}}
+\renewcommand{\H}{\mathcal{H}}
+\newcommand{\T}{\mathcal{T}}
+\newcommand{\ind}{\perp\!\!\!\perp}
+
+
+\title{Endpoint construction}
+\author{Tijn Jacobs}
+\date{\today}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.8em}
+
+
+\begin{document}
+\maketitle
+
+\subsection{Endpoint construction}
+
+The endpoint is deliberately asymmetric across the two data sources. The
+randomized component (ACTG~175) is used as published: a single composite
+indicator and one follow-up time, with the underlying components not
+separately released. The observational component (MACS) is reconstructed
+component-wise from the public release and then assembled to match a
+chosen target endpoint. Five candidate assemblies are tabulated below.
+The Kaplan--Meier diagnostic figure uses variant v5 (overall survival)
+for signal quality, while the publication-target FusionForest fit uses
+variant v3 (\emph{EFS-cd4-fix}), the closest analogue of the ACTG~175
+composite.
+
+\subsubsection*{ACTG~175 (RCT) side}
+
+ACTG~175 releases each subject's endpoint pre-assembled as a pair
+$(\texttt{days}, \texttt{cens})$, where $\texttt{cens} \in \{0, 1\}$ is
+the composite indicator for the first occurrence of any of (i)~confirmed
+$\geq 50\%$ decline in CD4 count from baseline, (ii)~AIDS-defining
+diagnosis, or (iii)~death from any cause; and \texttt{days} is the time
+from randomization to that event or to administrative censoring, with a
+maximum follow-up of approximately $1{,}231$ days. The three components
+are not released separately, so the RCT side cannot be respecified as a
+subset of the composite. On the analysis scale we work with
+$T = \texttt{days}/365.25$ in years and $\delta = \texttt{cens}$.
+
+A separate CD4-50\% reconstruction is also computed from the trial
+release (\texttt{cd\_decl\_50}, \texttt{cd\_decl\_days}) by comparing the
+20- and 96-week CD4 measurements to half of baseline and approximating
+the event time by the nominal window midpoint ($140$ days for the
+20-week visit, $672$ days for the 96-week visit). This is reported as a
+diagnostic only: it is unconfirmed, ignores AIDS and death, and is never
+used as the analysis endpoint.
+
+\subsubsection*{MACS (RWD) side: per-subject components}
+
+The MACS base frame, constructed once per analysis, carries every
+per-subject component as either a calendar year or a binary flag,
+independent of which variant is later assembled. The components and
+their sources are summarized in Table~\ref{tab:macs-components}.
+
+\begin{table}[tb]
+  \centering
+  \small
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    Field & Source & Meaning \\
+    \midrule
+    \texttt{anchor\_year} & $\min(\texttt{AVQY})$ in 1991--95 with
+        $\texttt{AVNW} = 2$ &
+        time-zero (year resolution) \\
+    \texttt{aids\_yr}     & \texttt{outcome.DATE1yy} if
+        $\texttt{AIDSCASE} \in \{2, 3\}$ &
+        year of CDC AIDS diagnosis \\
+    \texttt{cd4\_abs\_yr} & \texttt{outcome.SELFCD4Dyy} if $> 0$ &
+        year of first absolute CD4 $< 200$ or $< 14\%$ \\
+    \texttt{cd4\_rel\_yr} & first $\texttt{LDATY}$ with
+        $\texttt{LEU3N} \leq 0.5 \cdot \texttt{cd4\_base}$ &
+        year of first relative $\geq 50\%$ CD4 decline \\
+    \texttt{cd4\_base}    & first 1991--95 \texttt{LEU3N} per subject &
+        baseline CD4 for the relative rule \\
+    \texttt{death\_any}   & $\texttt{DEATH} \in \{1, 2, 3, 4\}$ &
+        all-cause death indicator (date redacted) \\
+    \texttt{death\_aids}  & $\texttt{DEATH} \in \{1, 2\}$ &
+        AIDS-related death indicator (date redacted) \\
+    \texttt{last\_year}   & $\max(\texttt{LDATY})$ in \texttt{lab\_rslt} &
+        last contact year; death-time fallback / censoring \\
+    \bottomrule
+  \end{tabular}
+  \caption{MACS per-subject component fields. Years are calendar years
+    extracted from the public release; flags are derived from the
+    \texttt{outcome} form. \texttt{LEU3N} is the \texttt{lab\_rslt} CD4
+    count, \texttt{LDATY} the lab visit year, \texttt{AVQY} the
+    drug-form visit year, and \texttt{AVNW} the ``currently taking''
+    indicator on a drug record.}
+  \label{tab:macs-components}
+\end{table}
+
+Two construction choices are non-trivial.
+
+\paragraph{CD4 reconstruction.} The ACTG~175 $\geq 50\%$-decline rule
+does not match the \texttt{SELFCD4D} field in MACS, which encodes an
+absolute sub-threshold crossing ($< 200$~cells/$\mu$L or $< 14\%$). We
+therefore rebuild the relative rule per subject from the
+\texttt{lab\_rslt} time series: take the earliest 1991--95 \texttt{LEU3N}
+as $\texttt{cd4\_base}$, then take \texttt{cd4\_rel\_yr} as the year of
+the first subsequent lab with $\texttt{LEU3N} \leq 0.5 \cdot
+\texttt{cd4\_base}$. This reconstruction is a one-shot threshold
+crossing rather than a confirmed decline, which is a known asymmetry
+against the RCT-side endpoint and is sensitive to non-uniform
+CD4-measurement frequency between subjects.
+
+\paragraph{Missing death dates.} The field \texttt{DTHDATEyy} is redacted
+from the public release. We therefore retain death indicators
+(\texttt{death\_any}, \texttt{death\_aids}) but no death dates. For
+subjects flagged as deceased without a preceding AIDS or CD4 year, the
+event-time fallback is the subject's \texttt{last\_year}, i.e.\ the year
+of their last laboratory visit. This is a downward bias on death-event
+times that propagates into the upper tail of the survival distribution.
+
+A prior-AIDS exclusion is applied as a final step: subjects with
+$\texttt{aids\_yr} < \texttt{anchor\_year}$ are dropped so that the
+cohort is AIDS-free at time-zero, matching the trial's entry criterion.
+
+\subsubsection*{Assembly}
+
+Given the base frame and a boolean specification of which components
+feed the composite, the assembler $\texttt{combine\_macs}(\cdot)$
+computes
+\begin{align*}
+  \texttt{ev\_yr}
+    &= \min \bigl\{
+        \texttt{cd4\_abs\_yr},\;
+        \texttt{cd4\_rel\_yr},\;
+        \texttt{aids\_yr},\;
+        \texttt{last\_year} \cdot \mathbf{1}\{\text{death active}\}
+      \bigr\}_{\text{activated}} , \\
+  \texttt{end\_year}
+    &= \begin{cases}
+        \texttt{ev\_yr}     & \text{if any activated component fires,} \\
+        \texttt{last\_year} & \text{otherwise (right-censored at last contact),}
+      \end{cases} \\
+  T  &= \max \bigl( \texttt{end\_year} - \texttt{anchor\_year},\, 0.5
+       \bigr), \\
+  \delta &= \mathbf{1}\{\text{any activated component fires}\}.
+\end{align*}
+Non-fired components contribute $+\infty$ to the rowwise minimum and so
+are ignored. Death contributes its fallback year (\texttt{last\_year})
+to the minimum only when the chosen death flag is active and the
+subject is flagged dead; otherwise the death component does not enter
+at all. The half-year floor on $T$ accommodates year-resolution event
+times when event and anchor coincide, where the elapsed time would
+otherwise round to exactly zero and trigger a $\log(0)$ on the
+log-survival scale used downstream.
+
+\subsubsection*{Variant menu}
+
+Five composite specifications are tabulated to map the activation
+choices onto recognizable named endpoints
+(Table~\ref{tab:variants}).
+
+\begin{table}[tb]
+  \centering
+  \small
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    Variant & Name & Components combined (event $=$ earliest activated year) \\
+    \midrule
+    v1 & \texttt{EFS-current}   &
+        absolute CD4 $+$ AIDS $+$ AIDS-related death \\
+    v2 & \texttt{EFS-death-fix} &
+        absolute CD4 $+$ AIDS $+$ all-cause death \\
+    v3 & \texttt{EFS-cd4-fix}   &
+        relative CD4 $+$ AIDS $+$ all-cause death \\
+    v4 & \texttt{PFS}           &
+        AIDS $+$ all-cause death \\
+    v5 & \texttt{OS}            &
+        all-cause death \\
+    \bottomrule
+  \end{tabular}
+  \caption{MACS endpoint variants. v1 is the original specification; v2
+    corrects a death-code restriction that silently dropped roughly
+    a quarter of recorded deaths by keeping only AIDS-related death
+    codes; v3 swaps the absolute CD4 component for the
+    confirmed-decline analogue and is the closest match to the
+    ACTG~175 composite. v4 and v5 are progressively narrower
+    endpoints used for sensitivity.}
+  \label{tab:variants}
+\end{table}
+
+\subsubsection*{Which variant the diagnostic figure uses}
+
+The Kaplan--Meier diagnostic figure does not call the variant menu
+directly: it reimplements variant v5 (\texttt{OS}) inline. The event is
+$\texttt{DEATH} \in \{1, 2, 3, 4\}$, the event time is
+\texttt{last\_year} (death-date fallback, since no death date is
+recorded), and the censoring time for survivors is also
+\texttt{last\_year}. Elapsed time is
+$T = \max(\texttt{last\_year} - \texttt{anchor\_year},\, 0.5)$. The
+figure labels this curve ``EFS'' for visual comparison with the RCT
+side, but mechanically it is overall survival --- a strict subset of
+the RCT composite, chosen because death is the only event MACS
+captures reliably enough to give a clean survival signal at year
+resolution.
+
+\subsubsection*{Time computation, side by side}
+
+Table~\ref{tab:time} summarizes the time fields on the two sides.
+
+\begin{table}[tb]
+  \centering
+  \small
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    Quantity & ACTG~175 & MACS \\
+    \midrule
+    Anchor       & date of randomization (day) &
+                   $\min(\texttt{AVQY})$ in 1991--95 with
+                   $\texttt{AVNW} = 2$ (year) \\
+    Event time   & \texttt{days} since randomization &
+                   rowwise $\min$ over activated component years \\
+    Censoring    & published in \texttt{days} &
+                   \texttt{last\_year} (year of last lab visit) \\
+    Analysis $T$ & $\texttt{days} / 365.25$ &
+                   $\max(\texttt{end\_year} - \texttt{anchor\_year},\,
+                   0.5)$ \\
+    Resolution   & day & year (with $0.5$-year floor) \\
+    \bottomrule
+  \end{tabular}
+  \caption{Time-axis construction on the two sides.}
+  \label{tab:time}
+\end{table}
+
+The $0.5$-year floor on the MACS side biases short-fuse events upward
+by up to one year. It is the most visible footprint of the
+year-resolution public release on the analysis; its impact concentrates
+on subjects whose event year equals their anchor year and is largest
+for cohorts enriched in fast events.
+
+\subsubsection*{Cohort definition versus endpoint}
+
+The cohort definition (which subjects enter the at-risk set) is
+logically distinct from the endpoint construction (how each subject's
+event and time are defined). Changing the cohort --- for example,
+restricting to incident users of the contrast regimens within 1991--95
+by excluding any subject with a pre-1991 record of
+$\texttt{AVNW} = 2$ on a regimen in the contrast code set --- leaves
+the endpoint mechanics unchanged. The same event field on a different
+at-risk set yields different event counts, different follow-up
+distributions, and therefore different survival curves, without any
+change to the assembly logic above.
+
+\end{document}

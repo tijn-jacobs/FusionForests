@@ -1,0 +1,39 @@
+\section{Discussion}\label{section:Discussion}
+
+This work introduces a novel regularisation strategy for Bayesian regression tree ensembles by applying shrinkage directly to the step heights via the horseshoe prior. 
+We use continuous global--local shrinkage to adaptively control model complexity in high-dimensional settings, while retaining all covariates in the model. 
+This provides an alternative to methods that exclude covariates from the model and risk omitting important confounders.
+Our method captures complex non-linear effects and higher-order interactions in both the prognostic and treatment effect functions. 
+These are essential for modelling heterogeneous treatment responses in survival data.
+
+
+We assume independent censoring given treatment and observed covariates. 
+This assumption enables coherent likelihood-based inference via data augmentation. 
+While standard in accelerated failure time models, independent censoring may be violated in practice, particularly in observational survival studies where censoring may depend on unmeasured prognostic factors. 
+Inverse probability of censoring weighting \citep{RobinsFinkelstein2000} offers an alternative in such settings, but may introduce additional variance and instability. 
+These issues are especially pronounced in high-dimensional settings with limited overlap and possibly extreme weights. 
+Extensions of the proposed framework to explicitly accommodate informative censoring or to incorporate formal sensitivity analyses may be considered in future research.
+
+
+The positivity assumption warrants further discussion.
+In high-dimensional observational settings such as the PDAC application, where $p$ greatly exceeds $n$, strict positivity in the full covariate space is generically incompatible with the data \citep{DAmour2021Overlap}. 
+Identification relies on overlap holding in a lower-dimensional confounding subspace, an assumption that cannot be empirically verified. 
+Common diagnostics, including propensity score histograms or summaries of estimated propensity scores, are of limited use in this regime: the estimated propensity score is itself a heavily regularised, high-dimensional object.
+Its distribution reflects the shrinkage behaviour of the underlying model as much as it reflects structural overlap. 
+This is a fundamental limitation of high-dimensional observational causal inference rather than a feature of any particular estimator. 
+We treat positivity as a working assumption throughout and emphasise that inferences from our model, like those from any causal estimator in this regime, should be interpreted with this caveat in mind.
+
+
+We adopt an inclusive adjustment strategy that retains the full set of high-dimensional pretreatment covariates. 
+This strategy guards against omitted variable bias, widely regarded as a primary threat to validity in observational studies \citep{Rubin2009}. 
+However, conditioning on many variables may introduce other biases. 
+Conditioning on colliders may induce M-bias, although theoretical and empirical work suggests that such bias is typically small relative to the bias from failing to adjust for relevant confounders \citep{Liu2012Mbias, DingMiratrix2015}. 
+
+Conditioning on instrumental variables can induce Z-bias. 
+When unmeasured confounding persists, adjustment for instrumental variables may amplify omitted variable bias rather than reduce it \citep{Ding2017BiasAmplifier}. 
+Even when all confounders are measured, including strong predictors of treatment that are not prognostic for the outcome may inflate variance \citep{Myers2011}.
+Additional simulations do not indicate substantial degradation in heterogeneous treatment effect estimation arising from collider or instrumental variable adjustment. 
+In our framework, the horseshoe prior regularises effect magnitudes in the outcome model, so covariates that primarily predict treatment but contribute little to outcome prediction tend to be shrunk strongly toward zero rather than explicitly excluded.
+This proposed approach balances broad confounder adjustment with adaptive regularisation that mitigates the risks associated with high-dimensional covariate inclusion.
+
+

@@ -1,0 +1,58 @@
+% !TEX root = main.tex
+\section{Discussion}
+
+We combined a randomised trial with real-world data to estimate heterogeneous treatment effects on survival outcomes, without assuming the real-world source is unconfounded.
+The simulation study and the HIV application demonstrate its advantages over a single-source analysis.
+The Bayesian fusion forest remains unbiased under varying levels of unmeasured confounding.
+It reduces the posterior variance of a trial-only analysis.
+In the application, we recovered a benefit of combination therapy that the survival curves of the real-world data alone did not reveal.
+We established benefit for nearly every patient where the trial alone was inconclusive.
+The model handled the right-censored trial and the interval-censored cohort jointly.
+
+Our framework implicitly assumes the acceleration factor $\exp\{\tau(X)\}$ is time-invariant: treatment rescales the survival time by a factor that depends on the covariates but not on time.
+This assumption may be inappropriate when treatment effects unfold over time, such as delayed-onset benefits or waning effects.
+Flexible parametric AFT models relax this assumption by letting the acceleration factor vary with time \citep{Crowther2023}.
+The causal interpretation of time-dependent acceleration factors has been formalised \citep{Brathovde2024}.
+A natural extension replaces $\tau(X)$ with a generalised Bayesian tree ensemble $\tau(X, t)$.
+
+%% The Funding, Acknowledgements and Conflict of interest sections live on the
+%% title page of ../general/main.tex, because Biostatistics requires them on
+%% page 1 of the manuscript. They are not repeated here. Data availability is
+%% not on that page-1 list and stays here as back matter.
+%%
+%% Funding wording used before the Biostatistics-mandated sentence:
+%%
+%% This project has received funding from the European Research Council (ERC) under the European Union’s Horizon Europe program under Grant agreement No. 101074802. Views and opinions expressed are however those of the author(s) only and do not necessarily reflect those of the European Union or the European Research Council Executive Agency. Neither the European Union nor the granting authority can be held responsible for them.
+%% This work used the Dutch national e-infrastructure with the support of the SURF Cooperative using grant no. EINF-18803.
+
+%% Funding, Acknowledgements and Conflict of interest are set on the title
+%% page in both main.tex (journal wording) and arxiv.tex (original ERC and
+%% SURF wording), so the copies below are commented out to avoid printing
+%% them twice. Data availability appears only here.
+\begin{comment}
+\section*{Funding}
+This work was supported by the European Research Council [grant number
+101074802]; and the SURF Cooperative [grant number EINF-18803].
+Views and opinions expressed are those of the authors only and do not
+necessarily reflect those of the European Union or the European Research
+Council Executive Agency.
+Neither the European Union nor the granting authority can be held responsible
+for them.
+
+\section*{Acknowledgements}
+The authors used generative artificial intelligence tools in support of
+developing and debugging the accompanying software.
+All such output was reviewed and verified by the authors, who take full
+responsibility for the content of this work.
+
+\section*{Conflict of interest}
+None declared.
+\end{comment}
+
+\section*{Data availability}
+\sloppy
+The software implementation is available on GitHub at \url{https://github.com/tijn-jacobs/FusionForests}.
+The same repository also holds the code for the simulation studies and the data analysis.
+A release on the Comprehensive R Archive Network is planned.
+The ACTG~175 trial data are available in the \texttt{speff2trial} R package \citep{speff2trial}.
+The MACS data can be requested through the MWCCS cohort website.

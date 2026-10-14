@@ -1,0 +1,168 @@
+\newpage
+\subsection*{Prior specification}
+
+We place an independent prior on each of the three regression functions $m_0$, $\tau$, and $c$ in the decomposition~\eqref{eq:decomp}.
+Each prior is a variant of the BART prior of equation~\eqref{eq:bart-revised}.
+We adapt the standard specification in three places.
+The prognostic function $m_0$ receives a hierarchical structure that allows cross-source borrowing.
+The confounding function $c$ receives an aggressive depth penalty that pulls it towards a constant in $X$ and through the leaf prior towards zero.
+We scale the prior variances of the four forests so that the induced prior on $\log T$ lies on the response range.
+
+\paragraph{Treatment effect function.}
+We assign $\tau \sim \mathrm{BART}(m_\tau, k_\tau, \alpha_\tau, \beta_\tau)$ with $m_\tau = 100$, $k_\tau = 1$, and tree-structure hyperparameters $(\alpha_\tau, \beta_\tau) = (0.95, 3)$.
+The step-height scale $k_\tau = 1$ is the methodology default.
+We follow \citet{hahn2020bayesian} and use fewer trees for $\tau$ than for the prognostic baseline, in keeping with the smaller expected complexity of the treatment-effect surface.
+The depth penalty $\beta_\tau = 3$ (versus the BART default $\beta = 2$) further enforces shallow $\tau$ trees.
+The prior expectation is that the heterogeneity of the treatment effect is low-order in $X$.
+The bulk of the prior mass therefore lies on trees of depth one or two, with deeper interactions admitted only when the data demand them.
+
+\paragraph{Prognostic function.}
+The prognostic function is the largest source of cross-source borrowing.
+By \eqref{eq:decomp}, $m_0(X, S) = \E[\log T \mid A = 0, X, S]$ is the conditional mean of the log-survival under control in source $S$.
+It captures how the covariates predict untreated survival.
+The underlying prognostic relationship is intrinsic to the disease and so is shared between the RCT and the RWD, with only modest drifts due to measurement protocol and patient mix.
+Cross-source borrowing on $m_0$ is therefore principled: equality is the prior baseline and source-specific departures are allowed when the data demand them.
+We model it as the sum of a shared component $m_0^{\mathrm{sh}}$ and a source-specific heterogeneous deviation $d$:
+\begin{equation}
+m_0(X, S) \;=\; m_0^{\mathrm{sh}}(X) + (1 - S) \cdot d(X).
+\label{eq:m0-decomp}
+\end{equation}
+We place separate BART priors on $m_0^{\mathrm{sh}}$ and $d$:
+\begin{equation*}
+m_0^{\mathrm{sh}} \;\sim\; \mathrm{BART}(m_{\mathrm{sh}}, k_{\mathrm{sh}}, \alpha, \beta), \qquad d \;\sim\; \mathrm{BART}(m_d, k_d, \alpha, \beta),
+\end{equation*}
+with $(m_{\mathrm{sh}}, k_{\mathrm{sh}}) = (200, 1)$ and $(m_d, k_d) = (50, 1)$.
+Both forests use the methodology-default step-height scale $k = 1$ and the BART-default depth prior $(\alpha, \beta) = (0.95, 2)$.
+The shared baseline receives four times as many trees as the deviation because it carries the bulk of the prognostic signal and is active on every observation; the deviation forest is fit on the RWD subset alone and a smaller ensemble already exhausts the resolution that the source-specific deviation needs.
+The construction is a heterogeneous meta-analytic-predictive prior on the prognostic function.
+Under cross-source exchangeability the shared component carries the disease-intrinsic prognosis, and the source-specific deviation absorbs only residual drifts due to measurement protocol and patient mix.
+The derivation from the framework of \citet{neuenschwander2010} and its semiparametric extension by \citet{hupf2021bayesian} is given in Appendix~\ref{app:map-m0}.
+
+
+Here we should expand our choice for this parametrisation. Under the assumptions, we can argue (or should argue) that if the baseline effects are the same (on average maube) in each datasource, then it does not make sense to model this heterogenuously. Also, this fromulation explicitly allows for heterogenuous deviations between study in baseline prognosis (is this one of the examples from the multi-study R learner?) 
+
+\paragraph{Confounding function.}
+We assign $c \sim \mathrm{BART}(m_c, k_c, \alpha_c, \beta_c)$ with $m_c = 50$, $k_c = 1$, and tree-structure hyperparameters $(\alpha_c, \beta_c) = (0.25, 3)$.
+The structural reading in Appendix~\ref{app:scm} identifies $c \equiv 0$ with the absence of unmeasured confounding in the RWD, so an aggressive depth penalty is well-justified.
+The base parameter $\alpha_c = 0.25$ assigns only $25\%$ prior probability to splitting at the root, so $c$ trees default to stumps.
+The confounding function is therefore pulled toward a constant in $X$ and, through the leaf prior, toward zero, unless the data clearly demand otherwise.
+This is the regularisation that makes the fusion safe under the structural argument that $c$ should vanish for honest real-world data.
+
+\begin{remark}[Multiplicative shrinkage on $c$]
+An alternative representation is $c(x) = \gamma \cdot g_c(x)$, with $\gamma$ a global shrinkage scalar and $g_c \sim \mathrm{BART}$.
+A heavy-tailed prior such as $\gamma \sim \mathcal{C}^+(0, 1)$ gives a global-local shrinkage construction \textbf{[CITE:horseshoe; e.g.\ Carvalho et al.\ 2010, Polson \& Scott 2011]}.
+A normal prior on $\gamma$ is a softer alternative.
+The representation lets the data choose between near-zero confounding and a substantial one, and may be preferable when the data are weakly informative about $c$.
+\end{remark}
+
+
+\paragraph{Scaling and number of trees.}
+We standardise the log-survival before fitting.
+A preliminary parametric (log-normal) AFT fit provides the centring and scaling constants.
+We write $\widetilde Y$ for the standardised response, which has approximately zero mean and unit variance.
+The four step-height priors are then all of the Chipman form with the methodology default $k_f = 1$:
+\begin{equation*}
+  \sigma_{h,f} \;=\; \frac{1}{2\sqrt{m_f}}, \qquad f \in \{m_0^{\mathrm{sh}}, d, \tau, c\}.
+\end{equation*}
+Each forest therefore has marginal prior variance $\mathrm{Var}_\pi\{f(x)\} = m_f \sigma_{h,f}^2 = 1/4$ on the standardised scale, independent of the number of trees.
+Tree counts are set to $(m_{\mathrm{sh}}, m_d, m_\tau, m_c) = (200, 50, 100, 50)$.
+The baseline carries the bulk of the prognostic signal and receives the most trees; the treatment-effect forest is allocated half as many because its surface is smoother by the depth prior $\beta_\tau = 3$; the source-deviation and confounding forests are restricted further still, since they are fit only on the RWD subset (and only on its treated arm, for $c$) and a smaller ensemble already exhausts the resolution the partial-likelihood updates can identify.
+The tree-count sensitivity sweep of \textbf{Section~XXX} found that varying $m_\tau, m_c \in \{50, 100, 200\}$ moves CATE RMSE by less than $0.005$ in every cell.
+This confirms that the Chipman calibration $\sigma_{h,f} = k_f / (2\sqrt{m_f})$ decouples tree count from prior magnitude.
+
+The choice of a uniform $k_f = 1$ across forests is deliberate.
+A simulation study (\textbf{Section~XXX}) compared this default against several asymmetric allocations that placed more variance on the baseline than on the corrections.
+The asymmetric allocations gave a modest CATE RMSE improvement under strong confounding ($5$--$10\%$ in scenarios where the real-world data are biased).
+The cost was a more elaborate calibration paragraph and a separate justification for each $k_f$.
+We adopt the uniform default in the spirit of \citet{chipman2010bart}.
+The leaf prior is simple to interpret and matches the BART/BCF defaults of the implementation.
+The residual differences in CATE performance are absorbed by the asymmetric tree counts and depth priors documented above.
+The simulation also confirmed that the uniform default is coherent with the inverse-$\chi^2$ residual prior of \textbf{Section~XXX}.
+The implied prior expected $R^2$ of the structural model is $\sum_f \pi_f / 4 \approx 0.6$.
+This complements the prior expected residual variance $\E_\pi[\sigma^2] \approx 0.4$ to give a total prior variance of approximately one on the standardised scale.
+
+\paragraph{Hierarchical model summary.}
+We summarise the full hierarchical model in compact form:
+\begin{align*}
+\log T_i &\;=\; m_0^{\mathrm{sh}}(X_i) + (1 - S_i)\, d(X_i) + A_i\, \tau(X_i) + (1 - S_i)\, A_i\, c(X_i) + \varepsilon_i, \\
+m_0^{\mathrm{sh}} &\;\sim\; \mathrm{BART}(m_{\mathrm{sh}}, k_{\mathrm{sh}}, \alpha, \beta), \\
+d &\;\sim\; \mathrm{BART}(m_d, k_d, \alpha, \beta), \\
+\tau &\;\sim\; \mathrm{BART}(m_\tau, k_\tau, \alpha_\tau, \beta_\tau), \\
+c &\;\sim\; \mathrm{BART}(m_c, k_c, \alpha_c, \beta_c), \\
+\varepsilon_i \mid S_i = s &\;\sim\; F_s, \\
+F_s &\;\sim\; \mathrm{HDPM}.
+\end{align*}
+The HDPM residual prior follows the construction of Section~\textbf{XXX}, with the full hierarchical specification in Appendix~\ref{app:hdp-error}.
+
+\begin{figure}[tb]
+\centering
+\begin{tikzpicture}[
+  thick,
+  forest/.style = {circle, draw=black, thick, fill=blue!8,  minimum size=0.85cm, inner sep=1pt, font=\small},
+  param/.style  = {circle, draw=black, thick, fill=white,   minimum size=0.78cm, inner sep=1pt, font=\small},
+  latent/.style = {circle, draw=black, thick, fill=white,   minimum size=0.72cm, inner sep=1pt, font=\small},
+  obs/.style    = {circle, draw=black, thick, fill=black!20,minimum size=0.72cm, inner sep=1pt, font=\small},
+  plate/.style  = {draw=black!60, dashed, rounded corners, inner sep=10pt},
+  arr/.style    = {-latex', thick}
+]
+
+% --- Row 1: forest priors (left) and HDPM upper hierarchy + atoms (right) ---
+\node[forest] (msh) {$m_0^{\mathrm{sh}}$};
+\node[forest, right=0.55cm of msh] (d)   {$d$};
+\node[forest, right=0.55cm of d]   (tau) {$\tau$};
+\node[forest, right=0.55cm of tau] (c)   {$c$};
+\node[param,  right=1.6cm of c]    (gamma) {$\gamma$};
+\node[param,  right=0.55cm of gamma] (beta) {$\bm{\beta}$};
+\node[param,  right=1.2cm of beta]  (theta) {$\theta_k^*$};
+
+% --- Row 2: HDPM lower hierarchy and per-source variance ---
+\node[param, below=0.9cm of gamma, xshift=0.4cm] (Ms)  {$M_s$};
+\node[param, right=0.55cm of Ms]                 (pis) {$\bm{\pi}_s$};
+\node[param, right=1.2cm of pis]                 (sig) {$\sigma_s^2$};
+
+% --- Plate contents: latents and observables ---
+\node[latent, below=1.6cm of tau, xshift=0.8cm] (logT) {$\log T_i$};
+\node[latent, right=2.4cm of logT]              (Z)    {$Z_i$};
+
+\node[obs, below=0.8cm of logT, xshift=-1.7cm] (X)     {$X_i$};
+\node[obs, right=0.3cm of X]                    (S)     {$S_i$};
+\node[obs, right=0.3cm of S]                    (A)     {$A_i$};
+\node[obs, below=0.8cm of logT, xshift=1.8cm]   (Tt)    {$\widetilde T_i$};
+\node[obs, right=0.3cm of Tt]                   (delta) {$\delta_i$};
+\node[obs, right=1.0cm of delta]                (Ci)    {$C_i$};
+
+\node[plate, fit=(logT) (Z) (X) (S) (A) (Tt) (delta) (Ci),
+      label={[anchor=south east, font=\small]south east:$i = 1, \ldots, n$}] {};
+
+% --- HDPM chain edges ---
+\draw[arr] (gamma) -- (beta);
+\draw[arr] (beta)  -- (pis);
+\draw[arr] (Ms)    -- (pis);
+\draw[arr] (pis)   -- (Z);
+
+% --- Forests --> log T_i ---
+\draw[arr] (msh) -- (logT);
+\draw[arr] (d)   -- (logT);
+\draw[arr] (tau) -- (logT);
+\draw[arr] (c)   -- (logT);
+
+% --- Atoms / scales / cluster --> log T_i ---
+\draw[arr] (theta) -- (logT);
+\draw[arr] (sig)   -- (logT);
+\draw[arr] (Z)     -- (logT);
+
+% --- Covariates and treatment --> log T_i ---
+\draw[arr] (X) -- (logT);
+\draw[arr] (S) -- (logT);
+\draw[arr] (A) -- (logT);
+
+% --- log T_i + C_i --> observed follow-up and event indicator ---
+\draw[arr] (logT) -- (Tt);
+\draw[arr] (logT) -- (delta);
+\draw[arr] (Ci)   -- (Tt);
+\draw[arr] (Ci)   -- (delta);
+
+\end{tikzpicture}
+\caption{Schematic DAG of the model. Shaded circles are observed; unshaded circles are random parameters or latent variables; light-blue circles mark the function-valued forest priors. The plate replicates over observations $i = 1, \ldots, n$. The source index $s \in \{0, 1\}$ on $\bm{\pi}_s, M_s, \sigma_s^2$ and the atom index $k = 1, \ldots, K$ on $\theta_k^*$ are kept as subscripts to avoid further nested plates; in the data-generating direction, $S_i$ selects the source-specific quantities and $Z_i$ selects the atom. Calibrated hyperparameters (BART tree, depth and step-height $m_f, k_f, \alpha, \beta$; HDPM $K, \sigma_\theta^2, \kappa_s, \nu_s, a_\gamma, b_\gamma, a_M, b_M$) are omitted.}
+\label{fig:dag}
+\end{figure}

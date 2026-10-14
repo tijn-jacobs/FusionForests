@@ -1,0 +1,54 @@
+
+\begin{table}[H]
+\centering
+\label{tab:clinical_covariates}
+% Changed 'll' to 'l p{9cm}' to allow text wrapping in the 2nd column
+\begin{tabular}{l p{9cm}} 
+\toprule
+\textbf{Variable} & \textbf{Description} \\
+\midrule
+\multicolumn{2}{l}{\textit{Demographic information}} \\
+\texttt{age} & Age of the patient at diagnosis (in years) \\
+\texttt{sex} & Biological sex (0 = female, 1 = male) \\
+\addlinespace % Better spacing than \\
+\multicolumn{2}{l}{\textit{Tumor characteristics}} \\
+\texttt{grade} & Histological tumor grade \\
+\texttt{tumor.cellularity} & Tumor cellularity as estimated by pathologist (numeric) \\
+\texttt{tumor.purity} & Estimated tumor purity (0 = low, 1 = high) \\
+\texttt{absolute.purity} & Tumor purity estimated using ABSOLUTE algorithm (numeric) \\
+\addlinespace
+\multicolumn{2}{l}{\textit{Molecular and expression features}} \\
+\texttt{moffitt.cluster} & Molecular subtype (0 = classical, 1 = basal-like) \\
+\texttt{meth.leukocyte.percent} & Estimated leukocyte fraction based on DNA methylation (numeric) \\
+\texttt{meth.purity.mode} & Tumor purity from methylation model (numeric) \\
+\addlinespace
+\multicolumn{2}{l}{\textit{Staging and metastasis}} \\
+\texttt{stage} & Nodal stage (0 = N0: no regional nodes, 1 = N1: nodal metastasis) \\
+\texttt{lymph.nodes} & Number of lymph nodes examined (numeric) \\
+\bottomrule
+\end{tabular}
+\caption{Overview of clinical covariates used in the PDAC data analysis.}
+\end{table}
+
+\begin{table}[H]
+\centering
+\label{tab:literature_genes}
+\begin{tabular}{lll}
+\toprule
+\textbf{Stefanoudakis et al. (2024)} & \textbf{Cicenas et al. (2017)} & \textbf{Takai \& Yachida (2015)} \\
+\midrule
+\textit{KRAS}    & \textit{BRCA1}    & \textit{ARID1A}  \\
+\textit{TP53}    & \textit{BRCA2}    & \textit{ATM}     \\
+\textit{CDKN2A}  & \textit{PALB2}    & \textit{RNF43}   \\
+\textit{SMAD4}   &                   & \textit{KDM6A}   \\
+                 &                   & \textit{PBRM1}   \\
+                 &                   & \textit{MLL3} \\
+                 &                   & \textit{ARID2}   \\
+                 &                   & \textit{SF3B1}   \\
+                 &                   & \textit{BRAF}    \\
+                 &                   & \textit{NRG1}    \\
+                 &                   & \textit{RET}     \\
+\bottomrule
+\end{tabular}
+\caption{Genes identified as drivers in pancreatic ductal adenocarcinoma (PDAC) according to the literature.}
+\end{table}
