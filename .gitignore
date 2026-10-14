@@ -2,6 +2,8 @@
 .claude/
 .devcontainer/
 info/
+notes/
+notes
 CLAUDE.md
 
 # R package build artifacts
