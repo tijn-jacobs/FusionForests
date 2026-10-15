@@ -134,8 +134,6 @@ vignette("FusionForests")
 
 It is also available on
 [CRAN](https://cran.r-project.org/package=FusionForests/vignettes/FusionForests.html).
-For the development version, install with
-`remotes::install_github("tijn-jacobs/FusionForests", build_vignettes = TRUE)`.
 
 ## The FusionForest model
 
