@@ -121,6 +121,22 @@ confounder, the fitted treatment effects track the truth (correlation
 0.89) and the 95% credible intervals cover the true effect for 94% of
 subjects.
 
+## Vignette
+
+The vignette walks through a complete analysis of the semi-synthetic
+`breast_fusion` data, which ship with the package. It covers the model
+fit, single-source comparisons, causal estimands, posterior projections,
+the confounding function and the error model. Open it in R with:
+
+```r
+vignette("FusionForests")
+```
+
+It is also available on
+[CRAN](https://cran.r-project.org/package=FusionForests/vignettes/FusionForests.html).
+For the development version, install with
+`remotes::install_github("tijn-jacobs/FusionForests", build_vignettes = TRUE)`.
+
 ## The FusionForest model
 
 `FusionForest()` is the heart of the package. It fits the decomposition
