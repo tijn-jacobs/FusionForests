@@ -110,3 +110,6 @@ data-private/
 
 # knitr cache of the precomputed vignette
 vignettes/cache/
+
+# Temporary notes on missing features (local only)
+vignettes/FEATURE_NOTES.md

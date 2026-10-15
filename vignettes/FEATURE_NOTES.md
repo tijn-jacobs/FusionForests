@@ -5,14 +5,10 @@ illustrating the package on `breast_fusion`, roughly by priority.
 
 ## 1. Check first (possible bugs or wrong docs)
 
-1. **Survival difference for `target_source = "rwd"` is not causal.**
-   `.linear_predictor()` uses `tau + c` for the OS target, so
-   `fusion_estimand(fit, "SD", target_source = "rwd")` returns the
-   observational contrast S(t | A = 1, x, S = 0) - S(t | A = 0, x, S = 0),
-   bias included. The help page calls these causal estimands. Either drop
-   `c` for the OS target (and state the transport assumption on the
-   baseline) or document that only `"rct"` gives a causal difference. The
-   vignette uses `"rct"` only for this reason.
+1. ~~**Survival difference for `target_source = "rwd"` is not causal.**~~
+   Fixed: `fusion_estimand()` now uses `.causal_linear_predictor()`
+   (untreated mean of the source plus `tau`, no `c`). The vignette could
+   now also show the RWD-target survival difference.
 2. **Wrong reference in `?fusion_projection`.** It cites "Bayesian
    inference with posterior projection", JCGS 29(4), 798-808 (2020). The
    paper's bib has Woody, Carvalho and Murray (2021), "Model interpretation

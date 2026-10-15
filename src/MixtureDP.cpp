@@ -27,7 +27,7 @@ MixtureDP::MixtureDP(int mode, size_t n_total, size_t K,
   if (mode_ == SHARED_DP) {
     num_groups_ = 1;
     obs_group_.assign(n_total_, 0);
-  } else { // SOURCE_DP, SOURCE_DP_SCALE, SOURCE_HDP, SOURCE_HDP_SCALE
+  } else { // SOURCE_* modes: group 0 = RWD, group 1 = RCT
     num_groups_ = 2;
     obs_group_.resize(n_total_);
     for (size_t i = 0; i < n_total_; ++i)
@@ -74,6 +74,15 @@ MixtureDP::MixtureDP(int mode, size_t n_total, size_t K,
 
 void MixtureDP::Update(const double* residuals, double sigma, Random& random) {
   if (mode_ == GAUSSIAN) return;
+
+  if (mode_ == SOURCE_GAUSSIAN) {
+    // Labels and the zero location never change; only sigma_g is updated.
+    for (int g = 0; g < num_groups_; ++g) {
+      if (group_indices_[g].empty()) continue;
+      updateSigmaGroup(g, residuals, random);
+    }
+    return;
+  }
 
   if (mode_ == SOURCE_HDP || mode_ == SOURCE_HDP_SCALE) {
     // Stage B: shared atoms theta_k* with per-source weights, sticks, and means.
@@ -122,7 +131,8 @@ void MixtureDP::Update(const double* residuals, double sigma, Random& random) {
 }
 
 double MixtureDP::sigma_pooled() const {
-  if (mode_ != SOURCE_DP_SCALE && mode_ != SOURCE_HDP_SCALE) {
+  if (mode_ != SOURCE_DP_SCALE && mode_ != SOURCE_HDP_SCALE &&
+      mode_ != SOURCE_GAUSSIAN) {
     return sigma_g_.empty() ? 1.0 : sigma_g_.front();
   }
   double ssq = 0.0;

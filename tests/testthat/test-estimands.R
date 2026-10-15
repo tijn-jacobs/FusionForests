@@ -173,8 +173,8 @@ test_that("fusion_estimand SD matches the closed form for a Gaussian fit", {
   sigma  <- fit$sigma * fit$meta$sigma_hat
   for (src in c("rwd", "rct")) {
     s_t  <- if (src == "rct") 1L else 0L
-    eta0 <- FusionForests:::.linear_predictor(comp, fit$meta, 0, s_t)
-    eta1 <- FusionForests:::.linear_predictor(comp, fit$meta, 1, s_t)
+    eta0 <- FusionForests:::.causal_linear_predictor(comp, fit$meta, 0, s_t)
+    eta1 <- FusionForests:::.causal_linear_predictor(comp, fit$meta, 1, s_t)
     surv0 <- 1 - pnorm((log(t_eval) - eta0) / sigma)
     surv1 <- 1 - pnorm((log(t_eval) - eta1) / sigma)
     sd <- fusion_estimand(fit, estimand = "SD", time = t_eval,
@@ -206,8 +206,8 @@ test_that("fusion_estimand SD uses the per-source scale of the target", {
   comp   <- FusionForests:::.log_scale_components(fit, fit$meta, "test")
   for (s_t in 0:1) {
     g     <- s_t + 1L                      # group 1 = RWD, group 2 = RCT
-    eta0  <- FusionForests:::.linear_predictor(comp, fit$meta, 0, s_t)
-    eta1  <- FusionForests:::.linear_predictor(comp, fit$meta, 1, s_t)
+    eta0  <- FusionForests:::.causal_linear_predictor(comp, fit$meta, 0, s_t)
+    eta1  <- FusionForests:::.causal_linear_predictor(comp, fit$meta, 1, s_t)
     pi_m  <- fit$dp_mix_prop[[g]]
     theta <- fit$dp_locations[[g]]
     sig   <- fit$dp_sigma_g[[g]]
@@ -272,4 +272,70 @@ test_that("fusion_estimand validates time and estimand", {
   expect_error(fusion_estimand(fit, estimand = "SD", time = -1),
                "single positive")
   expect_error(fusion_estimand(fit, estimand = "RMST", time = 1))
+})
+
+test_that("fusion_estimand SD uses the source scale under source_gaussian", {
+  fit <- FusionForest(
+    y                         = y_cnt,
+    X_train_control           = X_tr,
+    X_train_treat             = X_tr,
+    treatment_indicator_train = trt_tr,
+    source_indicator_train    = src_tr,
+    X_test_control            = X_te,
+    X_test_treat              = X_te,
+    treatment_indicator_test  = trt_te,
+    source_indicator_test     = src_te,
+    timescale                 = "log",
+    outcome_type              = "right-censored",
+    status                    = stat,
+    error_dist                = "source_gaussian",
+    store_posterior_sample    = TRUE,
+    N_post = N_post, N_burn = N_burn, verbose = FALSE
+  )
+  t_eval <- exp(median(y_cnt))
+  comp   <- FusionForests:::.log_scale_components(fit, fit$meta, "test")
+  for (s_t in 0:1) {
+    sig   <- fit$dp_sigma_g[[s_t + 1L]]
+    eta0  <- FusionForests:::.causal_linear_predictor(comp, fit$meta, 0, s_t)
+    eta1  <- FusionForests:::.causal_linear_predictor(comp, fit$meta, 1, s_t)
+    manual <- pnorm((log(t_eval) - eta0) / sig) -
+      pnorm((log(t_eval) - eta1) / sig)
+    sd <- fusion_estimand(fit, estimand = "SD", time = t_eval,
+                          target_source = if (s_t == 1L) "rct" else "rwd")
+    expect_equal(unclass(sd)[, ], manual, tolerance = 1e-10,
+                 ignore_attr = TRUE)
+  }
+})
+
+test_that("the causal predictor drops c(x) and keeps the untreated mean", {
+  for (coding in c("centered", "binary")) {
+    fit <- FusionForest(
+      y                         = y_cnt,
+      X_train_control           = X_tr,
+      X_train_treat             = X_tr,
+      treatment_indicator_train = trt_tr,
+      source_indicator_train    = src_tr,
+      X_test_control            = X_te,
+      X_test_treat              = X_te,
+      treatment_indicator_test  = trt_te,
+      source_indicator_test     = src_te,
+      treatment_coding          = coding,
+      store_posterior_sample    = TRUE,
+      N_post = N_post, N_burn = N_burn, verbose = FALSE
+    )
+    comp <- FusionForests:::.log_scale_components(fit, fit$meta, "test")
+    lp   <- FusionForests:::.linear_predictor
+    clp  <- FusionForests:::.causal_linear_predictor
+    for (s_t in 0:1) {
+      # The untreated arm is the observed untreated mean of the source.
+      expect_equal(clp(comp, fit$meta, 0, s_t), lp(comp, fit$meta, 0, s_t),
+                   info = coding)
+      # The treated arm adds tau only, without c.
+      expect_equal(clp(comp, fit$meta, 1, s_t) - clp(comp, fit$meta, 0, s_t),
+                   comp$tau, info = coding)
+    }
+    # In the RCT the causal and observed treated means coincide.
+    expect_equal(clp(comp, fit$meta, 1, 1L), lp(comp, fit$meta, 1, 1L),
+                 info = coding)
+  }
 })

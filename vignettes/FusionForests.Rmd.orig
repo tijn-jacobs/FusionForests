@@ -1,9 +1,9 @@
 ---
-title: "Fusing a randomised trial and an observational study"
+title: "Fusing a randomised trial and real-world data"
 author: "Tijn Jacobs"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Fusing a randomised trial and an observational study}
+  %\VignetteIndexEntry{Fusing a randomised trial and real-world data}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -25,28 +25,48 @@ knitr::opts_chunk$set(
 
 ## Introduction
 
-Randomised controlled trials (RCTs) estimate treatment effects without confounding.
-They are often small, follow patients for a short period and enrol a selected population.
-Observational studies (OS) are larger and broader.
-Their treatment assignment may depend on unmeasured factors.
-**FusionForests** combines the two sources.
-It estimates heterogeneous treatment effects on survival without assuming that the OS is unconfounded.
-The function arguments and help pages call the OS real-world data (RWD), as in `target_source = "rwd"`.
-This vignette uses OS throughout.
+We introduce the **FusionForests** package.
+It estimates heterogeneous treatment effects on survival from a randomised controlled trial (RCT) and real-world data (RWD) from an observational study.
+An RCT alone rarely suffices, because RCTs are often small.
+RWD are often more abundant but may suffer from unmeasured confounding.
+This confounding biases the estimated treatment effects.
+**FusionForests** combines both sources.
+The RCT protects the estimates against confounding, and the RWD contribute a larger sample.
+Jacobs, van der Pas and van Wieringen (2026) develop the methodology.
 
-The package implements the model of Jacobs, van der Pas and van Wieringen (2026).
-For a patient with covariates $x$, treatment $A$ and source $S$ (1 = RCT, 0 = OS), the log survival time follows an accelerated failure time model:
+For a patient with covariates $x$, treatment $A$ and source $S$ (1 = RCT, 0 = RWD), the log survival time follows an accelerated failure time model:
 $$
 \log T = m_0^{\mathrm{sh}}(x) + (1 - S)\, d(x) + A\, \tau(x) + (1 - S)\, A\, c(x) + \varepsilon .
 $$
-Each function receives its own Bayesian additive regression tree (BART) prior (Chipman et al., 2010).
-The shared baseline $m_0^{\mathrm{sh}}$ describes survival without treatment.
-The deviation $d$ allows the OS baseline to differ from the RCT baseline.
-The conditional average treatment effect (CATE) $\tau$ is common to both sources.
-The confounding function $c$ absorbs the bias of the treatment contrast in the OS.
-The error $\varepsilon$ follows a hierarchical Dirichlet process mixture with a scale per source.
-The RCT identifies $\tau$.
-The OS adds information on the baseline and the error distribution.
+The error $\varepsilon$ has mean zero.
+It follows a hierarchical Dirichlet process mixture with a scale per source.
+Each of the four functions receives its own Bayesian additive regression tree (BART) prior (Chipman et al., 2010).
+The four functions are contrasts of the conditional mean log survival time.
+We write this mean as follows:
+$$
+\mu(x, a, s) = \mathrm{E}[\log T \mid X = x, A = a, S = s].
+$$
+The shared baseline is the mean log survival time of untreated RCT patients:
+$$
+m_0^{\mathrm{sh}}(x) = \mu(x, 0, 1).
+$$
+The deviation is the difference between the RWD and RCT baselines:
+$$
+d(x) = \mu(x, 0, 0) - \mu(x, 0, 1).
+$$
+The conditional average treatment effect (CATE) is the causal effect on the log survival time:
+$$
+\tau(x) = \mathrm{E}[\log T(1) - \log T(0) \mid X = x] = \mu(x, 1, 1) - \mu(x, 0, 1),
+$$
+where $T(a)$ is the survival time under treatment $a$.
+The CATE is common to both sources.
+The confounding function is the bias of the treatment contrast in the RWD:
+$$
+c(x) = \mu(x, 1, 0) - \mu(x, 0, 0) - \tau(x).
+$$
+Jacobs, van der Pas and van Wieringen (2026) show that this decomposition holds and that $\tau$ and $c$ are identified.
+Their result requires standard assumptions on the causal structure and the censoring mechanism, randomisation in the RCT and transportability of the CATE across sources.
+The paper states these assumptions in full.
 
 We illustrate the package on a semi-synthetic data set.
 We describe the data, fit the model and summarise the posterior of the treatment effect, the confounding function and the error model.
@@ -54,16 +74,15 @@ The outcomes are simulated, so we can compare every estimate with the truth.
 
 ## Data
 
-The data set `breast_fusion` combines an RCT of 686 patients with an OS of 2,982 patients.
-The covariates are real.
-They come from the GBSG2 trial (Schumacher et al., 1994) and the Rotterdam tumour bank (Royston and Altman, 2013), as distributed with the **survival** package.
-The relapse-free survival times are simulated.
-The RCT treatment is randomised.
-The OS treatment is the real, non-random treatment assignment of the Rotterdam cohort.
+The data set `breast_fusion` combines an RCT of 686 patients with RWD on 2,982 patients.
+The covariates are derived from the GBSG2 trial (Schumacher et al., 1994) and the Rotterdam tumour bank (Royston and Altman, 2013).
+The datasets are distributed with the **survival** package.
+The relapse-free survival times are simulated, and the RCT treatment is randomised.
+The RWD treatment is the real, non-random treatment assignment of the Rotterdam cohort.
 This assignment depends in part on year of surgery and chemotherapy, which `breast_fusion` omits.
-The OS is subject to unmeasured confounding.
-The companion data set `breast_fusion_truth` holds the true CATE and the omitted confounders.
-The data describe no real treatment.
+The RWD are subject to unmeasured confounding.
+The companion data set `breast_fusion_truth` contains the true CATE and the omitted confounders.
+The data describe no real treatment or real clinical effect.
 
 ```{r data}
 library(FusionForests)
@@ -74,8 +93,8 @@ head(breast_fusion)
 table(source = breast_fusion$source, treated = breast_fusion$A)
 ```
 
-The covariate distributions differ between the sources.
-The RCT enrolled node-positive patients only, whereas the OS also includes node-negative patients.
+The distribution of the covariates differs between the sources.
+The RCT enrolled node-positive patients only, whereas the RWD also include node-negative patients.
 
 ```{r shift}
 round(sapply(split(breast_fusion[, x_names], breast_fusion$source),
@@ -83,25 +102,25 @@ round(sapply(split(breast_fusion[, x_names], breast_fusion$source),
 ```
 
 Figure 1 shows the Kaplan--Meier curves by source and arm.
-The RCT follows patients for a shorter period than the OS.
+The RCT follows patients for a shorter period than the RWD.
 
 ```{r km, fig.cap = "Figure 1: Kaplan--Meier curves of relapse-free survival by source and arm."}
 km   <- survfit(Surv(time, status) ~ source + A, data = breast_fusion)
-cols <- rep(c("#E69F00", "#0072B2"), 2)
+cols <- rep(c("#D55E00", "#0072B2"), 2)
 plot(km, col = cols, lty = c(1, 1, 2, 2), lwd = 2,
      xlab = "Years", ylab = "Relapse-free survival")
-legend("topright", c("RCT control", "RCT treated", "OS control", "OS treated"),
+legend("topright", c("RCT control", "RCT treated", "RWD control", "RWD treated"),
        col = cols, lty = c(1, 1, 2, 2), lwd = 2, bty = "n")
 ```
 
-## Model fit
+## Fitting the model
 
 `FusionForest()` takes covariate matrices, treatment and source indicators and the outcome.
 We supply log survival times with their event indicators.
 The test set determines where the posterior is evaluated.
 We pass all patients as the test set, so that we can later summarise either source.
 The argument `store_posterior_sample = TRUE` keeps the posterior draws that the summary functions need.
-We run 2,000 burn-in and 2,000 posterior iterations, against a default of 5,000 each.
+We run 5,000 burn-in and 5,000 posterior iterations, the package default.
 
 ```{r fit, cache = TRUE}
 X      <- as.matrix(breast_fusion[, x_names])
@@ -112,7 +131,7 @@ status <- breast_fusion$status
 is_rct <- S == 1
 is_os  <- S == 0
 
-set.seed(2026)
+set.seed(42)
 fit <- FusionForest(
   y = y, status = status,
   X_train_control = X, X_train_treat = X,
@@ -120,33 +139,55 @@ fit <- FusionForest(
   X_test_control = X, X_test_treat = X,
   treatment_indicator_test = A, source_indicator_test = S,
   outcome_type = "right-censored", timescale = "log",
-  N_post = 2000, N_burn = 2000,
+  N_post = 5000, N_burn = 5000,
   store_posterior_sample = TRUE, verbose = FALSE
 )
 fit
 ```
 
-The default settings follow the paper.
-The error model is the hierarchical Dirichlet process mixture with source-specific scales (`error_dist = "source_hdp_scale"`).
-The treatment indicator enters centred at one half (`treatment_coding = "centered"`), so that both arms inform $\tau$.
+The default error model follows the paper.
+It is the hierarchical Dirichlet process mixture with source-specific scales (`error_dist = "source_hdp_scale"`).
 The summary reports the residual scale, the spread of the individual CATEs and the acceptance ratios of the tree updates.
 
 ```{r summary}
 summary(fit)
 ```
 
+### Treatment coding
+
+The argument `treatment_coding` sets how the treatment indicator enters the model.
+A coded treatment $b$ replaces $A$ in front of $\tau$ and $c$:
+$$
+\log T = m_0^{\mathrm{sh}}(x) + (1 - S)\, d(x) + b\, \{\tau(x) + (1 - S)\, c(x)\} + \varepsilon .
+$$
+The package offers three codings.
+
+| `treatment_coding` | $b$ | $m_0^{\mathrm{sh}}$ and $d$ describe |
+|:---|:---|:---|
+| `"binary"` | $A$ | the untreated arm, as in the paper |
+| `"centered"` (default) | $A - 1/2$ | the average of the two arms |
+| `"adaptive"` | $A - \pi(x)$ | the average of the two arms, weighted by the propensity score $\pi(x)$ |
+
+The functions $\tau$ and $c$ keep their meaning under every coding.
+Under the binary coding, only treated patients inform $\tau$.
+Under the centred coding, both arms inform $\tau$.
+For this reason the centred coding is the default.
+The adaptive coding follows Hahn et al. (2020).
+It requires estimated propensity scores through `propensity_train` and `propensity_test`.
+`fusion_estimand()` accounts for the coding of the fit, so the estimands below have the same meaning under every coding.
+
 ### Single-source comparators
 
 We compare the fusion fit with two single-source analyses.
-`CausalShrinkageForest()`, re-exported from **ShrinkageTrees**, fits a causal forest to one source.
+`ShrinkageTrees::CausalShrinkageForest()`, from the **ShrinkageTrees** package, fits a causal forest to one source.
 We match its priors to those of `FusionForest()`.
-The RCT-only fit is unconfounded but uses 686 patients.
-The OS-only fit uses 2,982 patients but ignores the unmeasured confounding.
-It estimates $\tau + c$ rather than $\tau$.
+The RCT-only fit is unbiased but may have a large posterior variance.
+The RWD-only fit includes more patients, which lowers its posterior variance.
+Its treatment effects are biased by the unmeasured confounders.
 
 ```{r single, cache = TRUE}
 fit_single <- function(rows) {
-  CausalShrinkageForest(
+  ShrinkageTrees::CausalShrinkageForest(
     y = y[rows], status = status[rows],
     X_train_control = X[rows, ], X_train_treat = X[rows, ],
     treatment_indicator_train = A[rows],
@@ -157,11 +198,11 @@ fit_single <- function(rows) {
     local_hp_control = 1 / (2 * sqrt(200)),
     local_hp_treat = 0.5 / (2 * sqrt(100)),
     power_control = 2, power_treat = 3,
-    N_post = 2000, N_burn = 2000,
+    N_post = 5000, N_burn = 5000,
     store_posterior_sample = TRUE, verbose = FALSE
   )
 }
-set.seed(2026)
+set.seed(42)
 fit_rct <- fit_single(is_rct)
 fit_os  <- fit_single(is_os)
 ```
@@ -173,23 +214,20 @@ fit_os  <- fit_single(is_os)
 The acceleration factor $\exp\{\tau(x)\}$ multiplies the survival time of a patient with covariates $x$ under treatment.
 `fusion_estimand()` returns its posterior draws at each test row.
 With `population_average = TRUE` it averages over the test rows.
-The default weights follow the Bayesian bootstrap (Rubin, 1981), which propagates uncertainty about the covariate distribution.
+The average uses Bayesian-bootstrap weights (Rubin, 1981), which propagate uncertainty about the covariate distribution.
 Our test set contains all patients of both sources.
 
 ```{r af-union}
-af_union <- fusion_estimand(fit, "AF", population_average = TRUE, seed = 1)
+af_union <- fusion_estimand(fit, "AF", population_average = TRUE, seed = 42)
 quantile(af_union, c(0.025, 0.5, 0.975))
-mean(exp(breast_fusion_truth$tau))
 ```
 
-The second line gives the true average.
-A trace of the equally weighted average is a simple check of mixing (Figure 2).
+Figure 2 shows the distribution of the posterior mean CATE over the patients, on the log-time scale.
 
-```{r trace, fig.height = 3, fig.cap = "Figure 2: Trace of the average acceleration factor over the posterior iterations."}
-af_trace <- fusion_estimand(fit, "AF", population_average = TRUE,
-                            bayesian_bootstrap = FALSE)
-plot(af_trace, type = "l", col = "grey30",
-     xlab = "Iteration", ylab = "Average acceleration factor")
+```{r cate-hist, fig.height = 3, fig.cap = "Figure 2: Histogram of the posterior mean CATE of each patient on the log-time scale. The dashed line marks no effect."}
+hist(fit$test_predictions_treat, breaks = 40, col = "grey80",
+     border = "white", main = "", xlab = "Posterior mean CATE (log time)")
+abline(v = 0, lty = 2)
 ```
 
 We target a single source by averaging the draws over the test rows of that source.
@@ -198,7 +236,7 @@ We do so for the fusion fit and both comparators.
 ```{r af-sources}
 af_draws <- list(
   "RCT only"     = exp(fit_rct$test_predictions_sample_treat),
-  "OS only"      = exp(fit_os$test_predictions_sample_treat),
+  "RWD only"     = exp(fit_os$test_predictions_sample_treat),
   "FusionForest" = fusion_estimand(fit, "AF")
 )
 summarise_af <- function(rows) {
@@ -207,9 +245,9 @@ summarise_af <- function(rows) {
     c(mean = mean(v), quantile(v, c(0.025, 0.975)))
   }))
 }
-af_tab  <- list(RCT = summarise_af(is_rct), OS = summarise_af(is_os))
+af_tab  <- list(RCT = summarise_af(is_rct), RWD = summarise_af(is_os))
 af_true <- c(RCT = mean(exp(breast_fusion_truth$tau[is_rct])),
-             OS  = mean(exp(breast_fusion_truth$tau[is_os])))
+             RWD = mean(exp(breast_fusion_truth$tau[is_os])))
 lapply(af_tab, round, 3)
 round(af_true, 3)
 ```
@@ -230,21 +268,54 @@ par(op)
 
 ```{r widths, include = FALSE}
 width <- function(tb) tb[, "97.5%"] - tb[, "2.5%"]
-ratio_os <- width(af_tab$OS)["FusionForest"] / width(af_tab$OS)["RCT only"]
+ratio_os <- width(af_tab$RWD)["FusionForest"] / width(af_tab$RWD)["RCT only"]
 ```
 
 Figure 3 compares the three analyses.
-In the OS population, the interval of the fusion fit is `r round(ratio_os, 2)` times as wide as the RCT-only interval.
+In the RWD population, the interval of the fusion fit is `r round(ratio_os, 2)` times as wide as the RCT-only interval.
+
+Table 1 evaluates the individual CATEs on the log-time scale.
+Bias and root mean squared error (RMSE) compare the posterior mean with the true CATE.
+The posterior variance is averaged over patients.
+Coverage is the proportion of patients whose 95% credible interval contains the true CATE.
+
+```{r cate-metrics}
+tau_draws <- lapply(af_draws, log)
+tau_true  <- breast_fusion_truth$tau
+
+cate_metrics <- function(d, rows) {
+  d   <- d[, rows]
+  est <- colMeans(d)
+  lo  <- apply(d, 2, quantile, 0.025)
+  hi  <- apply(d, 2, quantile, 0.975)
+  err <- est - tau_true[rows]
+  c(bias     = mean(err),
+    rmse     = sqrt(mean(err^2)),
+    post_var = mean(apply(d, 2, var)),
+    coverage = mean(lo <= tau_true[rows] & tau_true[rows] <= hi))
+}
+
+populations <- list(RCT = is_rct, RWD = is_os)
+cate_tab <- do.call(rbind, lapply(names(populations), function(p)
+  data.frame(population = p, analysis = names(tau_draws),
+             t(sapply(tau_draws, cate_metrics, rows = populations[[p]])),
+             row.names = NULL)))
+
+knitr::kable(cate_tab, digits = 3,
+             col.names = c("Population", "Analysis", "Bias", "RMSE",
+                           "Posterior variance", "Coverage"),
+             caption = "Table 1: Accuracy of the individual CATE estimates.")
+```
 
 ### Survival difference
 
 The survival difference $S_1(t \mid x) - S_0(t \mid x)$ compares the survival probabilities at time $t$ under treatment and control.
 It depends on the baseline and the error distribution as well as on $\tau$.
 `fusion_estimand()` evaluates it in closed form at a time `time`, measured on the original time scale.
-The argument `target_source` selects the baseline and error distribution of the RCT or the OS.
+The argument `target_source` selects the baseline and error distribution of the RCT or the RWD.
 We compute the difference in the RCT population over the first seven years (Figure 4).
 
-```{r sd, cache = TRUE}
+```{r sd, cache = TRUE, dependson = "fit"}
 times  <- seq(0.5, 7, by = 0.5)
 sd_rct <- sapply(times, function(t) {
   d <- fusion_estimand(fit, "SD", time = t, target_source = "rct")
@@ -272,10 +343,10 @@ Tree ensembles shrink extreme effects towards the average, which flattens the po
 ```{r cate, fig.height = 4.5, fig.cap = "Figure 5: Posterior mean CATE against the true CATE. The dashed line is the identity."}
 tau_hat <- fit$test_predictions_treat
 plot(breast_fusion_truth$tau, tau_hat, pch = 16, cex = 0.4,
-     col = ifelse(is_rct, "#0072B2", "#E69F00"),
+     col = ifelse(is_rct, "#0072B2", "#D55E00"),
      xlab = "True CATE (log time)", ylab = "Posterior mean CATE (log time)")
 abline(0, 1, lty = 2)
-legend("topleft", c("RCT", "OS"), col = c("#0072B2", "#E69F00"),
+legend("topleft", c("RCT", "RWD"), col = c("#0072B2", "#D55E00"),
        pch = 16, bty = "n")
 ```
 
@@ -290,7 +361,7 @@ In the simulation the CATE depends on the progesterone receptor and grade only.
 ```{r projection}
 basis <- ~ age + meno + size + grade + log1p(nodes) + log1p(pgr) + log1p(er)
 proj  <- fusion_projection(fit, basis = basis, X_eval = as.data.frame(X),
-                           weights = "bayesian_bootstrap", seed = 1)
+                           weights = "bayesian_bootstrap", seed = 42)
 
 truth_df  <- cbind(as.data.frame(X), tau = breast_fusion_truth$tau)
 proj_true <- coef(lm(update(basis, tau ~ .), data = truth_df))
@@ -303,12 +374,12 @@ round(cbind(proj_tab, truth = proj_true), 3)
 
 ## Confounding and baseline deviation
 
-The forests for $c$ and $d$ describe how the OS differs from the RCT.
-A non-zero $c(x)$ signals that the treatment contrast in the OS is biased at $x$.
-A non-zero $d(x)$ signals that the OS baseline differs from the RCT baseline.
-Figure 6 shows the posterior means for the OS patients.
+The forests for $c$ and $d$ describe how the RWD differ from the RCT.
+A non-zero $c(x)$ signals that the treatment contrast in the RWD is biased at $x$.
+A non-zero $d(x)$ signals that the RWD baseline differs from the RCT baseline.
+Figure 6 shows the posterior means for the RWD patients.
 
-```{r components, fig.height = 3, fig.cap = "Figure 6: Posterior means of the confounding function (left) and the baseline deviation (right) for the OS patients."}
+```{r components, fig.height = 3, fig.cap = "Figure 6: Posterior means of the confounding function (left) and the baseline deviation (right) for the RWD patients."}
 c_hat <- fit$test_predictions_deconf[is_os]
 d_hat <- fit$test_predictions_deviation[is_os]
 op <- par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))
@@ -325,35 +396,78 @@ par(op)
 gap <- mean(fit_os$test_predictions_treat[is_os]) - mean(tau_hat[is_os])
 ```
 
-The average posterior mean of $c$ over the OS patients is `r round(mean(c_hat), 3)`.
-For comparison, the average CATE over the OS patients differs by `r round(gap, 3)` between the OS-only fit and the fusion fit.
+The average posterior mean of $c$ over the RWD patients is `r round(mean(c_hat), 3)`.
+For comparison, the average CATE over the RWD patients differs by `r round(gap, 3)` between the RWD-only fit and the fusion fit.
 
 ## Error distribution
 
+The argument `error_dist` selects the distribution of the error $\varepsilon$.
+The four main options range from a single normal distribution to the nonparametric model of the paper.
+
+| `error_dist` | Error model |
+|:---|:---|
+| `"gaussian"` | One normal distribution, $\varepsilon \sim N(0, \sigma^2)$, for both sources. |
+| `"source_gaussian"` | One normal distribution per source, $\varepsilon \sim N(0, \sigma_s^2)$. |
+| `"shared_dp"` | One Dirichlet process mixture of normals for both sources (Henderson et al., 2020). |
+| `"source_hdp_scale"` (default) | A hierarchical Dirichlet process mixture of normals. The sources share the mixture components but have their own weights and scales $\sigma_s$. |
+
+The normal models are fast and suit errors with a symmetric, unimodal shape.
+The mixture models adapt to skewed or multimodal errors.
+The default also lets the shape and the spread of the error differ between the sources.
+`fusion_estimand()` uses the fitted error distribution for the survival difference.
+The acceleration factor does not depend on it.
+
 The default error model gives each source its own scale $\sigma_s$.
-The fit stores their posterior draws in `fit$dp_sigma_g`, with the OS first and the RCT second.
+The fit stores their posterior draws in `fit$dp_sigma_g`, with the RWD first and the RCT second.
 
 ```{r sigma}
 sigma_s <- sapply(fit$dp_sigma_g, quantile, c(0.025, 0.5, 0.975))
-colnames(sigma_s) <- c("OS", "RCT")
+colnames(sigma_s) <- c("RWD", "RCT")
 round(sigma_s, 3)
 ```
 
-## Further options
+## Interval censoring and other outcome types
 
-`FusionForest()` supports several variations of the analysis above.
-Each row of the table gives one change and the arguments that make it.
+The analysis above uses right-censored event times.
+`FusionForest()` also handles interval-censored event times and uncensored continuous outcomes.
 
-| To | Set |
-|:---|:---|
-| Fit an uncensored continuous outcome. | `outcome_type = "continuous"` |
-| Fit interval-censored event times. | `observed_left_time`, `observed_right_time` and `interval_censoring_indicator` |
-| Change the error model. | `error_dist` to a Gaussian, Dirichlet process or hierarchical Dirichlet process model |
-| Change the treatment coding. | `treatment_coding`; for the propensity-adjusted coding also `propensity_train` and `propensity_test` |
-| Pool the two baselines fully ($d = 0$). | `k_deviation = 0` |
-| Change the size or regularisation of a forest. | `number_of_trees_*`, `k_*`, `power_*` and `base_*` |
+### Interval censoring
 
-The package re-exports the single-source models of **ShrinkageTrees**: `ShrinkageTrees()`, `HorseTrees()`, `CausalShrinkageForest()`, `CausalHorseForest()`, `SurvivalBART()`, `SurvivalDART()`, `SurvivalBCF()` and `SurvivalShrinkageBCF()`.
+Interval censoring arises when an event is known to occur only between two visits.
+Three arguments describe such data: `observed_left_time`, `observed_right_time` and `interval_censoring_indicator`.
+The outcome type remains `"right-censored"`.
+Each patient falls into one of three cases.
+
+| `status` | `interval_censoring_indicator` | Observation |
+|:---|:---|:---|
+| 1 | 0 | Event at `y`. |
+| 0 | 0 | Right-censored at `observed_right_time`. |
+| 0 | 1 | Event in the interval from `observed_left_time` to `observed_right_time`. |
+
+The bounds use the same scale as `y`.
+At every iteration the sampler draws the unknown event times within their intervals.
+A call takes the following form, with `left`, `right` and `ic` holding the bounds and indicators:
+
+```{r interval, eval = FALSE}
+fit_ic <- FusionForest(
+  y = y, status = status,
+  observed_left_time = left, observed_right_time = right,
+  interval_censoring_indicator = ic,
+  X_train_control = X, X_train_treat = X,
+  treatment_indicator_train = A, source_indicator_train = S,
+  outcome_type = "right-censored", timescale = "log"
+)
+```
+
+The estimands and projections of the previous sections apply unchanged.
+
+### Continuous outcomes
+
+The argument `outcome_type = "continuous"` fits an uncensored continuous outcome.
+The outcome then replaces $\log T$ in the model, and `status` is not used.
+The CATE $\tau$ is then the treatment effect on the outcome scale.
+The survival difference and the acceleration factor have no meaning for such outcomes.
+`fusion_projection()` with `target = "cate"` and the posterior draws of $\tau$ remain available.
 
 ## References
 
@@ -361,9 +475,18 @@ Chipman, H. A., George, E. I. and McCulloch, R. E. (2010).
 BART: Bayesian additive regression trees.
 *The Annals of Applied Statistics*, 4, 266--298.
 
+Hahn, P. R., Murray, J. S. and Carvalho, C. M. (2020).
+Bayesian regression tree models for causal inference: regularization, confounding, and heterogeneous effects.
+*Bayesian Analysis*, 15, 965--1056.
+
+Henderson, N. C., Louis, T. A., Rosner, G. L. and Varadhan, R. (2020).
+Individualized treatment effects with censored data via fully nonparametric Bayesian accelerated failure time models.
+*Biostatistics*, 21, 50--68.
+
 Jacobs, T., van der Pas, S. L. and van Wieringen, W. N. (2026).
 Bayesian fusion forests for heterogeneous treatment effects on survival from randomised and real-world data.
-Manuscript.
+*arXiv preprint* arXiv:2607.29295.
+<https://arxiv.org/abs/2607.29295>
 
 Royston, P. and Altman, D. G. (2013).
 External validation of a Cox prognostic model: principles and methods.

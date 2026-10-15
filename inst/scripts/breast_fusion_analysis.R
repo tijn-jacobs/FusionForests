@@ -2,20 +2,20 @@
 # Data-fusion analysis of breast_fusion, written as a real application.
 #
 # Question: what is the effect of treatment A on relapse-free survival in
-# the observational (OS) population?  The RCT is unconfounded but small and
-# has short follow-up; the OS is large but its treatment assignment is
+# the real-world (RWD) population?  The RCT is unconfounded but small and
+# has short follow-up; the RWD are large but their treatment assignment is
 # confounded.  FusionForest combines both.
 #
 # breast_fusion_truth is NOT used here: a real analysis would not have it.
 #
 # Steps
 #   1. Describe the two sources: sizes, covariate shift, follow-up, KM.
-#   2. Overlap: OS propensity score and source-membership score.
-#   3. RCT-only analysis with CausalShrinkageForest, transported to the OS.
-#   4. FusionForest on both sources, evaluated on the OS covariates.
+#   2. Overlap: RWD propensity score and source-membership score.
+#   3. RCT-only analysis with CausalShrinkageForest, transported to the RWD.
+#   4. FusionForest on both sources, evaluated on the RWD covariates.
 #   5. Estimands: acceleration factor and survival differences.
 #   6. Effect modification: CATE plots and posterior linear projection.
-#   7. Confounding function in the OS.
+#   7. Confounding function in the RWD.
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -54,7 +54,7 @@ print(round(cbind(
 
 grp <- factor(paste(d$source, ifelse(d$A == 1, "treated", "control")),
               levels = c("RCT control", "RCT treated",
-                         "OS control", "OS treated"))
+                         "RWD control", "RWD treated"))
 km      <- survfit(Surv(time, status) ~ grp, data = d)
 km_cols <- c("steelblue", "navy", "tomato", "firebrick")
 
@@ -68,13 +68,13 @@ par(op)
 
 
 # ---- 2. Overlap --------------------------------------------------------------
-# OS propensity score: who gets treated outside the trial?
+# RWD propensity score: who gets treated outside the trial?
 form_x <- ~ age + meno + size + grade + log1p(nodes) + log1p(pgr) +
   log1p(er)
 ps_fit <- glm(update(form_x, A ~ .), family = binomial, data = d[is_os, ])
 ps_os  <- fitted(ps_fit)
 
-cat("\n---- OS propensity model ----\n")
+cat("\n---- RWD propensity model ----\n")
 print(round(summary(ps_fit)$coefficients, 3))
 
 # Source-membership score: how RCT-like is each patient?
@@ -85,7 +85,7 @@ op <- par(mfrow = c(1, 2), mar = c(4, 4, 2, 1) + 0.1)
 brk <- seq(0, 1, by = 0.025)
 hist(ps_os[d$A[is_os] == 0], breaks = brk, freq = FALSE,
      col = adjustcolor("tomato", 0.5), border = NA,
-     xlab = "P(treated | x)", main = "OS propensity score")
+     xlab = "P(treated | x)", main = "RWD propensity score")
 hist(ps_os[d$A[is_os] == 1], breaks = brk, freq = FALSE,
      col = adjustcolor("firebrick", 0.5), border = NA, add = TRUE)
 legend("topright", c("control", "treated"), bty = "n",
@@ -95,14 +95,14 @@ hist(p_rct[is_os], breaks = brk, freq = FALSE,
      xlab = "P(RCT | x)", main = "Source membership")
 hist(p_rct[is_rct], breaks = brk, freq = FALSE,
      col = adjustcolor("navy", 0.5), border = NA, add = TRUE)
-legend("topright", c("OS", "RCT"), bty = "n",
+legend("topright", c("RWD", "RCT"), bty = "n",
        fill = adjustcolor(c("tomato", "navy"), 0.5), border = NA)
 par(op)
 
 
 # ---- 3. RCT-only analysis --------------------------------------------------
 # Unconfounded, but uses only 686 patients and transports the CATE to the
-# OS covariates by extrapolation.
+# RWD covariates by extrapolation.
 X_all <- as.matrix(d[, x_names])
 X_rct <- X_all[is_rct, , drop = FALSE]
 X_os  <- X_all[is_os,  , drop = FALSE]
@@ -131,12 +131,12 @@ fit_rct <- CausalShrinkageForest(
   store_posterior_sample    = TRUE,
   verbose                   = FALSE
 )
-cate_rct_os <- fit_rct$test_predictions_treat   # log-time scale, OS rows
+cate_rct_os <- fit_rct$test_predictions_treat   # log-time scale, RWD rows
 
 
 # ---- 4. FusionForest -------------------------------------------------------
-# Trained on both sources; the test set is the OS population, so the
-# estimands below target the OS.
+# Trained on both sources; the test set is the RWD population, so the
+# estimands below target the RWD.
 set.seed(seed)
 t0  <- proc.time()[["elapsed"]]
 fit <- FusionForest(
@@ -165,7 +165,7 @@ print(fit)
 summary(fit)
 
 
-# ---- 5. Estimands in the OS population ------------------------------------
+# ---- 5. Estimands in the RWD population -----------------------------------
 psum <- function(v) {
   ci <- quantile(v, c(0.025, 0.975), names = FALSE)
   c(mean = mean(v), lo = ci[1], hi = ci[2])
@@ -184,11 +184,11 @@ est_tab <- rbind(
 )
 rownames(est_tab) <- c("Acceleration factor",
                        sprintf("Survival difference, %g y", sd_times))
-cat("\n---- Population-averaged estimands, OS (mean [95% CI]) ----\n")
+cat("\n---- Population-averaged estimands, RWD (mean [95% CI]) ----\n")
 print(round(est_tab, 3))
 
-# Comparison: average AF from the RCT-only fit, transported to the OS.
-cat(sprintf("\nRCT-only average AF in the OS: %.3f\n",
+# Comparison: average AF from the RCT-only fit, transported to the RWD.
+cat(sprintf("\nRCT-only average AF in the RWD: %.3f\n",
             mean(exp(cate_rct_os))))
 
 
@@ -203,8 +203,8 @@ ord <- order(af_mean)
 op  <- par(mar = c(4, 4, 2, 1) + 0.1)
 plot(seq_len(n_os), af_mean[ord], type = "n", log = "y",
      ylim = range(af_lo, af_hi),
-     xlab = "OS patients (ordered)", ylab = "Acceleration factor",
-     main = "Individual acceleration factors, OS")
+     xlab = "RWD patients (ordered)", ylab = "Acceleration factor",
+     main = "Individual acceleration factors, RWD")
 segments(seq_len(n_os), af_lo[ord], seq_len(n_os), af_hi[ord],
          col = adjustcolor("grey50", 0.3))
 points(seq_len(n_os), af_mean[ord], pch = 19, cex = 0.3)
@@ -242,15 +242,15 @@ cat("\n---- Posterior projection of the CATE (log-time scale) ----\n")
 print(round(t(apply(proj, 2, psum)), 3))
 
 
-# ---- 7. Confounding in the OS ----------------------------------------------
-# c(x): the bias of the naive OS treatment contrast on the log-time scale.
+# ---- 7. Confounding in the RWD ---------------------------------------------
+# c(x): the bias of the naive RWD treatment contrast on the log-time scale.
 c_os <- fit$test_predictions_deconf
-cat("\n---- Estimated confounding function c(x), OS ----\n")
+cat("\n---- Estimated confounding function c(x), RWD ----\n")
 print(round(summary(c_os), 3))
 
 op <- par(mar = c(4, 4, 2, 1) + 0.1)
 hist(c_os, breaks = 40, col = "grey80", border = "white",
-     xlab = "Posterior mean c(x)", main = "Confounding function, OS")
+     xlab = "Posterior mean c(x)", main = "Confounding function, RWD")
 abline(v = 0, lty = 2)
 par(op)
 

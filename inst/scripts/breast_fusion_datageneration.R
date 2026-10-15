@@ -3,11 +3,11 @@
 #
 # Real ingredients (from the survival package):
 #   - covariates          : GBSG2 trial (gbsg, RCT) and Rotterdam tumour bank
-#                           (rotterdam, OS), harmonised to a common set
-#   - OS treatment        : the real (non-random) hormon assignment in
+#                           (rotterdam, RWD), harmonised to a common set
+#   - RWD treatment       : the real (non-random) hormon assignment in
 #                           Rotterdam, relabelled as a generic treatment A
 #   - hidden confounders  : year of surgery and chemotherapy (Rotterdam only),
-#                           which drive the real OS treatment assignment and
+#                           which drive the real RWD treatment assignment and
 #                           are left out of breast_fusion
 #   - baseline + error    : coefficients and scale of a Weibull AFT fitted
 #                           to the GBSG2 relapse-free survival data
@@ -164,9 +164,9 @@ cat("Reference AFT (real GBSG2): beta_A = ", round(beta_A, 3),
 # ---- 4. Assemble the shipped data sets -------------------------------------
 # Rows are aligned: breast_fusion_truth[i, ] belongs to breast_fusion[i, ],
 # and both carry the same id.
-source_lab <- factor(rep(c("RCT", "OS"),
+source_lab <- factor(rep(c("RCT", "RWD"),
                          c(nrow(sim_rct$data), nrow(sim_os$data))),
-                     levels = c("RCT", "OS"))
+                     levels = c("RCT", "RWD"))
 sim_data   <- rbind(sim_rct$data, sim_os$data)
 sim_truth  <- rbind(sim_rct$truth, sim_os$truth)
 n_total    <- nrow(sim_data)

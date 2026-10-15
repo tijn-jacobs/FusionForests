@@ -8,13 +8,13 @@
 A data frame with 3668 rows and 6 columns:
 \describe{
 \item{id}{Row identifier, matching \code{breast_fusion$id}.}
-\item{source}{Factor, \code{"RCT"} or \code{"OS"}.}
+\item{source}{Factor, \code{"RCT"} or \code{"RWD"}.}
 \item{tau}{True conditional average treatment effect on the log-time
 scale; \code{exp(tau)} is the acceleration factor.}
 \item{logT}{Uncensored log event time (log years).}
 \item{chemo}{Chemotherapy (1 = yes, 0 = no); unobserved confounder.
 All RCT rows are 1.}
-\item{year}{Year of surgery; unobserved confounder.  Real for the OS
+\item{year}{Year of surgery; unobserved confounder.  Real for the RWD
 rows, drawn uniformly from 1984--1989 for the RCT rows.}
 }
 }

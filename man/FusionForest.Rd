@@ -47,8 +47,8 @@ FusionForest(
   treatment_coding = c("centered", "binary", "adaptive"),
   propensity_train = NULL,
   propensity_test = NULL,
-  error_dist = c("source_hdp_scale", "gaussian", "shared_dp", "source_dp",
-    "source_dp_scale", "source_hdp"),
+  error_dist = c("source_hdp_scale", "gaussian", "source_gaussian", "shared_dp",
+    "source_dp", "source_dp_scale", "source_hdp"),
   error_truncation_K = 50L,
   error_atom_scale = 0.5,
   error_mass_init = 1,
@@ -155,6 +155,8 @@ the training and test rows.  Only used with
 centred, so the error has mean zero in each source.  One of:
 \describe{
 \item{\code{"gaussian"}}{Normal errors with one scale \eqn{\sigma}.}
+\item{\code{"source_gaussian"}}{Normal errors with a separate scale
+\eqn{\sigma_s} per source.}
 \item{\code{"shared_dp"}}{One Dirichlet process mixture of normals
 for both sources (Henderson et al., 2020).}
 \item{\code{"source_dp"}}{A separate Dirichlet process mixture per
@@ -200,14 +202,16 @@ of \eqn{c(X)}.  The training values cover the RWD rows only.}
 \item{train_predictions_deviation, test_predictions_deviation}{Posterior
 mean of \eqn{d(X)}.  The training values cover the RWD rows only.}
 \item{sigma}{Posterior draws of \eqn{\sigma} on the standardised scale.
-For the \code{"_scale"} error models this is a pooled scale.}
+For the error models with a scale per source, this is a pooled
+scale.  The per-source scales are in \code{dp_sigma_g}.}
 \item{acceptance_ratio_control, acceptance_ratio_treat,
 acceptance_ratio_deconf, acceptance_ratio_deviation}{Acceptance
 rates of the tree proposals.}
 \item{train_predictions_sample_control, ...}{All posterior draws.  Only
 with \code{store_posterior_sample = TRUE}.}
-\item{dp_mix_prop, dp_locations, ...}{Posterior draws of the error
-mixture.  Only for the mixture error models.}
+\item{dp_mix_prop, dp_locations, dp_sigma_g, ...}{Posterior draws of
+the error distribution.  Only for error models other than
+\code{"gaussian"}.}
 \item{meta}{Settings used by the summary functions.}
 }
 }

@@ -143,8 +143,9 @@ Rcpp::List FusionForest_cpp(
 
   // Residual mixture configuration (MixtureDP):
   //   mixture_mode: 0 = gaussian, 1 = shared_dp, 2 = source_dp,
-  //                 3 = source_dp_scale, 4 = source_hdp, 5 = source_hdp_scale
-  //                 (the error_dist options of the R wrapper)
+  //                 3 = source_dp_scale, 4 = source_hdp, 5 = source_hdp_scale,
+  //                 6 = source_gaussian (the error_dist options of the R
+  //                 wrapper; the wrapper passes mixture_K = 1 for mode 6)
   //   mixture_K   : truncation level (number of stick-breaking components)
   //   mixture_prior_atom_variance: prior variance of each atom, N(0, .)
   //   mixture_mass_init: starting value of the concentration parameter
@@ -299,7 +300,9 @@ Rcpp::List FusionForest_cpp(
   const bool dp_active     = mixture.active();
   const int  dp_groups     = mixture.num_groups();
   const bool dp_hdp_scale_mode = (mixture_mode == MixtureDP::SOURCE_HDP_SCALE);
-  const bool dp_scale_mode = (mixture_mode == MixtureDP::SOURCE_DP_SCALE) || dp_hdp_scale_mode;
+  const bool dp_scale_mode = (mixture_mode == MixtureDP::SOURCE_DP_SCALE) ||
+                             (mixture_mode == MixtureDP::SOURCE_GAUSSIAN) ||
+                             dp_hdp_scale_mode;
   const bool dp_hdp_mode   = (mixture_mode == MixtureDP::SOURCE_HDP) || dp_hdp_scale_mode;
 
   Rcpp::List dp_mix_prop_list (dp_active ? dp_groups : 0);

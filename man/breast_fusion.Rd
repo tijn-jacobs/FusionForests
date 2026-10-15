@@ -3,13 +3,13 @@
 \docType{data}
 \name{breast_fusion}
 \alias{breast_fusion}
-\title{Semi-synthetic RCT and observational study for data fusion}
+\title{Semi-synthetic RCT and real-world data for data fusion}
 \format{
-A data frame with 3668 rows (686 RCT, 2982 OS) and 13 columns:
+A data frame with 3668 rows (686 RCT, 2982 RWD) and 13 columns:
 \describe{
 \item{id}{Row identifier, matching \code{breast_fusion_truth$id}.}
-\item{source}{Factor, \code{"RCT"} or \code{"OS"}.}
-\item{S}{Source indicator (1 = RCT, 0 = OS), as used by
+\item{source}{Factor, \code{"RCT"} or \code{"RWD"}.}
+\item{S}{Source indicator (1 = RCT, 0 = RWD), as used by
 \code{FusionForest}.}
 \item{A}{Treatment indicator (1 = treated, 0 = control).}
 \item{time}{Observed relapse-free time in years.}
@@ -32,8 +32,8 @@ Covariates from the \pkg{survival} package data sets
 breast_fusion
 }
 \description{
-A combined data set of a randomised controlled trial (RCT) and an
-observational study (OS) with a right-censored time-to-event outcome,
+A combined data set of a randomised controlled trial (RCT) and a
+real-world data (RWD) source with a right-censored time-to-event outcome,
 built to illustrate \code{\link{FusionForest}}.  The covariates are real;
 the outcomes are simulated.  The data say nothing about any real
 treatment.
@@ -41,9 +41,9 @@ treatment.
 \details{
 The covariates come from the German Breast Cancer Study Group 2 trial
 (\code{\link[survival]{gbsg}}; the RCT rows) and the Rotterdam tumour bank
-(\code{\link[survival]{rotterdam}}; the OS rows), harmonised to a common
+(\code{\link[survival]{rotterdam}}; the RWD rows), harmonised to a common
 set.  The treatment \code{A} is a generic binary treatment.  In the RCT it
-is randomised with probability 1/2.  In the OS it is the real, non-random
+is randomised with probability 1/2.  In the RWD it is the real, non-random
 treatment assignment of the Rotterdam cohort, so it is confounded.  Part
 of that confounding acts through variables that are not included here
 (year of surgery and chemotherapy; see \code{\link{breast_fusion_truth}}).
@@ -53,7 +53,7 @@ baseline coefficients and scale were estimated from the real GBSG2
 outcomes.  The heterogeneous treatment effect and the effects of the
 unobserved variables are made up.  Censoring times are drawn from each
 source's real censoring distribution, so follow-up in the RCT is shorter
-than in the OS.  The script that builds the data and an example analysis
+than in the RWD.  The script that builds the data and an example analysis
 are installed with the package, in
 \code{system.file("scripts", package = "FusionForests")}.
 }

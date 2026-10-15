@@ -334,8 +334,8 @@ test_that("FusionForest validates its inputs", {
 })
 
 test_that("FusionForest runs under every error distribution", {
-  for (ed in c("gaussian", "shared_dp", "source_dp", "source_dp_scale",
-               "source_hdp", "source_hdp_scale")) {
+  for (ed in c("gaussian", "source_gaussian", "shared_dp", "source_dp",
+               "source_dp_scale", "source_hdp", "source_hdp_scale")) {
     fit <- FusionForest(
       y                         = y_srv,
       status                    = stat,
@@ -352,7 +352,7 @@ test_that("FusionForest runs under every error distribution", {
     expect_identical(fit$meta$error_dist, ed)
     if (ed != "gaussian")
       expect_false(is.null(fit$dp_mix_prop), info = ed)
-    if (ed %in% c("source_dp_scale", "source_hdp_scale"))
+    if (ed %in% c("source_gaussian", "source_dp_scale", "source_hdp_scale"))
       expect_length(fit$dp_sigma_g, 2L)
   }
 })
@@ -368,4 +368,31 @@ test_that("k_deviation = 0 switches off the deviation forest", {
     N_post = N_post, N_burn = N_burn, verbose = FALSE
   )
   expect_true(all(abs(fit$train_predictions_deviation) < 1e-6))
+})
+
+test_that("source_gaussian estimates a separate error scale per source", {
+  set.seed(2)
+  n_s  <- 150
+  X_s  <- matrix(rnorm(2 * n_s * 2), 2 * n_s, 2)
+  a_s  <- rbinom(2 * n_s, 1, 0.5)
+  s_s  <- rep(c(1L, 0L), each = n_s)
+  y_s  <- X_s[, 1] + 0.5 * a_s + rnorm(2 * n_s, sd = ifelse(s_s == 1, 0.3, 1.5))
+  fit <- FusionForest(
+    y                         = y_s,
+    X_train_control           = X_s,
+    X_train_treat             = X_s,
+    treatment_indicator_train = a_s,
+    source_indicator_train    = s_s,
+    error_dist                = "source_gaussian",
+    N_post = 100L, N_burn = 100L, verbose = FALSE
+  )
+  # One component with weight 1 at location 0 in each source.
+  expect_equal(ncol(fit$dp_mix_prop[[1]]), 1L)
+  expect_true(all(fit$dp_mix_prop[[1]] == 1 & fit$dp_mix_prop[[2]] == 1))
+  expect_true(all(fit$dp_locations[[1]] == 0 & fit$dp_locations[[2]] == 0))
+  # Group 1 = RWD (sd 1.5), group 2 = RCT (sd 0.3).
+  sd_rwd <- mean(fit$dp_sigma_g[[1]])
+  sd_rct <- mean(fit$dp_sigma_g[[2]])
+  expect_gt(sd_rwd, 1.0)
+  expect_lt(sd_rct, 0.6)
 })

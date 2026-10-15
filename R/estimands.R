@@ -9,11 +9,17 @@
 #' \deqn{S_a(t \mid x, s_t) = 1 - F_{s_t}\{\log t - \eta_a(x, s_t)\},}{
 #'   S_a(t | x, s_t) = 1 - F_{s_t}(log t - eta_a(x, s_t)),}
 #' with \eqn{F_{s_t}} the error distribution in source \eqn{s_t} and
-#' \deqn{\eta_a(x, s_t) = m_0^{\mathrm{sh}}(x) + (1 - s_t)\,d(x) +
-#'   a\,\tau(x) + (1 - s_t)\,a\,c(x).}{eta_a(x, s_t) = m_0^sh(x) +
-#'   (1 - s_t) d(x) + a tau(x) + (1 - s_t) a c(x).}
-#' For fits with the \code{"centered"} or \code{"adaptive"} treatment
-#' coding, the function uses the coded treatment instead of \eqn{a}.
+#' \deqn{\eta_a(x, s_t) = m_0(x, s_t) + a\,\tau(x).}{eta_a(x, s_t) =
+#'   m_0(x, s_t) + a tau(x).}
+#' The baseline \eqn{m_0(x, s_t)} is the mean log survival time of
+#' untreated patients in source \eqn{s_t}.  Under the binary coding it
+#' equals \eqn{m_0^{\mathrm{sh}}(x) + (1 - s_t)\,d(x)}{m_0^sh(x) +
+#' (1 - s_t) d(x)}; for the \code{"centered"} and \code{"adaptive"}
+#' codings the function recovers it from the fit.  The treatment effect
+#' is the causal effect \eqn{\tau(x)} in both target sources.  The
+#' confounding function \eqn{c(x)} does not enter: it is the bias of the
+#' treated arm in the RWD, not part of the causal effect.  The survival
+#' difference is thus causal in both target populations.
 #'
 #' Two estimands are available:
 #' \describe{
@@ -124,8 +130,8 @@ fusion_estimand <- function(
                   target_source = target_source)
   } else {
     s_t  <- if (target_source == "rct") 1L else 0L
-    eta0 <- .linear_predictor(comp, meta, a = 0, s_t = s_t)
-    eta1 <- .linear_predictor(comp, meta, a = 1, s_t = s_t)
+    eta0 <- .causal_linear_predictor(comp, meta, a = 0, s_t = s_t)
+    eta1 <- .causal_linear_predictor(comp, meta, a = 1, s_t = s_t)
 
     mix   <- .residual_mixture(fit, meta, s_t)    # list(pi, theta, sigma)
     draws <- .sd_draws(log(time), eta0, eta1, mix)
@@ -189,7 +195,7 @@ fusion_estimand <- function(
   )
 }
 
-# Linear predictor of arm a in target source s_t, per iteration (R x n):
+# Observed mean log T of arm a in source s_t, per iteration (R x n):
 #   eta_a = m_0^sh(x) + (1 - s_t) d(x) + b(a) [tau(x) + (1 - s_t) c(x)],
 # where b(a) is the coded treatment used by FusionForest().  Under the
 # "centered" and "adaptive" codings the baseline forests do not describe the
@@ -199,6 +205,18 @@ fusion_estimand <- function(
   eff  <- comp$tau + (if (s_t == 0L) comp$c else 0)
   b    <- .coded_treatment(meta, a, ncol(eff))
   base + eff * rep(b, each = nrow(eff))
+}
+
+# Causal linear predictor of arm a in target source s_t, per iteration:
+#   eta_0 = mean log T of untreated patients in source s_t,
+#   eta_1 = eta_0 + tau(x).
+# The confounding function c(x) is the bias of the treated arm in the RWD,
+# so it does not enter.  Taking eta_0 from the observed untreated mean makes
+# the result the same under every treatment coding; in the RCT it equals the
+# observed mean of both arms.
+.causal_linear_predictor <- function(comp, meta, a, s_t) {
+  eta0 <- .linear_predictor(comp, meta, a = 0, s_t = s_t)
+  if (a == 0) eta0 else eta0 + comp$tau
 }
 
 # Coded treatment b(a) for each evaluation row, matching FusionForest().
@@ -248,7 +266,8 @@ fusion_estimand <- function(
   pi_mat    <- fit$dp_mix_prop[[g_idx]]
   theta_mat <- fit$dp_locations[[g_idx]]
 
-  # Per-source scales ("source_dp_scale", "source_hdp_scale"): use the
+  # Per-source scales ("source_gaussian", "source_dp_scale",
+  # "source_hdp_scale"): use the
   # target source's own sigma_s.  fit$sigma then holds a pooled scale.
   if (!is.null(fit$dp_sigma_g)) {
     sigma_resp <- fit$dp_sigma_g[[g_idx]]           # already on response

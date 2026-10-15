@@ -5,8 +5,12 @@
   σ_h = k / (2√J), with defaults `k = 1` and `k_treat = 0.5`. Double old
   `k_*` values to reproduce earlier fits.
 - The default `error_dist` is now `"source_hdp_scale"`.
+- New `error_dist = "source_gaussian"`: a normal error with a separate
+  scale per source.
 - `fusion_estimand()` now respects `treatment_coding` and per-source
   error scales.
+- The survival difference for `target_source = "rwd"` is now causal: it
+  uses `tau` only and no longer adds the confounding function `c`.
 - Removed `SimpleBART()`, `SimpleBCF()`, the `decomposition` argument
   and the `"RMST"` estimand.
 - `FusionForest()` now errors on missing covariate values.

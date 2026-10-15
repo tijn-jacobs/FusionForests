@@ -20,6 +20,7 @@
 ^vignettes/.*\.Rmd\.orig$
 ^vignettes/precompile\.R$
 ^vignettes/FEATURE_NOTES\.md$
+^vignettes/README\.md$
 ^vignettes/cache$
 
 ## Compiler scratch files that R CMD build's cleanup does not know

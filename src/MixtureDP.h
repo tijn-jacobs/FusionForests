@@ -7,7 +7,7 @@
 // Centered Dirichlet process mixture of Gaussians on the residual distribution,
 // adapted from Henderson et al. (2020, Biostatistics) and Yang et al. (2010).
 //
-// Six modes:
+// Seven modes:
 //   GAUSSIAN        : no mixture, single normal residual (this class is a no-op)
 //   SHARED_DP       : one DP pooled across all observations
 //   SOURCE_DP       : independent DPs per data source, shared sigma (Stage A)
@@ -25,6 +25,10 @@
 //                     residual scale.  Label sampling and shared-atom posterior
 //                     use the per-source sigma_g; sigma_g is updated each sweep
 //                     via the same IG conjugate step as SOURCE_DP_SCALE.
+//   SOURCE_GAUSSIAN : a single normal residual per source, each with its own
+//                     scale sigma_g.  Implemented as a one-component mixture
+//                     (run with K = 1) whose location stays fixed at zero, so
+//                     each sweep only updates sigma_g.
 //
 // Per-source state is held in std::vector-of-vector containers indexed by
 // group g in [0, num_groups_).  SHARED_DP uses num_groups_ = 1; all SOURCE_*
@@ -34,7 +38,7 @@ class MixtureDP {
 public:
   enum Mode { GAUSSIAN = 0, SHARED_DP = 1, SOURCE_DP = 2,
               SOURCE_DP_SCALE = 3, SOURCE_HDP = 4,
-              SOURCE_HDP_SCALE = 5 };
+              SOURCE_HDP_SCALE = 5, SOURCE_GAUSSIAN = 6 };
 
   MixtureDP(int mode, size_t n_total, size_t K,
             double prior_atom_variance,
@@ -62,8 +66,9 @@ public:
   const std::vector<double>& locations(int g) const { return locations_[g]; }
   double mass(int g) const                          { return mass_[g];      }
 
-  // Per-source error scale (only meaningful in SOURCE_DP_SCALE; equals
-  // sigma_init for the other modes).
+  // Per-source error scale (only meaningful in the per-source scale modes
+  // SOURCE_DP_SCALE, SOURCE_HDP_SCALE and SOURCE_GAUSSIAN; equals sigma_init
+  // for the other modes).
   double sigma_g(int g) const { return sigma_g_[g]; }
 
   // sqrt of weight-by-group pooled variance.  Used as the reference sigma the

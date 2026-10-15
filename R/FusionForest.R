@@ -122,6 +122,8 @@
 #'   centred, so the error has mean zero in each source.  One of:
 #'   \describe{
 #'     \item{\code{"gaussian"}}{Normal errors with one scale \eqn{\sigma}.}
+#'     \item{\code{"source_gaussian"}}{Normal errors with a separate scale
+#'       \eqn{\sigma_s} per source.}
 #'     \item{\code{"shared_dp"}}{One Dirichlet process mixture of normals
 #'       for both sources (Henderson et al., 2020).}
 #'     \item{\code{"source_dp"}}{A separate Dirichlet process mixture per
@@ -161,14 +163,16 @@
 #'   \item{train_predictions_deviation, test_predictions_deviation}{Posterior
 #'     mean of \eqn{d(X)}.  The training values cover the RWD rows only.}
 #'   \item{sigma}{Posterior draws of \eqn{\sigma} on the standardised scale.
-#'     For the \code{"_scale"} error models this is a pooled scale.}
+#'     For the error models with a scale per source, this is a pooled
+#'     scale.  The per-source scales are in \code{dp_sigma_g}.}
 #'   \item{acceptance_ratio_control, acceptance_ratio_treat,
 #'     acceptance_ratio_deconf, acceptance_ratio_deviation}{Acceptance
 #'     rates of the tree proposals.}
 #'   \item{train_predictions_sample_control, ...}{All posterior draws.  Only
 #'     with \code{store_posterior_sample = TRUE}.}
-#'   \item{dp_mix_prop, dp_locations, ...}{Posterior draws of the error
-#'     mixture.  Only for the mixture error models.}
+#'   \item{dp_mix_prop, dp_locations, dp_sigma_g, ...}{Posterior draws of
+#'     the error distribution.  Only for error models other than
+#'     \code{"gaussian"}.}
 #'   \item{meta}{Settings used by the summary functions.}
 #' }
 #'
@@ -241,8 +245,9 @@ FusionForest <- function(
   propensity_train            = NULL,
   propensity_test             = NULL,
   error_dist                  = c("source_hdp_scale", "gaussian",
-                                  "shared_dp", "source_dp",
-                                  "source_dp_scale", "source_hdp"),
+                                  "source_gaussian", "shared_dp",
+                                  "source_dp", "source_dp_scale",
+                                  "source_hdp"),
   error_truncation_K          = 50L,
   error_atom_scale            = 0.5,
   error_mass_init             = 1.0,
@@ -266,18 +271,22 @@ FusionForest <- function(
 
   error_dist <- match.arg(error_dist,
                           c("source_hdp_scale", "gaussian",
-                            "shared_dp", "source_dp",
-                            "source_dp_scale", "source_hdp"))
+                            "source_gaussian", "shared_dp",
+                            "source_dp", "source_dp_scale",
+                            "source_hdp"))
   mixture_mode <- switch(error_dist,
                          "gaussian"         = 0L,
                          "shared_dp"        = 1L,
                          "source_dp"        = 2L,
                          "source_dp_scale"  = 3L,
                          "source_hdp"       = 4L,
-                         "source_hdp_scale" = 5L)
+                         "source_hdp_scale" = 5L,
+                         "source_gaussian"  = 6L)
   error_truncation_K <- as.integer(error_truncation_K)[1L]
   if (error_truncation_K < 2L)
     stop("error_truncation_K must be at least 2.")
+  # A normal error per source is a one-component "mixture" in the backend.
+  if (error_dist == "source_gaussian") error_truncation_K <- 1L
   if (!is.numeric(error_atom_scale) || length(error_atom_scale) != 1L ||
       !is.finite(error_atom_scale) || error_atom_scale <= 0)
     stop("error_atom_scale must be a single positive number.")
