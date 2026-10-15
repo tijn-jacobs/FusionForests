@@ -35,9 +35,8 @@ features, or documentation updates.
 The MCMC sampler is implemented in C++ (under `src/`) and interfaced via
 Rcpp. The forest machinery (`StanForest`, `StanTree`, `StanBirthDeath`)
 implements standard BART and Dirichlet BART (DART) tree updates; the entry
-points `FusionForest.cpp`, `SimpleBART.cpp` and `SimpleBCF.cpp` assemble
-these into the exported models, with the commensurate prior for information
-borrowing in `CommensurateParameters.cpp`.
+point `FusionForest.cpp` assembles these into the exported model, with the
+error mixtures in `MixtureDP.cpp`.
 
 The single-study causal and survival models re-exported by this package are
 developed in the [ShrinkageTrees](https://github.com/tijn-jacobs/ShrinkageTrees)

@@ -42,7 +42,6 @@ src/*.d
 
 # pkgdown site output
 docs/
-inst/
 
 # testthat output
 tests/testthat/_snaps/
@@ -85,6 +84,10 @@ tests/testthat/_snaps/
 *-blx.bib
 *.xml
 
+# Working figures written by simulation scripts (manuscript figures live
+# in manuscripts/)
+simulations/*/figures/
+
 # Large PDS data folders (too big for GitHub)
 **/MACS PDS/
 **/WIHS PDS/
@@ -103,4 +106,7 @@ file
 manuscripts/
 examples/
 .vscode/
-data/
+data-private/
+
+# knitr cache of the precomputed vignette
+vignettes/cache/

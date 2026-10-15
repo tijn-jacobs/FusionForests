@@ -1,197 +1,175 @@
-#' FusionForest
+#' Bayesian fusion forest
 #'
-#' Bayesian data-fusion model combining an RCT and an observational study to
-#' estimate heterogeneous treatment effects.
+#' Fits the Bayesian fusion forest.  The model combines a randomised
+#' controlled trial (RCT) with real-world data (RWD) to estimate
+#' heterogeneous treatment effects.  The RWD may be confounded.
 #'
-#' The model uses a MAP-prior four-forest decomposition:
-#' \deqn{\log(T) = \mu(X) + (1-S)\,g(X) + b\,[\tau(X) + (1-S)\,c(X)] +
-#'   \varepsilon,}
-#' where \eqn{\mu(X)} is a shared baseline fit to all data, \eqn{g(X)}
-#' captures the RWD-specific deviation, and \eqn{\varepsilon} is a
-#' mean-zero error term (Gaussian or a Dirichlet-process mixture; see
-#' \code{error_dist}).  Each forest has a Gaussian leaf
-#' prior \eqn{N(0, \omega^2)} parameterised uniformly as
-#' \deqn{\omega_X \;=\; k_X / \sqrt{m_X},}
-#' where \eqn{m_X} is the number of trees in forest \eqn{X} and the
-#' user-tunable scale \eqn{k_X} controls how informative the prior is
-#' (smaller \eqn{k_X} \eqn{\Rightarrow} stronger shrinkage toward zero).
-#' The deviation forest's scale \code{k_deviation} sets the strength of the
-#' MAP-prior borrowing between RCT and RWD.
+#' @details
+#' The model decomposes the log survival time as
+#' \deqn{\log T = m_0^{\mathrm{sh}}(X) + (1-S)\,d(X) + A\,\tau(X) +
+#'   (1-S)\,A\,c(X) + \varepsilon,}{log T = m_0^sh(X) + (1-S) d(X) +
+#'   A tau(X) + (1-S) A c(X) + epsilon,}
+#' with treatment \eqn{A} (1 = treated, 0 = control) and source \eqn{S}
+#' (1 = RCT, 0 = RWD).  The error \eqn{\varepsilon}{epsilon} has mean zero;
+#' see \code{error_dist}.  For a continuous outcome, the outcome replaces
+#' \eqn{\log T}{log T}.
 #'
-#' @param y Numeric vector of outcomes (survival times or continuous responses).
-#' @param status Integer vector of event indicators (\code{1} = event observed,
-#'   \code{0} = censored).  Required when \code{outcome_type = "right-censored"}.
-#'   When \code{interval_censoring_indicator[i] == 1}, \code{status[i]} should
-#'   be \code{0} (the event is known to lie in an interval, not at a point).
-#' @param observed_left_time,observed_right_time,interval_censoring_indicator
-#'   Optional numeric vectors of length \code{n}, used only for
-#'   right-censored outcomes to allow interval-censored events.  For each
-#'   observation \eqn{i}:
-#'   \describe{
-#'     \item{\code{status[i] = 1}}{Event observed at \code{y[i]}; no
-#'       augmentation. \code{observed_left_time[i]} and
-#'       \code{observed_right_time[i]} are ignored.}
-#'     \item{\code{status[i] = 0} and \code{interval_censoring_indicator[i] = 0}}{
-#'       Standard right-censoring at \code{observed_right_time[i]} (event
-#'       time unknown but greater than \code{observed_right_time[i]}).}
-#'     \item{\code{status[i] = 0} and \code{interval_censoring_indicator[i] = 1}}{
-#'       Interval-censored: event lies in
-#'       \code{(observed_left_time[i], observed_right_time[i]]}.  At each
-#'       sweep the event time is augmented by a truncated-normal draw on
-#'       that interval.}
-#'   }
-#'   When all three are \code{NULL} (the default) the wrapper falls back
-#'   to right-censoring with \code{observed_right_time = y} and
-#'   \code{interval_censoring_indicator = 0}, exactly reproducing the
-#'   historical right-censored behaviour.  Bounds are supplied on the
-#'   same scale as \code{y} (e.g. raw survival time when
-#'   \code{timescale = "time"}; log-time when \code{timescale = "log"}).
-#'   Ignored when \code{outcome_type != "right-censored"}.
-#' @param X_train_control Numeric matrix of covariates for the prognostic
-#'   (\eqn{m_0} or \eqn{\mu}) and deconfounding (\eqn{c}) forests.  One row
-#'   per training observation.
-#' @param X_train_treat Numeric matrix of covariates for the treatment-effect
-#'   (\eqn{\tau}) forest.  Must have the same number of rows as
-#'   \code{X_train_control}.
-#' @param treatment_indicator_train Integer vector of treatment assignments
-#'   (\code{1} = treated, \code{0} = control) for training observations.
-#' @param source_indicator_train Integer vector of data-source labels
-#'   (\code{1} = RCT, \code{0} = observational study) for training observations.
-#' @param X_test_control,X_test_treat,X_test_deconf Optional test matrices.
-#'   If omitted, predictions are returned for a single row at the column means
-#'   of the training data.
-#' @param treatment_indicator_test,source_indicator_test Optional integer vectors
-#'   for the test set (same coding as the training-set equivalents).
-#' @param outcome_type Character; either \code{"continuous"} or
-#'   \code{"right-censored"}.
-#' @param timescale Character; \code{"time"} (raw survival times, will be
-#'   log-transformed internally) or \code{"log"} (already on log scale).
-#' @param decomposition Character; must be \code{"four-forest"} (the
-#'   default and currently the only option).
-#' @param number_of_trees_control,number_of_trees_treat,number_of_trees_deconf
-#'   Number of trees in each BART ensemble.  Defaults: 200 (control), 100
-#'   (treat), 50 (deconf).
-#' @param number_of_trees_deviation Number of trees for the \eqn{g} forest.
-#'   Default 50.
-#' @param k_control,k_treat,k_deconf,k_deviation Leaf-prior scales for the four
-#'   forests, used as \eqn{\omega_X = k_X / \sqrt{m_X}} where \eqn{m_X}
-#'   is the corresponding number of trees.  Larger values give a more
-#'   diffuse leaf prior (weaker shrinkage); smaller values give a more
-#'   concentrated prior (stronger shrinkage).  The defaults
-#'   \code{k_control = k_treat = k_deconf = k_deviation = 0.5} reproduce the
-#'   standard \eqn{0.5 / \sqrt{m}} scaling used in BART/BCF.
-#'   \code{k_deviation} is the deviation-forest scale (formerly \code{k_g});
-#'   setting \code{k_deviation = 0} collapses the deviation prior to a point
-#'   mass at zero and disables \eqn{g} entirely (full pooling).
-#' @param power_control,base_control,power_deviation,base_deviation,power_treat,base_treat,power_deconf,base_deconf
-#'   Tree-topology prior parameters, set separately for each of the four
-#'   forests.  The probability that a node at depth \eqn{d} is non-terminal is
-#'   \eqn{\texttt{base} / (1 + d)^{\texttt{power}}} (larger \code{power} or
-#'   smaller \code{base} gives shallower trees).  There is no shared global
-#'   \code{power}/\code{base}; each forest carries its own pair and is set
-#'   independently.  Defaults follow METHODOLOGY.tex: the baseline \eqn{\mu}
-#'   (control) and deviation \eqn{g} use \code{(2, 0.95)}; the treatment
-#'   effect \eqn{\tau} uses \code{(3, 0.95)}; the confounding function
-#'   \eqn{c} (deconf) uses \code{(3, 0.25)}.
-#' @param p_grow,p_prune Probabilities of proposing a grow or prune move at
-#'   each MCMC step.
-#' @param nu Degrees of freedom for the inverse-chi-squared prior on
-#'   \eqn{\sigma^2}.
-#' @param q Quantile used to set the scale parameter \eqn{\lambda} of the
-#'   error-variance prior.
-#' @param sigma Optional fixed value for \eqn{\sigma}.  If \code{NULL} (default),
-#'   \eqn{\sigma} is estimated from the data and updated each MCMC iteration.
-#' @param N_post,N_burn Number of posterior and burn-in MCMC iterations.
-#' @param treatment_coding Character; how the binary treatment indicator
-#'   \eqn{Z \in \{0,1\}} is mapped to the regression weight \eqn{b_i} in the
-#'   BCF parameterisation \eqn{y = \mu(X) + b\,\tau(X) + \dots} (and similarly
-#'   for the deconfounding term).  One of:
-#'   \describe{
-#'     \item{\code{"centered"} (default)}{\eqn{b = 0.5} if treated,
-#'       \eqn{b = -0.5} if control.  Both arms inform \eqn{\tau}; \eqn{\mu}
-#'       is the average-arm mean function.}
-#'     \item{\code{"binary"}}{\eqn{b = 1} if treated, \eqn{b = 0} if control.
-#'       Only treated rows inform \eqn{\tau}; \eqn{\mu} is the control-arm
-#'       mean function.}
-#'     \item{\code{"adaptive"}}{\eqn{b_i = z_i - \pi_i}, the propensity-score
-#'       residual (Hahn et al., 2020).  Requires \code{propensity_train} and
-#'       \code{propensity_test}.}
-#'   }
-#'   The \eqn{\tau} and deconfounding (\eqn{c}) forests are fit with
-#'   per-observation weights \eqn{w_i = b_i^2} so that the weighted
-#'   sufficient statistics match the full-data likelihood; rows with
-#'   \eqn{|b_i|} essentially zero are excluded from those updates.
-#' @param propensity_train,propensity_test Numeric vectors of estimated
-#'   propensity scores in (0, 1) for the training and test rows.  Required
-#'   when \code{treatment_coding = "adaptive"}; ignored otherwise.
-#' @param error_dist Character; residual-distribution prior.  One of the
-#'   options below.  See \file{inst/error_distributions.md} for a full
-#'   reference (model statements, Gibbs steps, posterior storage, and a
-#'   selection guide).
-#'   \describe{
-#'     \item{\code{"gaussian"} (default)}{Single normal residual,
-#'       \eqn{\varepsilon_i \sim N(0, \sigma^2)}.}
-#'     \item{\code{"shared_dp"}}{Centred Dirichlet-process mixture of
-#'       Gaussians on the residual, pooled across data sources (AFTrees-style;
-#'       Henderson et al., 2020).  Atoms are recentred to weighted mean zero
-#'       to identify the structural mean components.}
-#'     \item{\code{"source_dp"}}{Independent centred Dirichlet-process
-#'       mixtures per source (Stage A of the HDP-CDP plan).  RCT and RWD get
-#'       their own atoms, weights, and concentration; \eqn{\sigma} is shared.}
-#'     \item{\code{"source_dp_scale"}}{Same as \code{"source_dp"} but with
-#'       per-source error scales \eqn{\sigma_s}.  Each source gets its own
-#'       inverse-gamma conjugate update for \eqn{\sigma_s}, and the per-source
-#'       precision is propagated to the forest backfitting via per-observation
-#'       precision weights.}
-#'     \item{\code{"source_hdp"}}{Hierarchical centred Dirichlet process
-#'       (Stage B): atoms \eqn{\theta_k^*} are shared across sources via a
-#'       top-level \eqn{DP(\gamma, H)}; per-source weights \eqn{\pi_{sk}} and
-#'       means \eqn{\mu_s} restore identifiability of the structural
-#'       components.  Concentration parameters \eqn{\gamma, M_0, M_1} are
-#'       updated via Escobar-West auxiliary-variable steps; the top-level
-#'       sticks \eqn{\beta} use the Antoniak-Teh table-count augmentation.}
-#'     \item{\code{"source_hdp_scale"}}{Same as \code{"source_hdp"} but with
-#'       per-source error scales \eqn{\sigma_s}.  Label sampling and the
-#'       precision-weighted shared-atom posterior use \eqn{\sigma_s}, and each
-#'       \eqn{\sigma_s} is refreshed via the inverse-gamma conjugate step from
-#'       \code{"source_dp_scale"}.  Useful when the two sources are believed
-#'       to share residual \emph{shape} (atoms) but differ in \emph{spread}.}
-#'   }
-#' @param error_truncation_K Integer; truncation level for the stick-breaking
-#'   representation.  Default 50.  Increase if the number of occupied components
-#'   approaches the bound during MCMC.
-#' @param error_atom_scale Numeric; prior standard deviation for each atom on
-#'   the standardised response scale, so each atom has prior
-#'   \eqn{N(0, \texttt{error\_atom\_scale}^2)}.  Default 0.5 (so atoms are
-#'   expected within roughly \eqn{\pm 1} on the standardised scale).
-#' @param error_mass_init Numeric; starting value for the concentration
-#'   parameter \eqn{\alpha} (or each \eqn{M_s} under \code{"source_dp"}).
-#'   Updated by the sampler via an AFTrees-style Gamma conjugate step with
-#'   fixed hyperprior \eqn{\mathrm{Gamma}(2, 0.1)}.  Default 1.
-#' @param store_posterior_sample Logical; if \code{TRUE}, the full
-#'   \eqn{N_{\text{post}} \times n} posterior sample matrices are returned for
-#'   all component forests.
-#' @param verbose Logical; print a progress bar and summary statistics.
-#'
-#' @return A named list with components:
+#' Each component has its own BART forest.  The arguments of a forest carry
+#' the suffix in brackets.
 #' \describe{
-#'   \item{train_predictions, test_predictions}{Posterior mean of the total
+#'   \item{\eqn{m_0^{\mathrm{sh}}(X)}{m_0^sh(X)} (\code{control})}{Baseline
+#'     log survival time under control, shared by both sources.}
+#'   \item{\eqn{d(X)} (\code{deviation})}{Difference between the RWD and
+#'     RCT baselines.  The baseline is
+#'     \eqn{m_0(X, S) = m_0^{\mathrm{sh}}(X) + (1-S)\,d(X)}{m_0(X, S) =
+#'     m_0^sh(X) + (1-S) d(X)}.}
+#'   \item{\eqn{\tau(X)} (\code{treat})}{Treatment effect on the log-time
+#'     scale.}
+#'   \item{\eqn{c(X)} (\code{deconf})}{Confounding function: the bias in
+#'     the RWD treatment contrast.}
+#' }
+#'
+#' The step heights of forest
+#' \eqn{f \in \{\mathrm{sh}, d, \tau, c\}}{f in {sh, d, tau, c}} have prior
+#' \eqn{N(0, \sigma_{h,f}^2)} with
+#' \deqn{\sigma_{h,f} = k_f / (2\sqrt{J_f}),}
+#' where \eqn{J_f} is the number of trees and \eqn{k_f} the scale.  A smaller
+#' \eqn{k_f} shrinks the forest more strongly toward zero.  All defaults
+#' follow the paper.
+#'
+#' The model above uses the binary treatment indicator \eqn{A}, as in the
+#' paper (\code{treatment_coding = "binary"}).  The default \code{"centered"}
+#' coding replaces \eqn{A} by \eqn{A - 1/2}.  The functions \eqn{\tau} and
+#' \eqn{c} keep their meaning.  The baseline forests then describe the
+#' average of the two arms instead of the control arm.
+#'
+#' @param y Numeric vector of outcomes: survival times or a continuous
+#'   response.
+#' @param status Event indicator (1 = event, 0 = censored).  Required for
+#'   right-censored outcomes.  Use 0 for interval-censored rows.
+#' @param observed_left_time,observed_right_time,interval_censoring_indicator
+#'   Optional vectors for interval censoring, on the same scale as \code{y}.
+#'   Each row is one of three types:
+#'   \describe{
+#'     \item{\code{status = 1}}{Event at \code{y}.  The bounds are ignored.}
+#'     \item{\code{status = 0}, indicator 0}{Right-censored at
+#'       \code{observed_right_time}.}
+#'     \item{\code{status = 0}, indicator 1}{Event in the interval
+#'       (\code{observed_left_time}, \code{observed_right_time}].}
+#'   }
+#'   Leave all three \code{NULL} for plain right-censoring at \code{y}.  Only
+#'   used when \code{outcome_type = "right-censored"}.
+#' @param X_train_control Covariate matrix for the
+#'   \eqn{m_0^{\mathrm{sh}}}{m_0^sh}, \eqn{d} and \eqn{c} forests.  The
+#'   \eqn{d} and \eqn{c} forests use the RWD rows only.
+#' @param X_train_treat Covariate matrix for the \eqn{\tau} forest, with the
+#'   same rows as \code{X_train_control}.
+#' @param treatment_indicator_train Treatment (1 = treated, 0 = control).
+#' @param source_indicator_train Source (1 = RCT, 0 = RWD).
+#' @param X_test_control,X_test_treat,X_test_deconf Optional covariate
+#'   matrices for prediction.  \code{X_test_deconf} defaults to
+#'   \code{X_test_control}.  Without test matrices, the function predicts at
+#'   the column means of the training data.
+#' @param treatment_indicator_test,source_indicator_test Treatment and
+#'   source of the test rows.  Both default to 1.
+#' @param outcome_type \code{"continuous"} or \code{"right-censored"}.  Use
+#'   \code{"right-censored"} also for interval-censored data.
+#' @param timescale \code{"time"} if \code{y} holds survival times,
+#'   \code{"log"} if it holds log survival times.  With \code{"time"}, the
+#'   predictions are returned on the time scale.
+#' @param number_of_trees_control,number_of_trees_treat,number_of_trees_deconf
+#'   Number of trees \eqn{J_f} in the \eqn{m_0^{\mathrm{sh}}}{m_0^sh},
+#'   \eqn{\tau} and \eqn{c} forests.  Defaults: 200, 100 and 50.
+#' @param number_of_trees_deviation Number of trees in the \eqn{d} forest.
+#'   Default 50.
+#' @param k_control,k_treat,k_deconf,k_deviation Step-height scales
+#'   \eqn{k_f} of the \eqn{m_0^{\mathrm{sh}}}{m_0^sh}, \eqn{\tau}, \eqn{c}
+#'   and \eqn{d} forests; see Details.  Larger values shrink less.  The
+#'   defaults are 1, except \code{k_treat = 0.5}.  Set
+#'   \code{k_deviation = 0} to switch off \eqn{d}, so that both sources share
+#'   one baseline.
+#' @param power_control,base_control,power_deviation,base_deviation,power_treat,base_treat,power_deconf,base_deconf
+#'   Tree-structure prior of each forest.  A node at depth \eqn{\delta}
+#'   splits with probability \eqn{\alpha_f (1 + \delta)^{-\beta_f}}, with
+#'   \eqn{\alpha_f} = \code{base} and \eqn{\beta_f} = \code{power}.  A larger
+#'   \code{power} or a smaller \code{base} gives shallower trees.  Defaults:
+#'   \eqn{(\alpha_f, \beta_f) = (0.95, 2)} for
+#'   \eqn{m_0^{\mathrm{sh}}}{m_0^sh} and \eqn{d}, \eqn{(0.95, 3)} for
+#'   \eqn{\tau} and \eqn{(0.25, 3)} for \eqn{c}.
+#' @param p_grow,p_prune Probabilities of a grow and a prune proposal.
+#' @param nu Degrees of freedom of the scaled inverse chi-squared prior on
+#'   \eqn{\sigma^2}.
+#' @param q Quantile that calibrates the scale \eqn{\lambda} of this prior.
+#' @param sigma Fixed error standard deviation.  If \code{NULL} (default),
+#'   \eqn{\sigma} is estimated.
+#' @param N_post,N_burn Number of posterior and burn-in iterations.
+#' @param treatment_coding How the treatment enters the model.  The coded
+#'   treatment \eqn{b_i} replaces \eqn{A} in front of \eqn{\tau} and
+#'   \eqn{c}.  One of:
+#'   \describe{
+#'     \item{\code{"centered"} (default)}{\eqn{b_i = \pm 1/2}{b_i = +/- 1/2}.
+#'       Both arms inform \eqn{\tau}.  The baseline forests describe the
+#'       average of the two arms.}
+#'     \item{\code{"binary"}}{\eqn{b_i = A_i}, as in the paper.  The baseline
+#'       forests describe the control arm.}
+#'     \item{\code{"adaptive"}}{\eqn{b_i = A_i - \pi_i}, the propensity score
+#'       residual (Hahn et al., 2020).  Requires propensity scores.}
+#'   }
+#' @param propensity_train,propensity_test Propensity scores in (0, 1) for
+#'   the training and test rows.  Only used with
+#'   \code{treatment_coding = "adaptive"}.
+#' @param error_dist Prior for the error distribution.  All mixtures are
+#'   centred, so the error has mean zero in each source.  One of:
+#'   \describe{
+#'     \item{\code{"gaussian"}}{Normal errors with one scale \eqn{\sigma}.}
+#'     \item{\code{"shared_dp"}}{One Dirichlet process mixture of normals
+#'       for both sources (Henderson et al., 2020).}
+#'     \item{\code{"source_dp"}}{A separate Dirichlet process mixture per
+#'       source, with a shared scale \eqn{\sigma}.}
+#'     \item{\code{"source_dp_scale"}}{As \code{"source_dp"}, with a
+#'       separate scale \eqn{\sigma_s} per source.}
+#'     \item{\code{"source_hdp"}}{Hierarchical Dirichlet process mixture.
+#'       The sources share the mixture components but have their own
+#'       weights.  Shared scale \eqn{\sigma}.}
+#'     \item{\code{"source_hdp_scale"} (default)}{As \code{"source_hdp"},
+#'       with a separate scale \eqn{\sigma_s} per source.  This is the error
+#'       model of the paper.}
+#'   }
+#' @param error_truncation_K Truncation level of the mixture.  Default 50.
+#'   Increase it if the number of occupied components gets close to this
+#'   level.
+#' @param error_atom_scale Prior standard deviation of the mixture
+#'   locations, on the standardised scale.  Default 0.5.
+#' @param error_mass_init Starting value of the concentration parameters.
+#'   They have a \eqn{\mathrm{Gamma}(2, 0.1)}{Gamma(2, 0.1)} prior.
+#'   Default 1.
+#' @param store_posterior_sample If \code{TRUE}, return all posterior draws
+#'   of each forest.  Required by \code{\link{fusion_estimand}} and
+#'   \code{\link{fusion_projection}}.
+#' @param verbose If \code{TRUE}, print progress.
+#'
+#' @return A \code{FusionForest} object: a list with
+#' \describe{
+#'   \item{train_predictions, test_predictions}{Posterior mean of the
 #'     fitted values.}
-#'   \item{train_predictions_control, test_predictions_control}{Posterior mean
-#'     of the shared baseline \eqn{\mu(X)}.}
-#'   \item{train_predictions_treat, test_predictions_treat}{Posterior mean of
-#'     the CATE \eqn{\tau(X)}.}
-#'   \item{train_predictions_deconf, test_predictions_deconf}{Posterior mean of
-#'     the confounding function \eqn{c(X)} (RWD rows only for training).}
+#'   \item{train_predictions_control, test_predictions_control}{Posterior
+#'     mean of \eqn{m_0^{\mathrm{sh}}(X)}{m_0^sh(X)}.}
+#'   \item{train_predictions_treat, test_predictions_treat}{Posterior mean
+#'     of \eqn{\tau(X)}.}
+#'   \item{train_predictions_deconf, test_predictions_deconf}{Posterior mean
+#'     of \eqn{c(X)}.  The training values cover the RWD rows only.}
 #'   \item{train_predictions_deviation, test_predictions_deviation}{Posterior
-#'     mean of the RWD deviation \eqn{g(X)} (RWD rows only for training).}
-#'   \item{sigma}{Posterior sample of \eqn{\sigma} (or the fixed value if
-#'     \code{sigma} was supplied).}
+#'     mean of \eqn{d(X)}.  The training values cover the RWD rows only.}
+#'   \item{sigma}{Posterior draws of \eqn{\sigma} on the standardised scale.
+#'     For the \code{"_scale"} error models this is a pooled scale.}
 #'   \item{acceptance_ratio_control, acceptance_ratio_treat,
-#'     acceptance_ratio_deconf}{Tree-update acceptance rates.}
-#'   \item{acceptance_ratio_deviation}{Acceptance rate for \eqn{g}.}
-#'   \item{train_predictions_sample_control, ...}{Full posterior sample matrices
-#'     (only present when \code{store_posterior_sample = TRUE}).}
+#'     acceptance_ratio_deconf, acceptance_ratio_deviation}{Acceptance
+#'     rates of the tree proposals.}
+#'   \item{train_predictions_sample_control, ...}{All posterior draws.  Only
+#'     with \code{store_posterior_sample = TRUE}.}
+#'   \item{dp_mix_prop, dp_locations, ...}{Posterior draws of the error
+#'     mixture.  Only for the mixture error models.}
+#'   \item{meta}{Settings used by the summary functions.}
 #' }
 #'
 #' @examples
@@ -236,15 +214,14 @@ FusionForest <- function(
   source_indicator_test       = NULL,
   outcome_type                = "continuous",
   timescale                   = "time",
-  decomposition               = "four-forest",
   number_of_trees_control     = 200,
   number_of_trees_treat       = 100,
   number_of_trees_deconf      = 50,
   number_of_trees_deviation   = 50,
-  k_control                   = 0.5,
+  k_control                   = 1,
   k_treat                     = 0.5,
-  k_deconf                    = 0.5,
-  k_deviation                 = 0.5,
+  k_deconf                    = 1,
+  k_deviation                 = 1,
   power_control               = 2.0,
   base_control                = 0.95,
   power_deviation             = 2.0,
@@ -263,9 +240,9 @@ FusionForest <- function(
   treatment_coding            = c("centered", "binary", "adaptive"),
   propensity_train            = NULL,
   propensity_test             = NULL,
-  error_dist                  = c("gaussian", "shared_dp", "source_dp",
-                                  "source_dp_scale", "source_hdp",
-                                  "source_hdp_scale"),
+  error_dist                  = c("source_hdp_scale", "gaussian",
+                                  "shared_dp", "source_dp",
+                                  "source_dp_scale", "source_hdp"),
   error_truncation_K          = 50L,
   error_atom_scale            = 0.5,
   error_mass_init             = 1.0,
@@ -281,14 +258,6 @@ FusionForest <- function(
   if (!outcome_type %in% allowed_types)
     stop("Invalid outcome_type. Choose 'continuous' or 'right-censored'.")
 
-  # Three-forest path is deprecated in this wrapper.  The FusionForest_cpp
-  # backend remains in the package and can be re-exposed by accepting
-  # "three-forest" here again.
-  if (!identical(decomposition, "four-forest"))
-    stop("decomposition = ", deparse(decomposition), " is no longer ",
-         "supported. Only 'four-forest' is available in the R interface; ",
-         "the three-forest backend is retained in FusionForest_cpp.")
-
   # Per-forest tree-topology priors (power_*, base_*) are passed straight to
   # the backend; there is no shared global power/base.
 
@@ -296,9 +265,9 @@ FusionForest <- function(
                                 c("centered", "binary", "adaptive"))
 
   error_dist <- match.arg(error_dist,
-                          c("gaussian", "shared_dp", "source_dp",
-                            "source_dp_scale", "source_hdp",
-                            "source_hdp_scale"))
+                          c("source_hdp_scale", "gaussian",
+                            "shared_dp", "source_dp",
+                            "source_dp_scale", "source_hdp"))
   mixture_mode <- switch(error_dist,
                          "gaussian"         = 0L,
                          "shared_dp"        = 1L,
@@ -340,6 +309,17 @@ FusionForest <- function(
   if (length(treatment_indicator_train) != length(y)) stop("treatment_indicator_train must match length(y).")
   if (length(source_indicator_train)    != length(y)) stop("source_indicator_train must match length(y).")
 
+  covariate_matrices <- list(X_train_control = X_train_control,
+                             X_train_treat   = X_train_treat,
+                             X_test_control  = X_test_control,
+                             X_test_treat    = X_test_treat,
+                             X_test_deconf   = X_test_deconf)
+  for (nm in names(covariate_matrices)) {
+    if (!is.null(covariate_matrices[[nm]]) && anyNA(covariate_matrices[[nm]]))
+      stop(nm, " contains missing values (NA/NaN); ",
+           "missing covariates are not supported.")
+  }
+
   treatment_indicator_train <- as.integer(treatment_indicator_train)
   if (!all(source_indicator_train %in% c(0L, 1L)))
     stop("source_indicator_train must be 0 (RWD) or 1 (RCT).")
@@ -363,22 +343,16 @@ FusionForest <- function(
   X_train_deconf <- X_train_control[source_indicator_train == 0L, , drop = FALSE]
   p_deconf       <- ncol(X_train_deconf)
 
-  # RWD subset for the deviation (g) forest (same rows as deconf)
-  # use_four_forest stays TRUE while the three-forest path is deprecated
-  # in this wrapper.  The downstream `if (use_four_forest)` branches are
-  # preserved (with their inactive `else` arms) so that re-exposing the
-  # three-forest decomposition only requires reintroducing the
-  # `decomposition` argument and restoring `(decomposition == "four-forest")`.
-  use_four_forest <- TRUE
+  # RWD subset for the deviation (d) forest (same rows as deconf)
   n_deviation     <- n_deconf
   X_train_deviation <- X_train_deconf  # same subset, same covariates
   p_deviation       <- p_deconf
 
-  # Leaf-prior standard deviations.  All four forests use the uniform
-  # parametrisation omega_X = k_X / sqrt(number_of_trees_X); see the
-  # roxygen for the meaning of k.  Setting k_deviation = 0 (or any non-positive
-  # value) is a special case that effectively disables the deviation
-  # forest g by collapsing its prior to a point mass at zero.
+  # Leaf-prior standard deviations.  All four forests use the paper's
+  # parametrisation omega_X = k_X / (2 sqrt(number_of_trees_X)); see the
+  # roxygen for the meaning of k.  Setting k_deviation = 0 is a special case
+  # that effectively disables the deviation forest d by collapsing its prior
+  # to a point mass at zero.
   validate_k <- function(name, val) {
     if (!is.numeric(val) || length(val) != 1L || !is.finite(val) || val < 0)
       stop(sprintf("`%s` must be a single non-negative finite number.", name))
@@ -388,15 +362,11 @@ FusionForest <- function(
   validate_k("k_deconf",  k_deconf)
   validate_k("k_deviation", k_deviation)
 
-  omega_control <- k_control / sqrt(number_of_trees_control)
-  omega_treat   <- k_treat   / sqrt(number_of_trees_treat)
-  omega_deconf  <- k_deconf  / sqrt(number_of_trees_deconf)
-  if (use_four_forest) {
-    omega_deviation <- if (k_deviation <= 0) 1e-10
-                       else k_deviation / sqrt(number_of_trees_deviation)
-  } else {
-    omega_deviation <- NULL  # unused in three-forest mode (deprecated)
-  }
+  omega_control <- k_control / (2 * sqrt(number_of_trees_control))
+  omega_treat   <- k_treat   / (2 * sqrt(number_of_trees_treat))
+  omega_deconf  <- k_deconf  / (2 * sqrt(number_of_trees_deconf))
+  omega_deviation <- if (k_deviation <= 0) 1e-10
+                     else k_deviation / (2 * sqrt(number_of_trees_deviation))
 
   # Test data
   if (!is.null(X_test_control) && !is.null(X_test_treat)) {
@@ -555,7 +525,7 @@ FusionForest <- function(
     lambda  <- (sigma_hat^2 * qchi) / nu
 
     fit <- .call_cpp_backend(
-      use_four_forest, n_train, p_treat, p_control, X_train_treat,
+      TRUE, n_train, p_treat, p_control, X_train_treat,
       X_train_control, y, status,
       observed_left_time, observed_right_time, interval_censoring_indicator,
       survival, treatment_indicator_train,
@@ -585,10 +555,8 @@ FusionForest <- function(
       fit$test_predictions_treat    <- exp(fit$test_predictions_treat    * sigma_hat)
       fit$train_predictions_deconf  <- exp(fit$train_predictions_deconf  * sigma_hat)
       fit$test_predictions_deconf   <- exp(fit$test_predictions_deconf   * sigma_hat)
-      if (use_four_forest) {
-        fit$train_predictions_deviation <- exp(fit$train_predictions_deviation * sigma_hat)
-        fit$test_predictions_deviation  <- exp(fit$test_predictions_deviation  * sigma_hat)
-      }
+      fit$train_predictions_deviation <- exp(fit$train_predictions_deviation * sigma_hat)
+      fit$test_predictions_deviation  <- exp(fit$test_predictions_deviation  * sigma_hat)
       if (store_posterior_sample) {
         fit$train_predictions_sample_control <- exp(fit$train_predictions_sample_control * sigma_hat + y_mean)
         fit$test_predictions_sample_control  <- exp(fit$test_predictions_sample_control  * sigma_hat + y_mean)
@@ -596,10 +564,8 @@ FusionForest <- function(
         fit$test_predictions_sample_treat    <- exp(fit$test_predictions_sample_treat    * sigma_hat)
         fit$train_predictions_sample_deconf  <- exp(fit$train_predictions_sample_deconf  * sigma_hat)
         fit$test_predictions_sample_deconf   <- exp(fit$test_predictions_sample_deconf   * sigma_hat)
-        if (use_four_forest) {
-          fit$train_predictions_sample_deviation <- exp(fit$train_predictions_sample_deviation * sigma_hat)
-          fit$test_predictions_sample_deviation  <- exp(fit$test_predictions_sample_deviation  * sigma_hat)
-        }
+        fit$train_predictions_sample_deviation <- exp(fit$train_predictions_sample_deviation * sigma_hat)
+        fit$test_predictions_sample_deviation  <- exp(fit$test_predictions_sample_deviation  * sigma_hat)
       }
     } else {
       fit$train_predictions         <- fit$train_predictions         * sigma_hat + y_mean
@@ -610,10 +576,8 @@ FusionForest <- function(
       fit$test_predictions_treat    <- fit$test_predictions_treat    * sigma_hat
       fit$train_predictions_deconf  <- fit$train_predictions_deconf  * sigma_hat
       fit$test_predictions_deconf   <- fit$test_predictions_deconf   * sigma_hat
-      if (use_four_forest) {
-        fit$train_predictions_deviation <- fit$train_predictions_deviation * sigma_hat
-        fit$test_predictions_deviation  <- fit$test_predictions_deviation  * sigma_hat
-      }
+      fit$train_predictions_deviation <- fit$train_predictions_deviation * sigma_hat
+      fit$test_predictions_deviation  <- fit$test_predictions_deviation  * sigma_hat
       if (store_posterior_sample) {
         fit$train_predictions_sample_control <- fit$train_predictions_sample_control * sigma_hat + y_mean
         fit$test_predictions_sample_control  <- fit$test_predictions_sample_control  * sigma_hat + y_mean
@@ -621,10 +585,8 @@ FusionForest <- function(
         fit$test_predictions_sample_treat    <- fit$test_predictions_sample_treat    * sigma_hat
         fit$train_predictions_sample_deconf  <- fit$train_predictions_sample_deconf  * sigma_hat
         fit$test_predictions_sample_deconf   <- fit$test_predictions_sample_deconf   * sigma_hat
-        if (use_four_forest) {
-          fit$train_predictions_sample_deviation <- fit$train_predictions_sample_deviation * sigma_hat
-          fit$test_predictions_sample_deviation  <- fit$test_predictions_sample_deviation  * sigma_hat
-        }
+        fit$train_predictions_sample_deviation <- fit$train_predictions_sample_deviation * sigma_hat
+        fit$test_predictions_sample_deviation  <- fit$test_predictions_sample_deviation  * sigma_hat
       }
     }
 
@@ -655,7 +617,7 @@ FusionForest <- function(
     interval_censoring_indicator <- rep(0, n_train)
 
     fit <- .call_cpp_backend(
-      use_four_forest, n_train, p_treat, p_control, X_train_treat,
+      TRUE, n_train, p_treat, p_control, X_train_treat,
       X_train_control, y, status,
       observed_left_time, observed_right_time, interval_censoring_indicator,
       survival, treatment_indicator_train,
@@ -684,10 +646,8 @@ FusionForest <- function(
     fit$test_predictions_treat    <- fit$test_predictions_treat    * sigma_hat
     fit$train_predictions_deconf  <- fit$train_predictions_deconf  * sigma_hat
     fit$test_predictions_deconf   <- fit$test_predictions_deconf   * sigma_hat
-    if (use_four_forest) {
-      fit$train_predictions_deviation <- fit$train_predictions_deviation * sigma_hat
-      fit$test_predictions_deviation  <- fit$test_predictions_deviation  * sigma_hat
-    }
+    fit$train_predictions_deviation <- fit$train_predictions_deviation * sigma_hat
+    fit$test_predictions_deviation  <- fit$test_predictions_deviation  * sigma_hat
     if (store_posterior_sample) {
       fit$train_predictions_sample_control <- fit$train_predictions_sample_control * sigma_hat + y_mean
       fit$test_predictions_sample_control  <- fit$test_predictions_sample_control  * sigma_hat + y_mean
@@ -695,10 +655,8 @@ FusionForest <- function(
       fit$test_predictions_sample_treat    <- fit$test_predictions_sample_treat    * sigma_hat
       fit$train_predictions_sample_deconf  <- fit$train_predictions_sample_deconf  * sigma_hat
       fit$test_predictions_sample_deconf   <- fit$test_predictions_sample_deconf   * sigma_hat
-      if (use_four_forest) {
-        fit$train_predictions_sample_deviation <- fit$train_predictions_sample_deviation * sigma_hat
-        fit$test_predictions_sample_deviation  <- fit$test_predictions_sample_deviation  * sigma_hat
-      }
+      fit$train_predictions_sample_deviation <- fit$train_predictions_sample_deviation * sigma_hat
+      fit$test_predictions_sample_deviation  <- fit$test_predictions_sample_deviation  * sigma_hat
     }
   }
 
@@ -731,8 +689,11 @@ FusionForest <- function(
     y_mean        = y_mean,
     timescale     = timescale,
     outcome_type  = outcome_type,
-    decomposition = decomposition,
     error_dist    = error_dist,
+    # Treatment coding (and test-row propensities for "adaptive"), needed by
+    # fusion_estimand() to rebuild the linear predictor of each arm.
+    treatment_coding = treatment_coding,
+    propensity_test  = if (treatment_coding == "adaptive") propensity_test,
     n_train       = n_train,
     n_rct         = sum(source_indicator_train == 1),
     n_rwd         = sum(source_indicator_train == 0),
@@ -747,7 +708,10 @@ FusionForest <- function(
 }
 
 
-# Internal helper: dispatch to three-forest or four-forest C++ backend
+# Internal helper: call the four-forest C++ backend.  The leading
+# use_four_forest argument is kept so that the frozen FusionForest copies in
+# the paper's simulation scripts, which call this helper positionally, keep
+# working.
 .call_cpp_backend <- function(
   use_four_forest, n_train, p_treat, p_control, X_train_treat,
   X_train_control, y, status,
@@ -768,7 +732,6 @@ FusionForest <- function(
   mixture_mode, mixture_K, mixture_prior_atom_variance, mixture_mass_init
 ) {
 
-  # Shared arguments for both backends
   shared <- list(
     nSEXP                        = n_train,
     p_treatSEXP                  = p_treat,
@@ -827,21 +790,21 @@ FusionForest <- function(
     mixture_mass_initSEXP        = as.numeric(mixture_mass_init)
   )
 
-  if (use_four_forest) {
-    extra <- list(
-      X_test_deviationSEXP     = X_test_deviation,
-      n_deviationSEXP          = n_deviation,
-      p_deviationSEXP          = p_deviation,
-      X_train_deviationSEXP    = X_train_deviation,
-      no_trees_deviationSEXP   = number_of_trees_deviation,
-      power_deviationSEXP      = power_deviation,
-      base_deviationSEXP       = base_deviation,
-      p_grow_deviationSEXP     = p_grow,
-      p_prune_deviationSEXP    = p_prune,
-      omega_deviationSEXP      = omega_deviation
-    )
-    do.call(FusionForest4_cpp, c(shared, extra))
-  } else {
-    do.call(FusionForest_cpp, shared)
-  }
+  if (!isTRUE(use_four_forest))
+    stop("The three-forest backend has been removed; ",
+         "only the four-forest model is available.")
+
+  extra <- list(
+    X_test_deviationSEXP     = X_test_deviation,
+    n_deviationSEXP          = n_deviation,
+    p_deviationSEXP          = p_deviation,
+    X_train_deviationSEXP    = X_train_deviation,
+    no_trees_deviationSEXP   = number_of_trees_deviation,
+    power_deviationSEXP      = power_deviation,
+    base_deviationSEXP       = base_deviation,
+    p_grow_deviationSEXP     = p_grow,
+    p_prune_deviationSEXP    = p_prune,
+    omega_deviationSEXP      = omega_deviation
+  )
+  do.call(FusionForest_cpp, c(shared, extra))
 }

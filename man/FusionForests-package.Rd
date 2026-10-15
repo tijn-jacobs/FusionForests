@@ -7,17 +7,16 @@
 \title{FusionForests: Bayesian Tree Ensembles for Data Fusion and Causal
 Inference}
 \description{
-Bayesian tree ensemble models for data fusion and causal inference.
-The main model \code{\link[=FusionForest]{FusionForest()}} combines data from a randomised
-controlled trial and an observational study using separate tree
-forests, without assuming the observational data are unconfounded.
-Posterior summaries of treatment effect estimands are available via
-\code{\link[=fusion_estimand]{fusion_estimand()}} and interpretable linear projections via
-\code{\link[=fusion_projection]{fusion_projection()}}.
+Bayesian tree ensembles for data fusion and causal inference.  The main
+model, \code{\link[=FusionForest]{FusionForest()}}, combines a randomised controlled trial with an
+observational study.  The observational data may be confounded.
+\code{\link[=fusion_estimand]{fusion_estimand()}} computes survival differences and acceleration
+factors.  \code{\link[=fusion_projection]{fusion_projection()}} summarises the treatment effect by a
+linear model.
 }
 \details{
-Single-study causal and survival models are re-exported from the
-\pkg{ShrinkageTrees} package; see \link{reexports}.
+Single-study models are re-exported from the \pkg{ShrinkageTrees}
+package; see \link{reexports}.
 }
 \seealso{
 Useful links:

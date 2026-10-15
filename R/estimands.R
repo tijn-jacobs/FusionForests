@@ -1,72 +1,58 @@
 #' Causal survival estimands from a FusionForest fit
 #'
-#' Compute posterior draws of the survival difference or the
-#' acceleration factor (AF) at the covariate values supplied to
-#' \code{FusionForest()} as the test set, using the closed-form
-#' expressions of the AFT decomposition with (H)DP error.
+#' Computes posterior draws of the survival difference or the acceleration
+#' factor at the test rows of a \code{\link{FusionForest}} fit.
 #'
 #' @details
-#' Under \deqn{\log T = m_0(X, S) + A \tau(X) + (1-S) A c(X) +
-#' \varepsilon,} with mean-zero error \eqn{\varepsilon} following a
-#' (source-specific) Gaussian or Dirichlet-process mixture
-#' distribution, the survival function under treatment \eqn{a} in
-#' target population \eqn{s_t} is
-#' \deqn{S_a(t | x, s_t) = 1 - F_{s_t}\bigl(\log t - \eta_a(x,
-#' s_t)\bigr),}
-#' where \eqn{F_{s_t}} is the error distribution function in source
-#' \eqn{s_t}, \eqn{\eta_a(x, s_t) = m_0(x, s_t) + a \tau(x) + (1-s_t) a
-#' c(x)} and \eqn{m_0(x, s_t) = \mu(x) + (1 - s_t) g(x)}.
-#' The estimands implemented here are
+#' The survival function under treatment \eqn{a} in target source \eqn{s_t}
+#' is
+#' \deqn{S_a(t \mid x, s_t) = 1 - F_{s_t}\{\log t - \eta_a(x, s_t)\},}{
+#'   S_a(t | x, s_t) = 1 - F_{s_t}(log t - eta_a(x, s_t)),}
+#' with \eqn{F_{s_t}} the error distribution in source \eqn{s_t} and
+#' \deqn{\eta_a(x, s_t) = m_0^{\mathrm{sh}}(x) + (1 - s_t)\,d(x) +
+#'   a\,\tau(x) + (1 - s_t)\,a\,c(x).}{eta_a(x, s_t) = m_0^sh(x) +
+#'   (1 - s_t) d(x) + a tau(x) + (1 - s_t) a c(x).}
+#' For fits with the \code{"centered"} or \code{"adaptive"} treatment
+#' coding, the function uses the coded treatment instead of \eqn{a}.
+#'
+#' Two estimands are available:
 #' \describe{
 #'   \item{\code{"SD"}}{Survival difference
-#'     \eqn{\Delta_{SD}(t; x, s_t) = S_1(t|x, s_t) - S_0(t|x, s_t)}.}
-#'   \item{\code{"AF"}}{Causal acceleration factor
-#'     \eqn{\exp(\tau(x))}.  Does not depend on the error distribution
-#'     or on \code{target_source}.}
+#'     \eqn{S_1(t \mid x, s_t) - S_0(t \mid x, s_t)}{S_1(t | x, s_t) -
+#'     S_0(t | x, s_t)}.}
+#'   \item{\code{"AF"}}{Acceleration factor \eqn{\exp\{\tau(x)\}}{exp(tau(x))}.
+#'     It does not depend on the error distribution or the target source.}
 #' }
 #'
-#' Population-averaged versions use Bayesian-bootstrap weights drawn fresh
-#' at each MCMC iteration (\eqn{w^{(r)} \sim Dirichlet(1, \ldots, 1)}), as
-#' in Rubin (1981); set \code{bayesian_bootstrap = FALSE} for equal
-#' weights.
+#' The population average weights the test rows.  By default, the weights
+#' are drawn from a Dirichlet(1, ..., 1) distribution at each iteration: the
+#' Bayesian bootstrap (Rubin, 1981).
 #'
-#' @param fit A fitted \code{FusionForest} object obtained with
-#'   \code{store_posterior_sample = TRUE}.  Must include posterior sample
-#'   matrices for all relevant component forests.  When
-#'   \code{estimand = "SD"}, the fit must use one of the supported
-#'   \code{error_dist} families.
-#' @param estimand Character, one of \code{"SD"}, \code{"AF"}.
-#' @param time Numeric scalar (positive).  Required for \code{"SD"};
-#'   ignored for \code{"AF"}.  Interpreted on the \emph{time} (not
-#'   log-time) scale.
-#' @param target_source Character, \code{"rwd"} (default) or \code{"rct"}.
-#'   Selects the target population \eqn{s_t} appearing in the survival
-#'   formula (eqs.\ 2.6--2.8 of \code{estimands.tex}).  Ignored for
-#'   \code{"AF"} since the causal AF is shared across sources.
-#' @param population_average Logical; if \code{TRUE} the function returns
-#'   posterior draws of the population-averaged estimand (a length
-#'   \eqn{R} vector).  Otherwise returns the \eqn{R \times n_{ev}} matrix
-#'   of per-\eqn{x} draws.  Default \code{FALSE}.
-#' @param bayesian_bootstrap Logical; if \code{TRUE} (default) the
-#'   population average uses Dirichlet weights drawn fresh at each
-#'   iteration.  If \code{FALSE} the average uses equal weights
-#'   \eqn{1/n_{ev}}.  Ignored when \code{population_average = FALSE}.
-#' @param seed Integer or \code{NULL}.  Sets the RNG seed used to draw
-#'   the Bayesian-bootstrap weights, for reproducibility.
+#' @param fit A \code{FusionForest} fit with
+#'   \code{store_posterior_sample = TRUE}.
+#' @param estimand \code{"SD"} or \code{"AF"}.
+#' @param time Time point for \code{"SD"}, on the time scale.  Ignored for
+#'   \code{"AF"}.
+#' @param target_source Target population: \code{"rwd"} (default) or
+#'   \code{"rct"}.  Ignored for \code{"AF"}.
+#' @param population_average If \code{TRUE}, average over the test rows.
+#'   Default \code{FALSE}.
+#' @param bayesian_bootstrap If \code{TRUE} (default), the population
+#'   average uses Bayesian bootstrap weights.  If \code{FALSE}, it uses
+#'   equal weights.
+#' @param seed Optional seed for the Bayesian bootstrap weights.
 #'
-#' @return If \code{population_average = FALSE}, an \eqn{R \times n_{ev}}
-#'   matrix of posterior draws of the estimand at each evaluation point
-#'   (test rows of the fit).  Otherwise a length-\eqn{R} numeric vector
-#'   of population-averaged draws.  In both cases the result carries
-#'   attributes \code{estimand}, \code{time}, \code{target_source}, and
-#'   (when applicable) \code{bayesian_bootstrap}.
+#' @return A matrix of posterior draws with one row per iteration and one
+#'   column per test row.  With \code{population_average = TRUE}, a vector
+#'   with one draw per iteration.  The result carries the attributes
+#'   \code{estimand}, \code{time} and \code{target_source}.
 #'
 #' @references
 #' Rubin, D.~B. (1981).  The Bayesian bootstrap.
 #' \emph{The Annals of Statistics}, 9, 130--134.
 #'
 #' @examples
-#' # Right-censored survival fusion fit with stored posterior samples
+#' # Right-censored fusion fit that stores the posterior draws
 #' set.seed(1)
 #' n <- 100
 #' X <- matrix(rnorm(n * 3), n, 3)
@@ -88,7 +74,7 @@
 #'   store_posterior_sample = TRUE, verbose = FALSE
 #' )
 #'
-#' # Posterior draws of the acceleration factor at each test point
+#' # Posterior draws of the acceleration factor per test row
 #' af <- fusion_estimand(fit, estimand = "AF")
 #' quantile(colMeans(af), c(0.25, 0.5, 0.75))
 #'
@@ -104,8 +90,7 @@ fusion_estimand <- function(
   seed               = NULL
 ) {
 
-  # "RMST" is accepted but intentionally undocumented (limited testing).
-  estimand      <- match.arg(estimand, choices = c("SD", "RMST", "AF"))
+  estimand      <- match.arg(estimand)
   target_source <- match.arg(target_source)
 
   meta <- fit$meta
@@ -113,7 +98,7 @@ fusion_estimand <- function(
     stop("fit$meta is missing.  Refit with FusionForest() using the current ",
          "package version, which attaches scale metadata to the result.")
 
-  if (estimand %in% c("SD", "RMST")) {
+  if (estimand == "SD") {
     if (is.null(time))
       stop("'time' is required for estimand = '", estimand, "'.")
     if (!is.numeric(time) || length(time) != 1L || !is.finite(time) || time <= 0)
@@ -138,24 +123,14 @@ fusion_estimand <- function(
     attrs <- list(estimand = "AF", time = NA_real_,
                   target_source = target_source)
   } else {
-    # eta_a(x, s_t) = m_0(x, s_t) + a tau(x) + (1 - s_t) a c(x)
-    s_t <- if (target_source == "rct") 1L else 0L
-    m0  <- comp$mu + (if (!is.null(comp$g) && s_t == 0L) comp$g else 0)
-    eta0 <- m0
-    eta1 <- m0 + comp$tau + (if (s_t == 0L) comp$c else 0)
+    s_t  <- if (target_source == "rct") 1L else 0L
+    eta0 <- .linear_predictor(comp, meta, a = 0, s_t = s_t)
+    eta1 <- .linear_predictor(comp, meta, a = 1, s_t = s_t)
 
-    mix  <- .residual_mixture(fit, meta, s_t)     # list(pi, theta, sigma)
-    log_t <- log(time)
-
-    if (estimand == "SD") {
-      draws <- .sd_draws(log_t, eta0, eta1, mix)
-      attrs <- list(estimand = "SD", time = time,
-                    target_source = target_source)
-    } else {                                       # "RMST"
-      draws <- .rmst_draws(time, log_t, eta0, eta1, mix)
-      attrs <- list(estimand = "RMST", time = time,
-                    target_source = target_source)
-    }
+    mix   <- .residual_mixture(fit, meta, s_t)    # list(pi, theta, sigma)
+    draws <- .sd_draws(log(time), eta0, eta1, mix)
+    attrs <- list(estimand = "SD", time = time,
+                  target_source = target_source)
   }
 
   ## -----------------------------------------------------------------
@@ -190,7 +165,7 @@ fusion_estimand <- function(
 # "time" the back-transform applied exp(.), so we take log() to recover
 # the log-time scale predictions used in the eta_a formula.  For "log"
 # and continuous outcomes the predictions are already on the right scale.
-# g(X) is NULL in three-forest mode.  `which` selects test or train rows.
+# `which` selects test or train rows.
 .log_scale_components <- function(fit, meta, which = c("test", "train")) {
 
   which <- match.arg(which)
@@ -209,9 +184,41 @@ fusion_estimand <- function(
     mu  = unlog(fit[[paste0(prefix, "control")]]),
     tau = unlog(fit[[paste0(prefix, "treat")]]),
     c   = unlog(fit[[paste0(prefix, "deconf")]]),
-    g   = if (meta$decomposition == "four-forest")
+    g   = if (!is.null(fit[[paste0(prefix, "deviation")]]))
             unlog(fit[[paste0(prefix, "deviation")]]) else NULL
   )
+}
+
+# Linear predictor of arm a in target source s_t, per iteration (R x n):
+#   eta_a = m_0^sh(x) + (1 - s_t) d(x) + b(a) [tau(x) + (1 - s_t) c(x)],
+# where b(a) is the coded treatment used by FusionForest().  Under the
+# "centered" and "adaptive" codings the baseline forests do not describe the
+# control arm, so the coding must be applied here as in the fit.
+.linear_predictor <- function(comp, meta, a, s_t) {
+  base <- comp$mu + (if (s_t == 0L && !is.null(comp$g)) comp$g else 0)
+  eff  <- comp$tau + (if (s_t == 0L) comp$c else 0)
+  b    <- .coded_treatment(meta, a, ncol(eff))
+  base + eff * rep(b, each = nrow(eff))
+}
+
+# Coded treatment b(a) for each evaluation row, matching FusionForest().
+.coded_treatment <- function(meta, a, n_ev) {
+  coding <- meta$treatment_coding
+  if (is.null(coding))
+    stop("fit$meta$treatment_coding is missing.  Refit with the current ",
+         "package version, or set it to the coding used for this fit ",
+         "(\"centered\", \"binary\" or \"adaptive\").")
+  switch(coding,
+    binary   = rep(a, n_ev),
+    centered = rep(a - 0.5, n_ev),
+    adaptive = {
+      pi_test <- meta$propensity_test
+      if (length(pi_test) != n_ev)
+        stop("fit$meta$propensity_test must have one entry per test row ",
+             "for treatment_coding = \"adaptive\".")
+      a - pi_test
+    },
+    stop("Unknown treatment_coding: \"", coding, "\"."))
 }
 
 # Return per-iteration mixture weights, atoms, and kernel SD for source s_t.
@@ -223,7 +230,7 @@ fusion_estimand <- function(
   err <- meta$error_dist
   R   <- length(fit$sigma)
 
-  if (err == "gaussian" || is.null(err)) {
+  if (is.null(err) || err == "gaussian") {
     sigma_resp <- fit$sigma * meta$sigma_hat       # R-vector
     return(list(
       pi    = matrix(1.0, R, 1L),
@@ -241,7 +248,9 @@ fusion_estimand <- function(
   pi_mat    <- fit$dp_mix_prop[[g_idx]]
   theta_mat <- fit$dp_locations[[g_idx]]
 
-  if (err == "source_dp_scale") {
+  # Per-source scales ("source_dp_scale", "source_hdp_scale"): use the
+  # target source's own sigma_s.  fit$sigma then holds a pooled scale.
+  if (!is.null(fit$dp_sigma_g)) {
     sigma_resp <- fit$dp_sigma_g[[g_idx]]           # already on response
   } else {
     sigma_resp <- fit$sigma * meta$sigma_hat
@@ -268,34 +277,4 @@ fusion_estimand <- function(
     out <- out + mix$pi[, k] * (pnorm(z0) - pnorm(z1))
   }
   out
-}
-
-# RMST contrast draws: R x n_ev matrix.  Per-component lognormal RMST,
-# weighted by the source mixture.
-.rmst_draws <- function(t_star, log_t, eta0, eta1, mix) {
-  K <- ncol(mix$pi)
-  R <- nrow(eta0)
-  out <- matrix(0.0, R, ncol(eta0))
-  sigma_r <- mix$sigma                              # R-vector
-  sigma2  <- sigma_r * sigma_r                      # R-vector
-  for (k in seq_len(K)) {
-    theta_k <- mix$theta[, k]                       # R-vector
-    xi0 <- eta0 + theta_k
-    xi1 <- eta1 + theta_k
-    out <- out + mix$pi[, k] *
-      (.rmst_component(t_star, log_t, xi1, sigma_r, sigma2) -
-       .rmst_component(t_star, log_t, xi0, sigma_r, sigma2))
-  }
-  out
-}
-
-# Lognormal RMST: E[min(T, t_star)] for log T ~ N(xi, sigma^2).
-# Returns an R x n_ev matrix.  Standard closed form:
-#   exp(xi + sigma^2/2) Phi((log t_star - xi - sigma^2)/sigma)
-#   + t_star (1 - Phi((log t_star - xi)/sigma)).
-.rmst_component <- function(t_star, log_t, xi, sigma_r, sigma2) {
-  inv_sigma <- 1.0 / sigma_r
-  a <- (log_t - xi - sigma2) * inv_sigma
-  b <- (log_t - xi) * inv_sigma
-  exp(xi + 0.5 * sigma2) * pnorm(a) + t_star * (1.0 - pnorm(b))
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/projection.R
 \name{fusion_projection}
 \alias{fusion_projection}
-\title{Posterior linear projection of the CATE or acceleration factor}
+\title{Posterior linear projection of the treatment effect}
 \usage{
 fusion_projection(
   fit,
@@ -18,82 +18,68 @@ fusion_projection(
 )
 }
 \arguments{
-\item{fit}{A fitted \code{FusionForest} object with
+\item{fit}{A \code{FusionForest} fit with
 \code{store_posterior_sample = TRUE}.}
 
-\item{basis}{One-sided formula defining the projection basis, e.g.\
-\code{~ x1 + x2 + x1:x2}.  Built into a design matrix via
-\code{stats::model.matrix}.}
+\item{basis}{One-sided formula for the basis, such as
+\code{~ x1 + x2 + x1:x2}.}
 
-\item{X_eval}{Data frame of evaluation covariates.  Must have one row
-per posterior-sample column of the chosen \code{which} set
-(i.e.\ the same rows passed as \code{X_test_*} or \code{X_train_*}
-when fitting).  Column names must match the variables referenced in
-\code{basis}.}
+\item{X_eval}{Data frame with the covariates of the evaluation rows: the
+test or training rows of the fit (see \code{which}).  It must contain
+the variables in \code{basis}.}
 
-\item{target}{Character; \code{"cate"} projects \eqn{\tau(x)} on the
-AFT log-time scale, \code{"af"} projects the acceleration factor
-\eqn{\exp\tau(x)} or its log (see \code{af_scale}).}
+\item{target}{\code{"cate"} projects \eqn{\tau(x)} on the log-time
+scale.  \code{"af"} projects the acceleration factor; see
+\code{af_scale}.}
 
-\item{af_scale}{Only used when \code{target = "af"}.
-\code{"multiplicative"} (default) projects \eqn{\exp\tau} directly,
-so \eqn{\gamma_k} is the change in the AF per unit of covariate
-\eqn{k}.  \code{"log"} projects \eqn{\tau} (equivalent to
-\code{target = "cate"}; kept as a labelled alias).}
+\item{af_scale}{For \code{target = "af"} only.  \code{"multiplicative"}
+(default) projects \eqn{\exp\tau}{exp(tau)}, so a coefficient is the
+change in the acceleration factor per unit of the covariate.
+\code{"log"} projects \eqn{\tau}, as \code{target = "cate"} does.}
 
-\item{which}{Which evaluation rows to use, \code{"test"} (default) or
-\code{"train"}.  Determines the implicit target population of the
-summary.}
+\item{which}{Evaluation rows: \code{"test"} (default) or \code{"train"}.
+These rows define the target population.}
 
-\item{weights}{\code{"uniform"} (default) or \code{"bayesian_bootstrap"}.
-The latter draws fresh Dirichlet weights at each MCMC iteration.}
+\item{weights}{\code{"uniform"} (default) or \code{"bayesian_bootstrap"}.}
 
-\item{center, scale}{Logical; centre and/or scale the non-intercept
-columns of \eqn{\Phi} before the projection.  Defaults: \code{TRUE},
-\code{FALSE}.}
+\item{center, scale}{Centre or scale the basis columns other than the
+intercept.  Defaults: \code{TRUE} and \code{FALSE}.}
 
-\item{seed}{Integer or \code{NULL}.  Sets the RNG seed used for the
-Bayesian-bootstrap weights, for reproducibility.}
+\item{seed}{Optional seed for the Bayesian bootstrap weights.}
 }
 \value{
-An \eqn{R \times k} numeric matrix of posterior draws of the
-projection coefficients, one row per MCMC iteration, with
-\code{colnames} from \code{model.matrix}.  Attributes:
-\code{target}, \code{af_scale}, \code{which}, \code{weights},
-\code{center} and \code{scale} vectors (\code{NULL} if not applied),
-and the original \code{formula}.
+A matrix of posterior draws of the coefficients, with one row
+per iteration and one column per basis term.  The attributes record
+\code{target}, \code{af_scale}, \code{which}, \code{weights}, the
+centring and scaling constants, and the \code{formula}.
 }
 \description{
-Projects each posterior draw of the heterogeneous treatment effect onto a
-user-supplied linear basis via (weighted) least squares.  The resulting
-\eqn{R \times k} collection of coefficient vectors is a sample from the
-posterior of the projection, i.e.\ the pushforward of \eqn{\tau(\cdot)}
-(or \eqn{\exp\tau(\cdot)}) under the projection map of Woody, Carvalho
-and Murray (2020).  Uncertainty is inherited exactly from the original
-posterior without refitting.
+Summarises the heterogeneous treatment effect by a linear model in a few
+covariates.  Each posterior draw of the effect is projected onto a
+linear basis by least squares (Woody, Carvalho and Murray, 2020).  The
+result is a posterior sample of the projection coefficients.  No
+refitting is needed.
 }
 \details{
-At iteration \eqn{r} the coefficient vector solves
-\deqn{\gamma^{(r)} = \arg\min_{\gamma}
-  \sum_i w_i^{(r)} \bigl(\theta^{(r)}(x_i) - \phi(x_i)^{\top}\gamma\bigr)^2,}
-where \eqn{\theta^{(r)}} is one of \eqn{\tau^{(r)}} (\code{target = "cate"}),
-\eqn{\exp\tau^{(r)}} (\code{target = "af"}, \code{af_scale = "multiplicative"}),
-or \eqn{\tau^{(r)}} again (\code{target = "af"}, \code{af_scale = "log"};
-kept as an alias for clarity).
+At iteration \eqn{r}, the coefficients solve
+\deqn{\gamma^{(r)} = \arg\min_{\gamma} \sum_i w_i^{(r)}
+  \{\theta^{(r)}(x_i) - \phi(x_i)^{\top}\gamma\}^2.}{gamma^(r) =
+  argmin_gamma sum_i w_i^(r) (theta^(r)(x_i) - phi(x_i)' gamma)^2.}
+Here \eqn{\theta^{(r)}} is \eqn{\tau^{(r)}} or
+\eqn{\exp\tau^{(r)}}{exp(tau^(r))}, depending on \code{target} and
+\code{af_scale}, and \eqn{\phi} is the basis given by \code{basis}.
 
-With \code{weights = "uniform"} the QR factorisation of \eqn{\Phi} is
-computed once and reused.  With \code{weights = "bayesian_bootstrap"}
-fresh Dirichlet weights \eqn{w^{(r)} \sim \mathrm{Dirichlet}(1,\ldots,1)}
-are drawn at each iteration (Rubin, 1981), injecting
-covariate-distribution uncertainty into the projection.
+The weights are equal by default.  With
+\code{weights = "bayesian_bootstrap"}, they are drawn from a
+Dirichlet(1, ..., 1) distribution at each iteration (Rubin, 1981).  This
+adds the uncertainty about the covariate distribution.
 
-Columns of \eqn{\Phi} other than the intercept are centred (and optionally
-scaled) once, on \code{X_eval}, before the projection.  The centring and
-scaling vectors are returned as attributes so coefficients can be mapped
-back to original units.
+The basis columns other than the intercept are centred on \code{X_eval},
+and optionally scaled.  The centring and scaling constants are returned
+as attributes.
 }
 \examples{
-# Continuous fusion fit with stored posterior samples
+# Continuous fusion fit that stores the posterior draws
 set.seed(1)
 n <- 100
 X <- matrix(rnorm(n * 3), n, 3)
@@ -112,7 +98,7 @@ fit <- FusionForest(
   store_posterior_sample = TRUE, verbose = FALSE
 )
 
-# Project the posterior CATE surface onto a linear basis
+# Summarise the treatment effect by a linear model in x1, x2 and x3
 proj <- fusion_projection(fit, basis = ~ x1 + x2 + x3,
                           X_eval = as.data.frame(X))
 colMeans(proj)

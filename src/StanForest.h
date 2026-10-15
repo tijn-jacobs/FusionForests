@@ -24,26 +24,11 @@ public:
                              std::vector<double>& split_probabilities,
                              bool use_augmentation, Random& random);
 
-  // IRS-aware overload of the birth-death step function.
-  friend bool BirthDeathStep(StanTree& tree, CutpointMatrix& cutpoints,
-                             DataInfo& data_info, PriorInfo& prior_info,
-                             double sigma,
-                             std::vector<size_t>& variable_split_counts,
-                             std::vector<double>& split_probabilities,
-                             bool use_augmentation, Random& random,
-                             RoutingMap& routing_map, int irs_mode);
-
   // Constructor / Destructor
   explicit StanForest(size_t num_trees);
   ~StanForest();
 
-  // Getters and Setters
-
-  size_t GetNumTrees() { return num_trees; }
-  void   SetNumTrees(size_t new_num_trees);
-
   // Set the feature matrix, working-response vector, and cutpoints.
-  void SetData(size_t p, size_t n, double* x, double* y, size_t nc = 100);
   void SetData(size_t p, size_t n, double* x, double* y, int* nc);
 
   // Set per-observation weights for weighted regression (e.g., b_i^2 in BCF).
@@ -52,7 +37,6 @@ public:
   // the array alive until weights are changed or cleared.
   void SetWeights(double* w) { data_info.weights = w; }
 
-  void SetPriorInfo(PriorInfo& info)  { this->prior_info = info; }
   void SetPriorParameters(double base, double power, double eta) {
     prior_info.base  = base;
     prior_info.power = power;
@@ -82,61 +66,18 @@ public:
   // Toggle the DART split-probability updates on/off.
   void ToggleDart() { dart_active = !dart_active; }
 
-  StanTree&       GetTree(size_t i)         { return trees[i]; }
-  CutpointMatrix& GetCutpointMatrix()       { return cutpoints; }
-  void            SetCutpointMatrix(CutpointMatrix& new_cutpoints);
-
   std::vector<size_t>& GetVariableSplitCounts() { return variable_split_counts; }
   std::vector<double>& GetSplitProbabilities()  { return split_probabilities; }
   double               GetDartTheta()           { return dart_theta; }
 
-  // Tree modification wrappers (by tree index and node id)
-  void Birth(size_t tree_index, size_t nid, size_t split_var, size_t cut_val,
-             double left_step_height, double right_step_height) {
-    trees[tree_index].Birth(nid, split_var, cut_val,
-                            left_step_height, right_step_height);
-  }
-  void Death(size_t tree_index, size_t nid, double new_step_height) {
-    trees[tree_index].Death(nid, new_step_height);
-  }
-
-  void Print();
-  void Clear() {
-    for (size_t i = 0; i < trees.size(); i++) trees[i].Clear();
-  }
-
   // Compute the forest prediction for all n observations and store in fp.
   void Predict(size_t p, size_t n, double* x, double* fp);
-
-  // IRS: test-time prediction with uniform random routing at NaN splits.
-  void Predict(size_t p, size_t n, double* x, double* fp, Random& random);
-
-  // IRS mode: 0=off, 1=skip-then-draw, 2=draw-then-decide, 3=uniform (P=0.5).
-  // Modes 4-6 = same as 1-3 but exclude NaN obs from leaf mean draws.
-  void SetIRS(int mode) {
-    if (mode >= 4 && mode <= 6) {
-      irs_mode = mode - 3;
-      irs_exclude_nan_from_mu = true;
-    } else {
-      irs_mode = mode;
-      irs_exclude_nan_from_mu = false;
-    }
-  }
 
   // Perform one full MCMC update (birth-death + leaf parameter draws).
   bool Draw(double sigma, Random& random, bool* accept);
 
   // Return the current forest fitted value for observation i.
   double GetFitAt(size_t i) { return all_fit[i]; }
-  double* GetAllFit()       { return all_fit; }
-
-  // Update the global scale parameter of the prior (horseshoe / half-Cauchy).
-  void UpdateGlobalScaleParameters(string prior_type,
-                                   double global_parameter,
-                                   double& storage_eta,
-                                   Random& random);
-  void UpdateHalfCauchyScale(double global_parameter, double& storage_eta,
-                             Random& random);
 
 protected:
   size_t num_trees;              // Number of trees in the ensemble
@@ -152,10 +93,6 @@ protected:
   double* residuals;             // Working residuals (length n)
   double* tree_fit_temp;         // Temporary per-tree fit buffer (length n)
   DataInfo data_info;            // Thin wrapper pointing into the arrays above
-  // IRS (Informed Random Splitting) state
-  int irs_mode = 0;              // 0=off, 1=skip-then-draw, 2=draw-then-decide, 3=uniform
-  bool irs_exclude_nan_from_mu = false;  // modes 4-6: exclude NaN obs from mu draw
-  std::vector<RoutingMap> routing_maps; // Per-tree routing maps for NaN obs
 
   // DART state
   bool use_dart;                 // Whether a Dirichlet prior is used

@@ -1,8 +1,7 @@
 #' Print a FusionForest fit
 #'
-#' Displays a compact overview of a fitted [FusionForest()] model:
-#' outcome type, forest decomposition, error model, sample sizes and
-#' MCMC settings.
+#' Prints the main settings of a [FusionForest()] fit: outcome type,
+#' treatment coding, error model, sample sizes and number of draws.
 #'
 #' @param x A `FusionForest` object.
 #' @param ... Ignored.
@@ -19,7 +18,7 @@ print.FusionForest <- function(x, ...) {
     cat("  Outcome type:    ", meta$outcome_type,
         " (timescale: ", meta$timescale, ")\n", sep = "")
   }
-  cat("  Decomposition:   ", meta$decomposition, "\n", sep = "")
+  cat("  Treatment coding:", meta$treatment_coding, "\n")
   cat("  Error model:     ", meta$error_dist, "\n", sep = "")
   cat("  Observations:    ", meta$n_train,
       " (RCT: ", meta$n_rct, ", RWD: ", meta$n_rwd, ")\n", sep = "")
@@ -32,19 +31,20 @@ print.FusionForest <- function(x, ...) {
 
 #' Summarise a FusionForest fit
 #'
-#' Computes posterior summaries of a fitted [FusionForest()] model:
-#' the residual standard deviation and the distribution of the
-#' estimated individual treatment effects (posterior means of the
-#' treatment forest evaluated at the training covariates).
+#' Summarises a [FusionForest()] fit: the error standard deviation, the
+#' estimated treatment effects of the training rows and the acceptance
+#' rates.
 #'
 #' @param object A `FusionForest` object.
 #' @param ... Ignored.
 #'
-#' @return An object of class `summary.FusionForest`: a list with
-#'   elements `meta`, `sigma` (posterior draws of the residual SD on
-#'   the standardised scale, `NULL` if `sigma` was fixed),
-#'   `treatment_effects` (posterior-mean treatment forest predictions
-#'   for the training data) and `acceptance_ratios`.
+#' @return A `summary.FusionForest` object: a list with
+#'   * `meta`: the settings of the fit;
+#'   * `sigma`: posterior draws of the error standard deviation on the
+#'     standardised scale;
+#'   * `treatment_effects`: posterior mean treatment effect of each
+#'     training row;
+#'   * `acceptance_ratios`: mean acceptance rate per forest.
 #'
 #' @export
 summary.FusionForest <- function(object, ...) {
@@ -78,7 +78,7 @@ print.summary.FusionForest <- function(x, digits = 3, ...) {
   cat("Summary of FusionForest fit\n\n")
   cat("Model\n")
   cat("  Outcome type:    ", meta$outcome_type, "\n", sep = "")
-  cat("  Decomposition:   ", meta$decomposition, "\n", sep = "")
+  cat("  Treatment coding:", meta$treatment_coding, "\n")
   cat("  Error model:     ", meta$error_dist, "\n", sep = "")
   cat("  Observations:    ", meta$n_train,
       " (RCT: ", meta$n_rct, ", RWD: ", meta$n_rwd, ")\n", sep = "")

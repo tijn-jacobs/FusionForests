@@ -43,28 +43,5 @@ void AugmentCensoredObservations(
   Random& random
 );
 
-// UpdateInvariantCoding
-// Conjugate normal update for the parameter-expanded (invariant) treatment
-// coding of Hahn, Murray & Carvalho (2020).  The model is
-//   y_i = mu(x_i) + tilde_tau(x_i) * b_{z_i} + eps_i
-// with priors  b_0 ~ N(0, 1/2),  b_1 ~ N(0, 1/2).
-// Given current mu, tilde_tau and sigma, the full conditional for each b_j
-// is a standard conjugate normal.
-void UpdateInvariantCoding(
-  double& b0,
-  double& b1,
-  double* b_train,
-  double* b_test,
-  const double* y,
-  const double* prediction_control,
-  const double* prediction_treat,
-  const int* treatment_indicator,
-  const int* treatment_indicator_test,
-  const size_t n,
-  const size_t n_test,
-  const double sigma,
-  Random& random
-);
-
 #endif // OUTERGIBBSFUNCTIONS_H
 

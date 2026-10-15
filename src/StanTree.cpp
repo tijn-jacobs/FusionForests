@@ -1,54 +1,5 @@
 #include "StanTree.h"
 
-// Return the 1-based binary-heap node id.
-size_t StanTree::NodeID() const
-{
-  if (!parent) return 1; // Root has no parent
-  if (this == parent->left) return 2 * (parent->NodeID());
-  else return 2 * (parent->NodeID()) + 1;
-}
-
-// Return a pointer to the node with the given id, or nullptr if not found.
-StanTree* StanTree::GetNodePointer(size_t id)
-{
-  if (this->NodeID() == id) return this;
-  if (left == nullptr) return nullptr;
-  StanTree* found_left = left->GetNodePointer(id);
-  if (found_left) return found_left;
-  StanTree* found_right = right->GetNodePointer(id);
-  if (found_right) return found_right;
-  return nullptr;
-}
-
-// Grow a leaf (addressed by node id) into an internal node.
-bool StanTree::Birth(size_t nid, size_t split_var, size_t cut_val,
-                     double left_step_height, double right_step_height)
-{
-  StanTree* target = GetNodePointer(nid);
-  if (target == nullptr) {
-    Rcpp::Rcout << "error in Birth: bottom node not found\n";
-    return false;
-  }
-  if (target->left != nullptr) {
-    Rcpp::Rcout << "error in Birth: found node has children\n";
-    return false;
-  }
-
-  StanTree* left_child  = new StanTree;
-  left_child->step_height  = left_step_height;
-  StanTree* right_child = new StanTree;
-  right_child->step_height = right_step_height;
-
-  target->left      = left_child;
-  target->right     = right_child;
-  target->split_var = split_var;
-  target->cut_val   = cut_val;
-  left_child->parent  = target;
-  right_child->parent = target;
-
-  return true;
-}
-
 // Return the depth of this node (root = 0).
 size_t StanTree::NodeDepth()
 {
@@ -72,41 +23,6 @@ char StanTree::NodeType()
   return 'i';
 }
 
-// Remove the children of the nog node with the given id.
-bool StanTree::Death(size_t nid, double new_step_height)
-{
-  StanTree* nog_node = GetNodePointer(nid);
-  if (nog_node == nullptr) {
-    Rcpp::Rcout << "error in Death: nid invalid\n";
-    return false;
-  }
-  if (nog_node->IsNog()) {
-    delete nog_node->left;
-    delete nog_node->right;
-    nog_node->left        = nullptr;
-    nog_node->right       = nullptr;
-    nog_node->split_var   = 0;
-    nog_node->cut_val     = 0;
-    nog_node->step_height = new_step_height;
-    return true;
-  } else {
-    Rcpp::Rcout << "error in Death: node is not a nog node\n";
-    return false;
-  }
-}
-
-// Return true iff this node has children but no grandchildren.
-bool StanTree::IsNog()
-{
-  bool is_nog = true;
-  if (left) {
-    if (left->left || right->left) is_nog = false;
-  } else {
-    is_nog = false; // Leaf node has no children
-  }
-  return is_nog;
-}
-
 size_t StanTree::NumberOfNogs()
 {
   if (!left) return 0;
@@ -115,12 +31,6 @@ size_t StanTree::NumberOfNogs()
   } else {
     return 1;
   }
-}
-
-size_t StanTree::NumberOfLeaves()
-{
-  if (left == nullptr) return 1;
-  return left->NumberOfLeaves() + right->NumberOfLeaves();
 }
 
 // Collect pointers to all leaf nodes.
@@ -147,25 +57,6 @@ void StanTree::CollectNogs(std::vector<StanTree*>& nog_vector)
   }
 }
 
-// Collect pointers to all nodes.
-void StanTree::CollectNodes(std::vector<StanTree*>& node_vector)
-{
-  node_vector.push_back(this);
-  if (left) {
-    left->CollectNodes(node_vector);
-    right->CollectNodes(node_vector);
-  }
-}
-
-void StanTree::CollectNodes(std::vector<const StanTree*>& node_vector) const
-{
-  node_vector.push_back(this);
-  if (left) {
-    left->CollectNodes(node_vector);
-    right->CollectNodes(node_vector);
-  }
-}
-
 // Find the leaf reached by observation x using the given cutpoints.
 StanTree* StanTree::FindLeaf(double* x, CutpointMatrix& cutpoints)
 {
@@ -181,44 +72,6 @@ StanTree* StanTree::FindLeaf(double* x, CutpointMatrix& cutpoints)
   }
 }
 
-// IRS: uniform random routing at NaN splits (test-time prediction).
-StanTree* StanTree::FindLeaf(double* x, CutpointMatrix& cutpoints, Random& random)
-{
-  if (left == nullptr) return this;
-  if (std::isnan(x[split_var])) {
-    if (random.uniform() < 0.5) {
-      return left->FindLeaf(x, cutpoints, random);
-    } else {
-      return right->FindLeaf(x, cutpoints, random);
-    }
-  }
-  if (x[split_var] < cutpoints[split_var][cut_val]) {
-    return left->FindLeaf(x, cutpoints, random);
-  } else {
-    return right->FindLeaf(x, cutpoints, random);
-  }
-}
-
-// IRS: routing-map lookup at NaN splits (training MCMC).
-StanTree* StanTree::FindLeaf(double* x, size_t obs_index,
-                             CutpointMatrix& cutpoints,
-                             RoutingMap& routing_map)
-{
-  if (left == nullptr) return this;
-  if (std::isnan(x[split_var])) {
-    auto it = routing_map.find(this);
-    if (it != routing_map.end() && it->second[obs_index] == 1) {
-      return left->FindLeaf(x, obs_index, cutpoints, routing_map);
-    } else {
-      return right->FindLeaf(x, obs_index, cutpoints, routing_map);
-    }
-  }
-  if (x[split_var] < cutpoints[split_var][cut_val]) {
-    return left->FindLeaf(x, obs_index, cutpoints, routing_map);
-  } else {
-    return right->FindLeaf(x, obs_index, cutpoints, routing_map);
-  }
-}
 
 // Narrow [lower_bound, upper_bound] for split_var by walking up the ancestors.
 void StanTree::FindRegionBounds(size_t split_var, int* lower_bound,

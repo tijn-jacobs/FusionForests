@@ -1,3 +1,17 @@
+# FusionForests 1.1.0
+
+- New data sets `breast_fusion` and `breast_fusion_truth`.
+- The `k_*` arguments now follow the paper's scaling
+  σ_h = k / (2√J), with defaults `k = 1` and `k_treat = 0.5`. Double old
+  `k_*` values to reproduce earlier fits.
+- The default `error_dist` is now `"source_hdp_scale"`.
+- `fusion_estimand()` now respects `treatment_coding` and per-source
+  error scales.
+- Removed `SimpleBART()`, `SimpleBCF()`, the `decomposition` argument
+  and the `"RMST"` estimand.
+- `FusionForest()` now errors on missing covariate values.
+- Documentation in the paper's notation, code cleanup and more tests.
+
 # FusionForests 1.0.1
 
 - Internal cleanup of the C++ layer for CRAN portability: removed

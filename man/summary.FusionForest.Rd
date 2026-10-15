@@ -12,15 +12,18 @@
 \item{...}{Ignored.}
 }
 \value{
-An object of class \code{summary.FusionForest}: a list with
-elements \code{meta}, \code{sigma} (posterior draws of the residual SD on
-the standardised scale, \code{NULL} if \code{sigma} was fixed),
-\code{treatment_effects} (posterior-mean treatment forest predictions
-for the training data) and \code{acceptance_ratios}.
+A \code{summary.FusionForest} object: a list with
+\itemize{
+\item \code{meta}: the settings of the fit;
+\item \code{sigma}: posterior draws of the error standard deviation on the
+standardised scale;
+\item \code{treatment_effects}: posterior mean treatment effect of each
+training row;
+\item \code{acceptance_ratios}: mean acceptance rate per forest.
+}
 }
 \description{
-Computes posterior summaries of a fitted \code{\link[=FusionForest]{FusionForest()}} model:
-the residual standard deviation and the distribution of the
-estimated individual treatment effects (posterior means of the
-treatment forest evaluated at the training covariates).
+Summarises a \code{\link[=FusionForest]{FusionForest()}} fit: the error standard deviation, the
+estimated treatment effects of the training rows and the acceptance
+rates.
 }

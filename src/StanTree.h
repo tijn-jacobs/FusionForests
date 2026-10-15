@@ -7,31 +7,12 @@
 // An observation goes left when x[v] < CutpointMatrix[v][c].
 using CutpointMatrix = std::vector<std::vector<double>>;
 
-// Per-node routing indicators for missing-data handling (IRS).
-// Maps internal-node pointer -> vector of length n:
-//   0 = not missing (deterministic routing)
-//   1 = routed left
-//  -1 = routed right
-class StanTree;  // forward declaration for the typedef
-using RoutingMap = std::unordered_map<StanTree*, std::vector<int8_t>>;
-
-// Information about a single node, used by the input-stream operator.
-struct NodeInfo {
-  std::size_t id;
-  std::size_t split_var;
-  std::size_t cut_val;
-  double step_height;
-};
-
 
 // A node in a binary regression tree carrying a scalar leaf parameter
 // (step_height).  Each node stores its own split rule (split_var, cut_val),
 // and pointers to its parent, left child, and right child.
 class StanTree {
 public:
-  // Stream operator for deserialisation
-  friend std::istream& operator>>(std::istream&, StanTree&);
-
   // Constructors and destructor
   StanTree()
     : step_height(0.0), split_var(0), cut_val(0),
@@ -52,8 +33,6 @@ public:
 
   // Setters
   void SetStepHeight(double value) { step_height = value; }
-  void SetSplitVar(size_t var)     { split_var = var; }
-  void SetCutVal(size_t val)       { cut_val = val; }
 
   // Getters
   double GetStepHeight() const { return step_height; }
@@ -63,18 +42,8 @@ public:
   StanTree* GetLeft()          { return left; }
   StanTree* GetRight()         { return right; }
 
-  // Return a pointer to the node with the given id (nullptr if not found).
-  StanTree* GetNodePointer(size_t id);
-
   // Find the leaf node reached by observation x using the given cutpoints.
   StanTree* FindLeaf(double* x, CutpointMatrix& cutpoints);
-
-  // IRS: uniform random routing at NaN splits (for test-time prediction).
-  StanTree* FindLeaf(double* x, CutpointMatrix& cutpoints, Random& random);
-
-  // IRS: routing-map lookup at NaN splits (for training MCMC).
-  StanTree* FindLeaf(double* x, size_t obs_index, CutpointMatrix& cutpoints,
-                     RoutingMap& routing_map);
 
   // Recursively narrow the valid range [lower_bound, upper_bound] for
   // split_var by walking up to the root.
@@ -85,21 +54,13 @@ public:
   size_t GetConstrainedCut(size_t split_var);
 
   // Node type queries
-  size_t NodeID()    const; // 1-based binary-heap index
   size_t NodeDepth();       // Distance from root (0 = root)
   char   NodeType();        // 't'=top 'b'=bottom 'n'=no-grandchildren 'i'=interior
-  bool   IsNog();           // True iff node has children but no grandchildren
 
   // Tree metrics
   size_t TreeSize();        // Total number of nodes
   size_t NumberOfNogs();    // Number of no-grandchildren nodes
-  size_t NumberOfLeaves();  // Number of leaf (bottom) nodes
 
-  // Grow a leaf into an internal node (addressed by node id).
-  bool Birth(size_t nid, size_t split_var, size_t cut_val,
-             double left_step_height, double right_step_height);
-  // Remove the two leaf children of a nog node (addressed by node id).
-  bool Death(size_t nid, double new_step_height);
   // Grow a leaf into an internal node via direct pointer.
   void BirthAtNode(StanTree* leaf, size_t split_var, size_t cut_val,
                    double left_step_height, double right_step_height);
@@ -110,12 +71,6 @@ public:
   void CollectLeaves(std::vector<StanTree*>& leaf_vector);
   // Collect pointers to all no-grandchildren nodes.
   void CollectNogs(std::vector<StanTree*>& nog_vector);
-  // Collect pointers to all nodes.
-  void CollectNodes(std::vector<StanTree*>& node_vector);
-  void CollectNodes(std::vector<const StanTree*>& node_vector) const;
-
-  // Print the tree to screen.
-  void Print(bool also_print_children = true);
 
 private:
   double step_height; // Leaf parameter (step height)

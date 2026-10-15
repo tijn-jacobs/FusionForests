@@ -15,7 +15,6 @@
 \code{x}, invisibly.
 }
 \description{
-Displays a compact overview of a fitted \code{\link[=FusionForest]{FusionForest()}} model:
-outcome type, forest decomposition, error model, sample sizes and
-MCMC settings.
+Prints the main settings of a \code{\link[=FusionForest]{FusionForest()}} fit: outcome type,
+treatment coding, error model, sample sizes and number of draws.
 }

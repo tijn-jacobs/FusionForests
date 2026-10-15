@@ -30,17 +30,6 @@ struct ForestEngine {
     stan_forest->SetData(p, n, X, augment_outcome, nc);
   }
 
-  // Overload with uniform number of cutpoints per variable.
-  void SetUpForest(size_t p, size_t n, double* X, double* augment_outcome,
-                   size_t num_cuts, double omega) {
-    stan_forest->SetData(p, n, X, augment_outcome, num_cuts);
-  }
-
-  // Set IRS mode: 0=off, 1=skip-then-draw, 2=draw-then-decide, 3=uniform.
-  void SetIRS(int mode) {
-    stan_forest->SetIRS(mode);
-  }
-
   // Set per-observation weights for weighted regression (e.g., b_i^2 in BCF).
   // Pass nullptr to clear and revert to the unweighted (uniform) likelihood.
   void SetWeights(double* w) { stan_forest->SetWeights(w); }
@@ -62,18 +51,9 @@ struct ForestEngine {
     stan_forest->Predict(p, n_test, X, out);
   }
 
-  // IRS: test-time prediction with uniform random routing at NaN splits.
-  void Predict(size_t p, size_t n_test, double* X, double* out, Random& random) {
-    stan_forest->Predict(p, n_test, X, out, random);
-  }
-
   // Accessors
   inline double GetPrediction(size_t i) {
     return stan_forest->GetFitAt(i);
-  }
-
-  inline double* GetPredictions() {
-    return stan_forest->GetAllFit();
   }
 
   std::vector<size_t>& GetVariableInclusionCount() {
@@ -82,13 +62,6 @@ struct ForestEngine {
 
   std::vector<double>& GetVariableInclusionProb() {
     return stan_forest->GetSplitProbabilities();
-  }
-
-  void UpdateGlobalScaleParameters(string prior_type,
-                                   double global_parameter,
-                                   double& storage_eta,
-                                   Random& random) {
-    stan_forest->UpdateGlobalScaleParameters(prior_type, global_parameter, storage_eta, random);
   }
 };
 

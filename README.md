@@ -14,7 +14,7 @@ The model targets heterogeneous treatment effects on continuous and
 time specification, the outcome is decomposed over separate tree
 forests:
 
-$$\log T = m_0(X) + (1-S)\,d(X) + A\,\tau(X) + (1-S)\,A\,c(X) + \varepsilon,$$
+$$\log T = m_0^{\mathrm{sh}}(X) + (1-S)\,d(X) + A\,\tau(X) + (1-S)\,A\,c(X) + \varepsilon,$$
 
 where $T$ is the survival time (for a continuous outcome, $\log T$ is
 replaced by the outcome itself), $A$ is the treatment, $S$ indicates
@@ -22,7 +22,7 @@ the source ($S = 1$ for the RCT, $S = 0$ for the RWD), and
 $\varepsilon$ is a mean-zero error term — Gaussian or a flexible
 Dirichlet-process mixture. Each term is modelled by its own forest:
 
-- $m_0(X)$ — **baseline forest**: the baseline log survival time under
+- $m_0^{\mathrm{sh}}(X)$ — **baseline forest**: the baseline log survival time under
   control, shared across both sources (`control` arguments);
 - $d(X)$ — **deviation forest**: how the baseline in the RWD deviates
   from the one in the RCT (`deviation` arguments);
@@ -44,6 +44,12 @@ The methodology is described in:
 > https://arxiv.org/abs/2607.29295
 
 ## Installation
+
+Install the released version from CRAN:
+
+```r
+install.packages("FusionForests")
+```
 
 The development version can be installed from GitHub:
 

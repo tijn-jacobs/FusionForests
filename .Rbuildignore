@@ -1,22 +1,26 @@
 ^sticker$
 ^simulations$
-^paper$
-^\.github$
 ^\.devcontainer$
 ^\.claude$
 ^LICENSE\.md$
 ^CONTRIBUTING\.md$
 ^info$
 ^examples$
+^notes$
 
 ## Heavy folders not part of the package proper
 ^archive$
 ^backups$
-^data$
+## Private data (local only); data/ holds package data only
+^data-private$
 ^manuscripts$
-^inst/AFTrees-master$
-^src/deprecated$
 ^\.vscode$
+
+## Vignette sources: CRAN renders the precomputed FusionForests.Rmd only
+^vignettes/.*\.Rmd\.orig$
+^vignettes/precompile\.R$
+^vignettes/FEATURE_NOTES\.md$
+^vignettes/cache$
 
 ## Compiler scratch files that R CMD build's cleanup does not know
 ^src/.*\.o\.tmp$
@@ -25,9 +29,5 @@
 ^\.RDataTmp$
 ^\.Rhistory$
 ^\.DS_Store$
-^TEST\.md$
-^error_distribution_notes\.md$
-^texput\.log$
 ^CLAUDE\.md$
 ^Rplots\.pdf$
-^file$

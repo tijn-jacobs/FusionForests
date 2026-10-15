@@ -6,8 +6,6 @@ StanForest::StanForest(size_t num_trees_init)
   : num_trees(num_trees_init), trees(num_trees_init), prior_info(),
     p(0), n(0), x(nullptr), y(nullptr), cutpoints(),
     all_fit(nullptr), residuals(nullptr), tree_fit_temp(nullptr), data_info(),
-    irs_mode(0), irs_exclude_nan_from_mu(false),
-    routing_maps(num_trees_init),
     use_dart(false), dart_active(false), use_augmentation(false),
     fixed_theta(false), dart_a(0.0), dart_b(0.0), dart_rho(0.0),
     dart_theta(1.0) {}
@@ -20,39 +18,9 @@ StanForest::~StanForest()
   if (tree_fit_temp) delete[] tree_fit_temp;
 }
 
-// Change the number of trees and recompute the current forest fit.
-void StanForest::SetNumTrees(size_t new_num_trees)
-{
-  trees.resize(new_num_trees);
-  routing_maps.resize(new_num_trees);
-  num_trees = trees.size();
-  if (all_fit && (cutpoints.size() == p)) Predict(p, n, x, all_fit);
-}
-
-// Deep-copy new_cutpoints into the internal cutpoints.
-void StanForest::SetCutpointMatrix(CutpointMatrix& new_cutpoints)
-{
-  size_t num_predictors = new_cutpoints.size();
-  cutpoints.resize(num_predictors);
-  for (size_t i = 0; i < num_predictors; i++) {
-    size_t num_cuts = new_cutpoints[i].size();
-    cutpoints[i].resize(num_cuts);
-    for (size_t j = 0; j < num_cuts; j++)
-      cutpoints[i][j] = new_cutpoints[i][j];
-  }
-}
-
 // Set the feature matrix and working-response, build cutpoints, and allocate
-// working arrays.  nc == uniform cut count per variable (scalar overload).
-void StanForest::SetData(size_t p, size_t n, double* x, double* y,
-                         size_t num_cuts_per_var)
-{
-  int* nc = new int[p];
-  for (size_t i = 0; i < p; ++i) nc[i] = static_cast<int>(num_cuts_per_var);
-  this->SetData(p, n, x, y, nc);
-  delete[] nc;
-}
-
+// working arrays.  nc[v] is the number of cutpoints for predictor v, or
+// nullptr to use the unique observed values.
 void StanForest::SetData(size_t p, size_t n, double* x, double* y, int* nc)
 {
   this->p = p; this->n = n; this->x = x; this->y = y;
@@ -95,76 +63,30 @@ void StanForest::Predict(size_t p, size_t n, double* x, double* fp)
   delete[] temp;
 }
 
-// IRS: test-time prediction with uniform random routing at NaN splits.
-void StanForest::Predict(size_t p, size_t n, double* x, double* fp,
-                         Random& random)
-{
-  double* temp = new double[n];
-
-  for (size_t j = 0; j < n; j++) fp[j] = 0.0;
-  for (size_t j = 0; j < num_trees; j++) {
-    FitTree(trees[j], cutpoints, p, n, x, temp, random);
-    for (size_t k = 0; k < n; k++) fp[k] += temp[k];
-  }
-
-  delete[] temp;
-}
-
 // Perform one full MCMC sweep: for each tree, update its structure and leaf
 // parameters, then optionally update the DART split probabilities.
 bool StanForest::Draw(double sigma, Random& random, bool* accept)
 {
   for (size_t j = 0; j < num_trees; j++) {
 
-    if (irs_mode > 0) {
-
-      // Redraw routing indicators at nog nodes (Gibbs step).
-      RedrawNogRouting(trees[j], cutpoints, data_info, sigma,
-                       prior_info.eta, routing_maps[j], random, irs_mode);
-
-      // Remove the current contribution of tree j from all_fit.
-      FitTree(trees[j], cutpoints, p, n, x, tree_fit_temp, routing_maps[j]);
-      for (size_t k = 0; k < n; k++) {
-        all_fit[k]  -= tree_fit_temp[k];
-        residuals[k] = y[k] - all_fit[k];
-      }
-
-      // Propose a birth or death for tree j (IRS-aware).
-      accept[j] = BirthDeathStep(trees[j], cutpoints, data_info, prior_info,
-                                  sigma, variable_split_counts,
-                                  split_probabilities, use_augmentation, random,
-                                  routing_maps[j], irs_mode);
-
-      // Draw new leaf parameters for tree j (IRS-aware).
-      DrawAllLeafMeans(trees[j], cutpoints, data_info, prior_info, sigma,
-                       random, routing_maps[j],
-                       irs_exclude_nan_from_mu);
-
-      // Add the updated contribution of tree j back to all_fit.
-      FitTree(trees[j], cutpoints, p, n, x, tree_fit_temp, routing_maps[j]);
-      for (size_t k = 0; k < n; k++) all_fit[k] += tree_fit_temp[k];
-
-    } else {
-
-      // Remove the current contribution of tree j from all_fit.
-      FitTree(trees[j], cutpoints, p, n, x, tree_fit_temp);
-      for (size_t k = 0; k < n; k++) {
-        all_fit[k]  -= tree_fit_temp[k];
-        residuals[k] = y[k] - all_fit[k];
-      }
-
-      // Propose a birth or death for tree j.
-      accept[j] = BirthDeathStep(trees[j], cutpoints, data_info, prior_info,
-                                  sigma, variable_split_counts,
-                                  split_probabilities, use_augmentation, random);
-
-      // Draw new leaf parameters for tree j.
-      DrawAllLeafMeans(trees[j], cutpoints, data_info, prior_info, sigma, random);
-
-      // Add the updated contribution of tree j back to all_fit.
-      FitTree(trees[j], cutpoints, p, n, x, tree_fit_temp);
-      for (size_t k = 0; k < n; k++) all_fit[k] += tree_fit_temp[k];
+    // Remove the current contribution of tree j from all_fit.
+    FitTree(trees[j], cutpoints, p, n, x, tree_fit_temp);
+    for (size_t k = 0; k < n; k++) {
+      all_fit[k]  -= tree_fit_temp[k];
+      residuals[k] = y[k] - all_fit[k];
     }
+
+    // Propose a birth or death for tree j.
+    accept[j] = BirthDeathStep(trees[j], cutpoints, data_info, prior_info,
+                                sigma, variable_split_counts,
+                                split_probabilities, use_augmentation, random);
+
+    // Draw new leaf parameters for tree j.
+    DrawAllLeafMeans(trees[j], cutpoints, data_info, prior_info, sigma, random);
+
+    // Add the updated contribution of tree j back to all_fit.
+    FitTree(trees[j], cutpoints, p, n, x, tree_fit_temp);
+    for (size_t k = 0; k < n; k++) all_fit[k] += tree_fit_temp[k];
   }
 
   if (dart_active) {
@@ -178,63 +100,3 @@ bool StanForest::Draw(double sigma, Random& random, bool* accept)
 
   return true;
 }
-
-void StanForest::Print()
-{
-  Rcpp::Rcout << "*****StanForest object:\n";
-  Rcpp::Rcout << "num_trees: " << num_trees << std::endl;
-  Rcpp::Rcout << "prior and mcmc info:\n";
-  if (use_dart) {
-    Rcpp::Rcout << "*****dart prior (On):\n";
-    Rcpp::Rcout << "dart_a: "   << dart_a   << std::endl;
-    Rcpp::Rcout << "dart_b: "   << dart_b   << std::endl;
-    Rcpp::Rcout << "dart_rho: " << dart_rho << std::endl;
-    Rcpp::Rcout << "use_augmentation: " << use_augmentation << std::endl;
-  } else {
-    Rcpp::Rcout << "*****dart prior (Off):\n";
-  }
-  if (p) Rcpp::Rcout << "data set: n, p: " << n << ", " << p << std::endl;
-  else   Rcpp::Rcout << "data not set\n";
-}
-
-void StanForest::UpdateGlobalScaleParameters(string prior_type,
-                                             double global_parameter,
-                                             double& storage_eta,
-                                             Random& random)
-{
-  if (prior_type == "standard-halfcauchy") {
-    this->UpdateHalfCauchyScale(global_parameter, storage_eta, random);
-  } else if (prior_type == "standard-halfnormal") {
-    return;
-  } else {
-    return;
-  }
-}
-
-void StanForest::UpdateHalfCauchyScale(double global_parameter,
-                                       double& storage_eta,
-                                       Random& random)
-{
-  double sum_sq    = 0.0;
-  double num_leaves = 0.0;
-
-  for (size_t j = 0; j < num_trees; j++) {
-    std::vector<StanTree*> leaves;
-    trees[j].CollectLeaves(leaves);
-
-    for (auto* leaf : leaves) {
-      double step_height = leaf->GetStepHeight();
-      sum_sq    += (step_height * step_height) / (prior_info.eta * prior_info.eta);
-      num_leaves += 1.0;
-    }
-  }
-
-  double shape = 0.5 * (1.0 + num_leaves);
-  double rate  = 0.5 * (1.0 + sum_sq);
-
-  double aux = random.gamma(shape, 1.0) / rate;
-  prior_info.eta = global_parameter /
-                   (std::sqrt(aux) * std::sqrt(static_cast<double>(num_trees)));
-  storage_eta = prior_info.eta;
-}
-

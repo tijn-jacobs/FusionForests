@@ -15,77 +15,63 @@ fusion_estimand(
 )
 }
 \arguments{
-\item{fit}{A fitted \code{FusionForest} object obtained with
-\code{store_posterior_sample = TRUE}.  Must include posterior sample
-matrices for all relevant component forests.  When
-\code{estimand = "SD"}, the fit must use one of the supported
-\code{error_dist} families.}
+\item{fit}{A \code{FusionForest} fit with
+\code{store_posterior_sample = TRUE}.}
 
-\item{estimand}{Character, one of \code{"SD"}, \code{"AF"}.}
+\item{estimand}{\code{"SD"} or \code{"AF"}.}
 
-\item{time}{Numeric scalar (positive).  Required for \code{"SD"};
-ignored for \code{"AF"}.  Interpreted on the \emph{time} (not
-log-time) scale.}
+\item{time}{Time point for \code{"SD"}, on the time scale.  Ignored for
+\code{"AF"}.}
 
-\item{target_source}{Character, \code{"rwd"} (default) or \code{"rct"}.
-Selects the target population \eqn{s_t} appearing in the survival
-formula (eqs.\ 2.6--2.8 of \code{estimands.tex}).  Ignored for
-\code{"AF"} since the causal AF is shared across sources.}
+\item{target_source}{Target population: \code{"rwd"} (default) or
+\code{"rct"}.  Ignored for \code{"AF"}.}
 
-\item{population_average}{Logical; if \code{TRUE} the function returns
-posterior draws of the population-averaged estimand (a length
-\eqn{R} vector).  Otherwise returns the \eqn{R \times n_{ev}} matrix
-of per-\eqn{x} draws.  Default \code{FALSE}.}
+\item{population_average}{If \code{TRUE}, average over the test rows.
+Default \code{FALSE}.}
 
-\item{bayesian_bootstrap}{Logical; if \code{TRUE} (default) the
-population average uses Dirichlet weights drawn fresh at each
-iteration.  If \code{FALSE} the average uses equal weights
-\eqn{1/n_{ev}}.  Ignored when \code{population_average = FALSE}.}
+\item{bayesian_bootstrap}{If \code{TRUE} (default), the population
+average uses Bayesian bootstrap weights.  If \code{FALSE}, it uses
+equal weights.}
 
-\item{seed}{Integer or \code{NULL}.  Sets the RNG seed used to draw
-the Bayesian-bootstrap weights, for reproducibility.}
+\item{seed}{Optional seed for the Bayesian bootstrap weights.}
 }
 \value{
-If \code{population_average = FALSE}, an \eqn{R \times n_{ev}}
-matrix of posterior draws of the estimand at each evaluation point
-(test rows of the fit).  Otherwise a length-\eqn{R} numeric vector
-of population-averaged draws.  In both cases the result carries
-attributes \code{estimand}, \code{time}, \code{target_source}, and
-(when applicable) \code{bayesian_bootstrap}.
+A matrix of posterior draws with one row per iteration and one
+column per test row.  With \code{population_average = TRUE}, a vector
+with one draw per iteration.  The result carries the attributes
+\code{estimand}, \code{time} and \code{target_source}.
 }
 \description{
-Compute posterior draws of the survival difference or the
-acceleration factor (AF) at the covariate values supplied to
-\code{FusionForest()} as the test set, using the closed-form
-expressions of the AFT decomposition with (H)DP error.
+Computes posterior draws of the survival difference or the acceleration
+factor at the test rows of a \code{\link{FusionForest}} fit.
 }
 \details{
-Under \deqn{\log T = m_0(X, S) + A \tau(X) + (1-S) A c(X) +
-\varepsilon,} with mean-zero error \eqn{\varepsilon} following a
-(source-specific) Gaussian or Dirichlet-process mixture
-distribution, the survival function under treatment \eqn{a} in
-target population \eqn{s_t} is
-\deqn{S_a(t | x, s_t) = 1 - F_{s_t}\bigl(\log t - \eta_a(x,
-s_t)\bigr),}
-where \eqn{F_{s_t}} is the error distribution function in source
-\eqn{s_t}, \eqn{\eta_a(x, s_t) = m_0(x, s_t) + a \tau(x) + (1-s_t) a
-c(x)} and \eqn{m_0(x, s_t) = \mu(x) + (1 - s_t) g(x)}.
-The estimands implemented here are
+The survival function under treatment \eqn{a} in target source \eqn{s_t}
+is
+\deqn{S_a(t \mid x, s_t) = 1 - F_{s_t}\{\log t - \eta_a(x, s_t)\},}{
+  S_a(t | x, s_t) = 1 - F_{s_t}(log t - eta_a(x, s_t)),}
+with \eqn{F_{s_t}} the error distribution in source \eqn{s_t} and
+\deqn{\eta_a(x, s_t) = m_0^{\mathrm{sh}}(x) + (1 - s_t)\,d(x) +
+  a\,\tau(x) + (1 - s_t)\,a\,c(x).}{eta_a(x, s_t) = m_0^sh(x) +
+  (1 - s_t) d(x) + a tau(x) + (1 - s_t) a c(x).}
+For fits with the \code{"centered"} or \code{"adaptive"} treatment
+coding, the function uses the coded treatment instead of \eqn{a}.
+
+Two estimands are available:
 \describe{
 \item{\code{"SD"}}{Survival difference
-\eqn{\Delta_{SD}(t; x, s_t) = S_1(t|x, s_t) - S_0(t|x, s_t)}.}
-\item{\code{"AF"}}{Causal acceleration factor
-\eqn{\exp(\tau(x))}.  Does not depend on the error distribution
-or on \code{target_source}.}
+\eqn{S_1(t \mid x, s_t) - S_0(t \mid x, s_t)}{S_1(t | x, s_t) -
+    S_0(t | x, s_t)}.}
+\item{\code{"AF"}}{Acceleration factor \eqn{\exp\{\tau(x)\}}{exp(tau(x))}.
+It does not depend on the error distribution or the target source.}
 }
 
-Population-averaged versions use Bayesian-bootstrap weights drawn fresh
-at each MCMC iteration (\eqn{w^{(r)} \sim Dirichlet(1, \ldots, 1)}), as
-in Rubin (1981); set \code{bayesian_bootstrap = FALSE} for equal
-weights.
+The population average weights the test rows.  By default, the weights
+are drawn from a Dirichlet(1, ..., 1) distribution at each iteration: the
+Bayesian bootstrap (Rubin, 1981).
 }
 \examples{
-# Right-censored survival fusion fit with stored posterior samples
+# Right-censored fusion fit that stores the posterior draws
 set.seed(1)
 n <- 100
 X <- matrix(rnorm(n * 3), n, 3)
@@ -107,7 +93,7 @@ fit <- FusionForest(
   store_posterior_sample = TRUE, verbose = FALSE
 )
 
-# Posterior draws of the acceleration factor at each test point
+# Posterior draws of the acceleration factor per test row
 af <- fusion_estimand(fit, estimand = "AF")
 quantile(colMeans(af), c(0.25, 0.5, 0.75))
 
