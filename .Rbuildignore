@@ -1,6 +1,7 @@
 ^sticker$
 ^simulations$
 ^\.devcontainer$
+^\.github$
 ^\.claude$
 ^LICENSE\.md$
 ^CONTRIBUTING\.md$
