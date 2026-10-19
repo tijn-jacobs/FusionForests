@@ -113,3 +113,7 @@ vignettes/cache/
 
 # Temporary notes on missing features (local only)
 vignettes/FEATURE_NOTES.md
+
+# centring benchmark: local package libraries and results
+simulations/benchmark_centering/lib/
+simulations/benchmark_centering/results*/

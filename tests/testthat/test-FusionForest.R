@@ -358,6 +358,8 @@ test_that("FusionForest runs under every error distribution", {
 })
 
 test_that("k_deviation = 0 switches off the deviation forest", {
+  # Under a source-specific error model the reported d is the constant
+  # mu_0 - mu_1 (see test-mixture-centering.R), so use a Gaussian error here.
   fit <- FusionForest(
     y                         = y_cnt,
     X_train_control           = X,
@@ -365,6 +367,7 @@ test_that("k_deviation = 0 switches off the deviation forest", {
     treatment_indicator_train = trt,
     source_indicator_train    = src,
     k_deviation               = 0,
+    error_dist                = "gaussian",
     N_post = N_post, N_burn = N_burn, verbose = FALSE
   )
   expect_true(all(abs(fit$train_predictions_deviation) < 1e-6))

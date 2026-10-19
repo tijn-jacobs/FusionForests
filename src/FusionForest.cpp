@@ -309,7 +309,7 @@ Rcpp::List FusionForest_cpp(
   Rcpp::List dp_locations_list(dp_active ? dp_groups : 0);
   Rcpp::List dp_mass_list     (dp_active ? dp_groups : 0);
   Rcpp::List dp_sigma_g_list  (dp_scale_mode ? dp_groups : 0);
-  Rcpp::List dp_mu_g_list     (dp_hdp_mode   ? dp_groups : 0);
+  Rcpp::List dp_mu_g_list     (dp_active ? dp_groups : 0);
   Rcpp::NumericMatrix dp_locations_shared_mat;
   Rcpp::NumericMatrix dp_beta_mat;
   Rcpp::NumericVector dp_gamma_vec;
@@ -319,7 +319,7 @@ Rcpp::List FusionForest_cpp(
       dp_locations_list[g] = Rcpp::NumericMatrix(N_post, static_cast<int>(mixture_K));
       dp_mass_list[g]      = Rcpp::NumericVector(N_post);
       if (dp_scale_mode) dp_sigma_g_list[g] = Rcpp::NumericVector(N_post);
-      if (dp_hdp_mode)   dp_mu_g_list[g]    = Rcpp::NumericVector(N_post);
+      dp_mu_g_list[g]      = Rcpp::NumericVector(N_post);
     }
   }
   if (dp_hdp_mode) {
@@ -415,6 +415,28 @@ Rcpp::List FusionForest_cpp(
       Rcpp::Rcout.flush();
     }
 
+    // Refresh the mu target with the current augmented outcome and the
+    // current mixture shift (both changed at the end of the previous sweep).
+    {
+      size_t j = 0;  // index into RWD subset
+      for (size_t k = 0; k < n; ++k) {
+        const double b = b_train[k];
+        const double s =
+          (source_indicator[k] == 1) ? 1.0 : 0.0;
+        double g_k = 0.0, c_k = 0.0;
+        if (source_indicator[k] == 0) {
+          g_k = forest_g.GetPrediction(j);
+          c_k = forest_c.GetPrediction(j);
+          ++j;
+        }
+        augmented_outcome_control[k] =
+          y[k] - (1.0 - s) * g_k
+               - b * (forest_tau.GetPrediction(k)
+                     + (1.0 - s) * c_k)
+               - theta_shift[k];
+      }
+    }
+
     // -- Update mu (shared baseline, all observations) --
     forest_mu.UpdateForest(sigma, accepted_control, random);
 
@@ -471,11 +493,6 @@ Rcpp::List FusionForest_cpp(
                     - theta_shift[k]) / b;
           ++j;
         }
-        augmented_outcome_control[k] =
-          y[k] - (1.0 - s) * g_k
-               - b * (forest_tau.GetPrediction(k)
-                     + (1.0 - s) * c_k)
-               - theta_shift[k];
         augmented_outcome_treat[k] = b_zero ? 0.0
           : (y[k] - forest_mu.GetPrediction(k)
                   - (1.0 - s) * g_k
@@ -493,8 +510,6 @@ Rcpp::List FusionForest_cpp(
       for (size_t k = 0; k < n; ++k) {
         const double b      = b_train[k];
         const bool   b_zero = (std::abs(b) < b_eps);
-        const double s =
-          (source_indicator[k] == 1) ? 1.0 : 0.0;
 
         double g_k = 0.0, c_k = 0.0;
         if (source_indicator[k] == 0) {
@@ -510,11 +525,6 @@ Rcpp::List FusionForest_cpp(
                     - theta_shift[k]) / b;
           ++j;
         }
-        augmented_outcome_control[k] =
-          y[k] - (1.0 - s) * g_k
-               - b * (forest_tau.GetPrediction(k)
-                     + (1.0 - s) * c_k)
-               - theta_shift[k];
       }
     }
 
@@ -540,11 +550,6 @@ Rcpp::List FusionForest_cpp(
                  - theta_shift[k];
           ++j;
         }
-        augmented_outcome_control[k] =
-          y[k] - (1.0 - s) * g_k
-               - b * (forest_tau.GetPrediction(k)
-                     + (1.0 - s) * c_k)
-               - theta_shift[k];
         augmented_outcome_treat[k] = b_zero ? 0.0
           : (y[k] - forest_mu.GetPrediction(k)
                   - (1.0 - s) * g_k
@@ -621,15 +626,25 @@ Rcpp::List FusionForest_cpp(
     // -- Post-burn-in storage --
     if (i >= N_burn) {
 
+      // Centring map (Yang et al., 2010).  The sweep works with the
+      // uncentred mixture; the stored draw is the centred model's:
+      //   m0_sh = mu~ + mu_RCT,   d = d~ + (mu_RWD - mu_RCT),
+      //   atoms theta_k - mu_s (from mixture.locations(g)); tau, c unchanged.
+      // Both shifts are zero without a mixture.
+      const double mu_rct     = dp_active ? mixture.mu_source(1) : 0.0;
+      const double mu_rwd     = dp_active ? mixture.mu_source(0) : 0.0;
+      const double shift_ctrl = mu_rct;
+      const double shift_dev  = mu_rwd - mu_rct;
+
       size_t j_rwd = 0;
       for (size_t k = 0; k < n; ++k) {
         const double b = b_train[k];
-        const double mu_k  = forest_mu.GetPrediction(k);
+        const double mu_k  = forest_mu.GetPrediction(k) + shift_ctrl;
         const double tau_k = forest_tau.GetPrediction(k);
         double g_k = 0.0, c_k = 0.0, s = 1.0;
         if (source_indicator[k] == 0) {
           s   = 0.0;
-          g_k = forest_g.GetPrediction(j_rwd);
+          g_k = forest_g.GetPrediction(j_rwd) + shift_dev;
           c_k = forest_c.GetPrediction(j_rwd);
           train_predictions_mean_deviation[j_rwd] += g_k;
           train_predictions_mean_deconf[j_rwd]    += c_k;
@@ -645,7 +660,7 @@ Rcpp::List FusionForest_cpp(
       if (store_posterior_sample) {
         for (size_t k = 0; k < n; ++k) {
           train_predictions_sample_control(i - N_burn, k) =
-            forest_mu.GetPrediction(k);
+            forest_mu.GetPrediction(k) + shift_ctrl;
           train_predictions_sample_treat(i - N_burn, k) =
             forest_tau.GetPrediction(k);
         }
@@ -655,7 +670,7 @@ Rcpp::List FusionForest_cpp(
             train_predictions_sample_deconf(i - N_burn, j_rwd2) =
               forest_c.GetPrediction(j_rwd2);
             train_predictions_sample_deviation(i - N_burn, j_rwd2) =
-              forest_g.GetPrediction(j_rwd2);
+              forest_g.GetPrediction(j_rwd2) + shift_dev;
             ++j_rwd2;
           }
         }
@@ -670,6 +685,10 @@ Rcpp::List FusionForest_cpp(
                          X_test_deconf, testpred_deconf);
         forest_g.Predict(p_deviation, n_test,
                          X_test_deviation, testpred_deviation);
+        for (size_t k = 0; k < n_test; ++k) {
+          testpred_control[k]   += shift_ctrl;
+          testpred_deviation[k] += shift_dev;
+        }
 
         if (store_posterior_sample) {
           for (size_t k = 0; k < n_test; ++k) {
@@ -727,7 +746,7 @@ Rcpp::List FusionForest_cpp(
             Rcpp::NumericVector sg = dp_sigma_g_list[g];
             sg[i - N_burn] = mixture.sigma_g(g);
           }
-          if (dp_hdp_mode) {
+          {
             Rcpp::NumericVector mug = dp_mu_g_list[g];
             mug[i - N_burn] = mixture.mu_g_vec()[g];
           }
@@ -839,12 +858,12 @@ Rcpp::List FusionForest_cpp(
     results["dp_mix_prop"]   = dp_mix_prop_list;
     results["dp_locations"]  = dp_locations_list;
     results["dp_mass"]       = dp_mass_list;
+    results["dp_mu_g"]       = dp_mu_g_list;
     if (dp_scale_mode) results["dp_sigma_g"] = dp_sigma_g_list;
     if (dp_hdp_mode) {
       results["dp_locations_shared"] = dp_locations_shared_mat;
       results["dp_beta"]             = dp_beta_mat;
       results["dp_gamma"]            = dp_gamma_vec;
-      results["dp_mu_g"]             = dp_mu_g_list;
     }
   }
 

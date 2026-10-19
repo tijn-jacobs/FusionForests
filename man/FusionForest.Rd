@@ -112,7 +112,10 @@ Default 50.}
 and \eqn{d} forests; see Details.  Larger values shrink less.  The
 defaults are 1, except \code{k_treat = 0.5}.  Set
 \code{k_deviation = 0} to switch off \eqn{d}, so that both sources share
-one baseline.}
+one baseline.  Under a source-specific error model the reported \eqn{d}
+is then the constant \eqn{\mu_0 - \mu_1}, the difference between the
+two source-specific error means absorbed by the centring (see
+\code{error_dist}).}
 
 \item{power_control, base_control, power_deviation, base_deviation, power_treat, base_treat, power_deconf, base_deconf}{Tree-structure prior of each forest.  A node at depth \eqn{\delta}
 splits with probability \eqn{\alpha_f (1 + \delta)^{-\beta_f}}, with
@@ -152,7 +155,13 @@ the training and test rows.  Only used with
 \code{treatment_coding = "adaptive"}.}
 
 \item{error_dist}{Prior for the error distribution.  All mixtures are
-centred, so the error has mean zero in each source.  One of:
+centred, so the error has mean zero in each source.  The sampler works
+with the uncentred mixture, whose full conditionals are all conjugate,
+and centres every stored draw afterwards: the mixture mean of the RCT,
+\eqn{\mu_1}, is added to \eqn{m_0^{\mathrm{sh}}}{m_0^sh} and the
+difference \eqn{\mu_0 - \mu_1} to \eqn{d}, while the atoms are
+shifted to mean zero (Yang et al., 2010; Henderson et al., 2020).
+\eqn{\tau} and \eqn{c} are unaffected.  One of:
 \describe{
 \item{\code{"gaussian"}}{Normal errors with one scale \eqn{\sigma}.}
 \item{\code{"source_gaussian"}}{Normal errors with a separate scale
@@ -209,9 +218,21 @@ acceptance_ratio_deconf, acceptance_ratio_deviation}{Acceptance
 rates of the tree proposals.}
 \item{train_predictions_sample_control, ...}{All posterior draws.  Only
 with \code{store_posterior_sample = TRUE}.}
-\item{dp_mix_prop, dp_locations, dp_sigma_g, ...}{Posterior draws of
-the error distribution.  Only for error models other than
-\code{"gaussian"}.}
+\item{dp_mix_prop, dp_locations, dp_mass, dp_mu_g}{Posterior draws of
+the error distribution, one list element per source in the order
+RWD, RCT (a single element for \code{"shared_dp"}).  Rows are
+draws.  \code{dp_mix_prop} holds the weights \eqn{\pi_{sk}},
+\code{dp_locations} the centred atoms \eqn{\theta_k - \mu_s} and
+\code{dp_mu_g} the mean \eqn{\mu_s} of the uncentred working
+mixture, both on the response scale.  Only for error models other
+than \code{"gaussian"}.}
+\item{dp_sigma_g}{Posterior draws of the per-source scales
+\eqn{\sigma_s}, same order.  Only for the error models with a scale
+per source.}
+\item{dp_locations_shared, dp_beta, dp_gamma}{Posterior draws of the
+shared atoms \eqn{\theta_k^*} (response scale), the top-level
+weights and the top-level concentration.  Only for the hierarchical
+error models.}
 \item{meta}{Settings used by the summary functions.}
 }
 }

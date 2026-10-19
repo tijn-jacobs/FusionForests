@@ -1,3 +1,21 @@
+# FusionForests 1.1.1
+
+- The sampler for the centred error mixture is now exact.  It samples the
+  uncentred (parameter-expanded) mixture, whose full conditionals are all
+  conjugate, and centres every stored draw afterwards (Yang et al., 2010):
+  the RCT mixture mean is added to `m0_sh` and the difference of the two
+  source means to `d`; the atoms are shifted to mean zero.  Previously the
+  forests conditioned on the centred atoms while the atoms and weights were
+  updated as in the uncentred model.  `tau` and `c` are unaffected; `m0_sh`
+  and `d` now carry the source-specific error means.  Draws are not
+  bit-identical to 1.1.0.
+- The baseline forest now fits the current augmented outcome; it used to see
+  the outcome from one sweep earlier.
+- `dp_mu_g` is returned for every mixture error model, and the mixture
+  outputs are documented in full.
+- With `k_deviation = 0` and a source-specific error model, `d` equals the
+  constant difference of the source-specific error means.
+
 # FusionForests 1.1.0
 
 - New data sets `breast_fusion` and `breast_fusion_truth`.

@@ -51,11 +51,17 @@ is
 \deqn{S_a(t \mid x, s_t) = 1 - F_{s_t}\{\log t - \eta_a(x, s_t)\},}{
   S_a(t | x, s_t) = 1 - F_{s_t}(log t - eta_a(x, s_t)),}
 with \eqn{F_{s_t}} the error distribution in source \eqn{s_t} and
-\deqn{\eta_a(x, s_t) = m_0^{\mathrm{sh}}(x) + (1 - s_t)\,d(x) +
-  a\,\tau(x) + (1 - s_t)\,a\,c(x).}{eta_a(x, s_t) = m_0^sh(x) +
-  (1 - s_t) d(x) + a tau(x) + (1 - s_t) a c(x).}
-For fits with the \code{"centered"} or \code{"adaptive"} treatment
-coding, the function uses the coded treatment instead of \eqn{a}.
+\deqn{\eta_a(x, s_t) = m_0(x, s_t) + a\,\tau(x).}{eta_a(x, s_t) =
+  m_0(x, s_t) + a tau(x).}
+The baseline \eqn{m_0(x, s_t)} is the mean log survival time of
+untreated patients in source \eqn{s_t}.  Under the binary coding it
+equals \eqn{m_0^{\mathrm{sh}}(x) + (1 - s_t)\,d(x)}{m_0^sh(x) +
+(1 - s_t) d(x)}; for the \code{"centered"} and \code{"adaptive"}
+codings the function recovers it from the fit.  The treatment effect
+is the causal effect \eqn{\tau(x)} in both target sources.  The
+confounding function \eqn{c(x)} does not enter: it is the bias of the
+treated arm in the RWD, not part of the causal effect.  The survival
+difference is thus causal in both target populations.
 
 Two estimands are available:
 \describe{

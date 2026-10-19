@@ -50,6 +50,8 @@ MixtureDP::MixtureDP(int mode, size_t n_total, size_t K,
   labels_         .assign(num_groups_, std::vector<int>());
   mix_prop_       .assign(num_groups_, std::vector<double>(K_, 1.0 / static_cast<double>(K_)));
   locations_      .assign(num_groups_, std::vector<double>(K_, 0.0));
+  locations_centered_.assign(num_groups_, std::vector<double>(K_, 0.0));
+  mu_g_           .assign(num_groups_, 0.0);
   cluster_counts_ .assign(num_groups_, std::vector<int>(K_, 0));
   mass_           .assign(num_groups_, mass_init);
   sigma_g_        .assign(num_groups_, sigma_init);
@@ -57,7 +59,6 @@ MixtureDP::MixtureDP(int mode, size_t n_total, size_t K,
   // HDP-only state
   if (mode_ == SOURCE_HDP || mode_ == SOURCE_HDP_SCALE) {
     locations_shared_.assign(K_, 0.0);
-    mu_g_           .assign(num_groups_, 0.0);
     beta_           .assign(K_, 1.0 / static_cast<double>(K_));
     table_counts_   .assign(num_groups_, std::vector<int>(K_, 0));
     gamma_top_       = 1.0;
@@ -85,10 +86,12 @@ void MixtureDP::Update(const double* residuals, double sigma, Random& random) {
   }
 
   if (mode_ == SOURCE_HDP || mode_ == SOURCE_HDP_SCALE) {
-    // Stage B: shared atoms theta_k* with per-source weights, sticks, and means.
+    // Stage B: shared atoms theta_k* with per-source weights and sticks.
     // In SOURCE_HDP_SCALE the label sampler uses per-source sigma_g, the shared-
     // atom posterior is precision-weighted across sources, and each sigma_g is
-    // refreshed via the IG conjugate step.
+    // refreshed via the IG conjugate step.  All steps are the conjugate
+    // conditionals of the uncentred working model; the centring is computed
+    // afterwards for output only.
     const bool hdp_scale = (mode_ == SOURCE_HDP_SCALE);
     for (int g = 0; g < num_groups_; ++g) {
       if (group_indices_[g].empty()) continue;
@@ -107,7 +110,7 @@ void MixtureDP::Update(const double* residuals, double sigma, Random& random) {
     } else {
       updateAtomsShared(residuals, sigma, random);
     }
-    recomputeCenteredLocations();
+    recomputeCentering();
     if (hdp_scale) {
       for (int g = 0; g < num_groups_; ++g) {
         if (group_indices_[g].empty()) continue;
@@ -126,6 +129,7 @@ void MixtureDP::Update(const double* residuals, double sigma, Random& random) {
     tabCountsGroup      (g);
     updateMixGroup      (g, random);
     updateLocationsGroup(g, residuals, sigma_g_eff, random);
+    recomputeCenteringGroup(g);
     if (scale_mode) updateSigmaGroup(g, residuals, random);
   }
 }
@@ -275,12 +279,13 @@ void MixtureDP::updateLocationsGroup(int g, const double* residuals,
   const std::vector<int>&    nn   = cluster_counts_[g];
   const std::vector<size_t>& idx  = group_indices_[g];
   const std::vector<int>&    lbl  = labels_[g];
-  const std::vector<double>& prop = mix_prop_[g];
   const size_t n_g = idx.size();
 
   const double sigsq       = sigma * sigma;
   const double prior_sigsq = prior_atom_variance_;
 
+  // Conjugate draw of the uncentred atoms: R_i ~ N(theta_k, sigma^2) when
+  // Z_i = k.  No recentring here (see the header).
   for (size_t k = 0; k < K_; ++k) {
     double clust_sum = 0.0;
     for (size_t jj = 0; jj < n_g; ++jj) {
@@ -293,12 +298,6 @@ void MixtureDP::updateLocationsGroup(int g, const double* residuals,
     double post_sd   = std::sqrt(post_var);
     loc[k] = post_mean + post_sd * random.normal();
   }
-
-  // Centring: atoms are recentred to weighted mean zero within this group.
-  // (Per-source recentre when SOURCE_DP*, global recentre when SHARED_DP.)
-  double muG = 0.0;
-  for (size_t k = 0; k < K_; ++k) muG += prop[k] * loc[k];
-  for (size_t k = 0; k < K_; ++k) loc[k] -= muG;
 }
 
 void MixtureDP::updateSigmaGroup(int g, const double* residuals,
@@ -335,12 +334,12 @@ void MixtureDP::updateSigmaGroup(int g, const double* residuals,
 void MixtureDP::updateAtomsShared(const double* residuals, double sigma,
                                    Random& random) {
   // Conjugate Gaussian draw for each shared atom theta_k*, pooling observations
-  // from all source groups in cluster k.  The model decomposes the residual as
+  // from all source groups in cluster k.  The working model decomposes the
+  // residual as
   //
-  //     R_i = theta_{Z_i}^* - mu_{S_i} + sigma * eps_i,
+  //     R_i = theta_{Z_i}^* + sigma * eps_i,
   //
-  // so the augmented quantity (R_i + mu_{S_i}) ~ N(theta_k^*, sigma^2) when
-  // Z_i = k.  We collect (R_i + mu_{S_i}) sums per cluster across both groups.
+  // so R_i ~ N(theta_k^*, sigma^2) when Z_i = k.
   const double sigsq       = sigma * sigma;
   const double prior_sigsq = prior_atom_variance_;
 
@@ -350,10 +349,9 @@ void MixtureDP::updateAtomsShared(const double* residuals, double sigma,
     for (int g = 0; g < num_groups_; ++g) {
       const std::vector<size_t>& idx = group_indices_[g];
       const std::vector<int>&    lbl = labels_[g];
-      const double mu_s              = mu_g_[g];
       for (size_t jj = 0; jj < idx.size(); ++jj) {
         if (lbl[jj] == static_cast<int>(k) + 1) {
-          clust_sum += residuals[idx[jj]] + mu_s;
+          clust_sum += residuals[idx[jj]];
           ++n_k;
         }
       }
@@ -369,8 +367,8 @@ void MixtureDP::updateAtomsShared(const double* residuals, double sigma,
 void MixtureDP::updateAtomsSharedPerSourceSigma(const double* residuals,
                                                  Random& random) {
   // Per-source-sigma variant of updateAtomsShared.  Each source g contributes
-  // (R_i + mu_g) ~ N(theta_k*, sigma_g^2) when Z_i = k, so the posterior of
-  // theta_k* is precision-weighted across sources.
+  // R_i ~ N(theta_k*, sigma_g^2) when Z_i = k, so the posterior of theta_k*
+  // is precision-weighted across sources.
   const double prior_prec = 1.0 / prior_atom_variance_;
 
   for (size_t k = 0; k < K_; ++k) {
@@ -379,11 +377,10 @@ void MixtureDP::updateAtomsSharedPerSourceSigma(const double* residuals,
     for (int g = 0; g < num_groups_; ++g) {
       const std::vector<size_t>& idx = group_indices_[g];
       const std::vector<int>&    lbl = labels_[g];
-      const double mu_s              = mu_g_[g];
       const double inv_sigsq_g       = 1.0 / (sigma_g_[g] * sigma_g_[g]);
       for (size_t jj = 0; jj < idx.size(); ++jj) {
         if (lbl[jj] == static_cast<int>(k) + 1) {
-          precx += (residuals[idx[jj]] + mu_s) * inv_sigsq_g;
+          precx += residuals[idx[jj]] * inv_sigsq_g;
           prec  += inv_sigsq_g;
         }
       }
@@ -395,16 +392,24 @@ void MixtureDP::updateAtomsSharedPerSourceSigma(const double* residuals,
   }
 }
 
-void MixtureDP::recomputeCenteredLocations() {
-  // mu_s = sum_k pi_{sk} * theta_k*  ; locations_[g][k] = theta_k* - mu_s
-  for (int g = 0; g < num_groups_; ++g) {
-    const std::vector<double>& prop = mix_prop_[g];
-    double mu = 0.0;
-    for (size_t k = 0; k < K_; ++k) mu += prop[k] * locations_shared_[k];
-    mu_g_[g] = mu;
-    std::vector<double>& loc = locations_[g];
-    for (size_t k = 0; k < K_; ++k) loc[k] = locations_shared_[k] - mu;
-  }
+void MixtureDP::recomputeCenteringGroup(int g) {
+  // Output centring only; the working atoms locations_[g] stay uncentred.
+  //   HDP modes : locations_[g] := theta* (shared across groups)
+  //   mu_g_[g]   = sum_k pi_{gk} * locations_[g][k]
+  //   locations_centered_[g][k] = locations_[g][k] - mu_g_[g]
+  std::vector<double>& loc = locations_[g];
+  if (!locations_shared_.empty())
+    for (size_t k = 0; k < K_; ++k) loc[k] = locations_shared_[k];
+  const std::vector<double>& prop = mix_prop_[g];
+  double mu = 0.0;
+  for (size_t k = 0; k < K_; ++k) mu += prop[k] * loc[k];
+  mu_g_[g] = mu;
+  std::vector<double>& cen = locations_centered_[g];
+  for (size_t k = 0; k < K_; ++k) cen[k] = loc[k] - mu;
+}
+
+void MixtureDP::recomputeCentering() {
+  for (int g = 0; g < num_groups_; ++g) recomputeCenteringGroup(g);
 }
 
 void MixtureDP::updateBeta(Random& random) {
