@@ -17,19 +17,8 @@ void UpdateSigma(
   Random& random
 );
 
-// AugmentCensoredObservations
-void AugmentCensoredObservations(
-  bool is_survival,
-  double* event_time, 
-  const double* observed_time,
-  const double* status_indicator,
-  const double* predicted_time,
-  const double& sigma,
-  const size_t& n, 
-  Random& random
-);
-
-// Second AugmentCensoredObservations with interval censoring
+// AugmentCensoredObservations, right and interval censoring, with one error
+// scale per observation
 void AugmentCensoredObservations(
   bool is_survival,
   double* event_time,
@@ -38,7 +27,7 @@ void AugmentCensoredObservations(
   const double* observed_right_time,
   const double* interval_censoring_indicator,
   const double* predicted_time,
-  const double& sigma,
+  const double* sigma_obs,
   const size_t& n,
   Random& random
 );

@@ -85,7 +85,7 @@
 #' @param k_control,k_treat,k_deconf,k_deviation Step-height scales
 #'   \eqn{k_f} of the \eqn{m_0^{\mathrm{sh}}}{m_0^sh}, \eqn{\tau}, \eqn{c}
 #'   and \eqn{d} forests; see Details.  Larger values shrink less.  The
-#'   defaults are 1, except \code{k_treat = 0.5}.  Set
+#'   defaults are 1.  Set
 #'   \code{k_deviation = 0} to switch off \eqn{d}, so that both sources share
 #'   one baseline.  Under a source-specific error model the reported \eqn{d}
 #'   is then the constant \eqn{\mu_0 - \mu_1}, the difference between the
@@ -244,7 +244,7 @@ FusionForest <- function(
   number_of_trees_deconf      = 50,
   number_of_trees_deviation   = 50,
   k_control                   = 1,
-  k_treat                     = 0.5,
+  k_treat                     = 1,
   k_deconf                    = 1,
   k_deviation                 = 1,
   power_control               = 2.0,
@@ -533,7 +533,12 @@ FusionForest <- function(
       interval_censoring_indicator <- rep(0, n_train)
     }
 
-    cens_inf  <- censored_info(y, status)
+    cens_inf  <- if (icArgsSupplied) {
+      censored_info(y, status, observed_left_time, observed_right_time,
+                    interval_censoring_indicator)
+    } else {
+      censored_info(y, status)
+    }
     y_mean    <- cens_inf$mu
     y         <- y - y_mean
     observed_left_time  <- observed_left_time  - y_mean

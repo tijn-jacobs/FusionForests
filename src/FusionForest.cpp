@@ -341,6 +341,9 @@ Rcpp::List FusionForest_cpp(
     for (size_t j = 0; j < n_deviation; ++j) weight_deviation_dyn[j] = 1.0;
   }
 
+  // ---- Per-observation error scale for the data augmentation ----
+  double* sigma_augment = new double[n];
+
 
   // ---- Set up forests ----
 
@@ -616,11 +619,19 @@ Rcpp::List FusionForest_cpp(
                   y, n, total_plus_shift, nu, lambda, random);
 
     // -- Augment censored observations --
+    // Each draw uses the scale of its source.  The pooled sigma is only the
+    // reference scale of the forests, which the weights above compensate for.
+    {
+      const double sg_rct = dp_scale_mode ? mixture.sigma_g(1) : sigma;
+      const double sg_rwd = dp_scale_mode ? mixture.sigma_g(0) : sigma;
+      for (size_t k = 0; k < n; ++k)
+        sigma_augment[k] = (source_indicator[k] == 1) ? sg_rct : sg_rwd;
+    }
     AugmentCensoredObservations(is_survival, y,
                                 observed_left_time, status_indicator,
                                 observed_right_time,
                                 interval_censoring_indicator,
-                                total_plus_shift, sigma, n, random);
+                                total_plus_shift, sigma_augment, n, random);
 
 
     // -- Post-burn-in storage --
@@ -893,6 +904,7 @@ Rcpp::List FusionForest_cpp(
   if (weight_deconf_dyn)    delete[] weight_deconf_dyn;
   if (weight_control_dyn)   delete[] weight_control_dyn;
   if (weight_deviation_dyn) delete[] weight_deviation_dyn;
+  delete[] sigma_augment;
 
   return results;
 }

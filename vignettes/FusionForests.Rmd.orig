@@ -182,7 +182,7 @@ We compare the fusion fit with two single-source analyses.
 `ShrinkageTrees::CausalShrinkageForest()`, from the **ShrinkageTrees** package, fits a causal forest to one source.
 We match its priors to those of `FusionForest()`.
 The RCT-only fit is unbiased but may have a large posterior variance.
-The RWD-only fit includes more patients, which lowers its posterior variance.
+The RWD-only fit includes more patients, but only 339 of them are treated.
 Its treatment effects are biased by the unmeasured confounders.
 
 ```{r single, cache = TRUE}
@@ -196,7 +196,7 @@ fit_single <- function(rows) {
     number_of_trees_control = 200, number_of_trees_treat = 100,
     prior_type_control = "standard", prior_type_treat = "standard",
     local_hp_control = 1 / (2 * sqrt(200)),
-    local_hp_treat = 0.5 / (2 * sqrt(100)),
+    local_hp_treat = 1 / (2 * sqrt(100)),
     power_control = 2, power_treat = 3,
     N_post = 5000, N_burn = 5000,
     store_posterior_sample = TRUE, verbose = FALSE
@@ -273,6 +273,7 @@ ratio_os <- width(af_tab$RWD)["FusionForest"] / width(af_tab$RWD)["RCT only"]
 
 Figure 3 compares the three analyses.
 In the RWD population, the interval of the fusion fit is `r round(ratio_os, 2)` times as wide as the RCT-only interval.
+The fusion fit narrows the intervals of the individual effects more than the interval of the average effect (Table 1).
 
 Table 1 evaluates the individual CATEs on the log-time scale.
 Bias and root mean squared error (RMSE) compare the posterior mean with the true CATE.
@@ -397,7 +398,6 @@ gap <- mean(fit_os$test_predictions_treat[is_os]) - mean(tau_hat[is_os])
 ```
 
 The average posterior mean of $c$ over the RWD patients is `r round(mean(c_hat), 3)`.
-For comparison, the average CATE over the RWD patients differs by `r round(gap, 3)` between the RWD-only fit and the fusion fit.
 
 ## Error distribution
 

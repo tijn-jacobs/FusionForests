@@ -1,3 +1,26 @@
+# FusionForests 1.1.2
+
+- Censored event times are now augmented with the error scale of their own
+  source under the error models with a scale per source (`source_hdp_scale`,
+  `source_dp_scale`, `source_gaussian`).  They used to get the pooled scale
+  for every observation, which pulled the per-source scales towards each
+  other.  The pooled scale is still the forests' reference scale and is what
+  `sigma` returns.  Fits under these error models change; the other error
+  models are unaffected.
+- The default `k_treat` is now 1, so every forest defaults to `k = 1`.  Pass
+  `k_treat = 0.5` to reproduce earlier default fits.
+- The preliminary fit that centres and scales a censored outcome now uses the
+  interval bounds.  It used to read interval-censored rows as right-censored at
+  `y`, which overstated the location and scale, and with them `sigma_hat` and
+  the size of every forest's prior on the response scale.  Fits with
+  interval-censored rows change, by about a factor 0.6 in `sigma_hat` in our
+  simulation design.
+- When the `survival` package is missing, or `survreg()` fails or does not
+  converge, the preliminary fit now solves the same censored-normal likelihood
+  in base R.  It used to fall back on a cruder estimate when `survival` was
+  missing, so results could differ between machines.  Fits without interval
+  bounds are unchanged when `survival` is installed.
+
 # FusionForests 1.1.1
 
 - The sampler for the centred error mixture is now exact.  It samples the

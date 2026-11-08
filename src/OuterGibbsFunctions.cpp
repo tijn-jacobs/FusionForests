@@ -3,51 +3,13 @@
 void AugmentCensoredObservations(
   bool is_survival,
   double* event_time, 
-  const double* observed_time,
-  const double* status_indicator,
-  const double* predicted_time,
-  const double& sigma,
-  const size_t& n, 
-  Random& random
-) {
-
-  if (!is_survival) return;
-
-  // Declare variables
-  double prediction, x_i, temporary, U;                     
-  
-  // Loop over all observations 
-  for (size_t i = 0; i < n; i++) {
-
-    // Check if the event time is censored
-    if (status_indicator[i] == 0) {
-
-      // Sample from the truncated normal distribution
-      U = random.uniform();
-      prediction = predicted_time[i];
-      x_i = (observed_time[i] - prediction)/sigma;  
-
-      // x_i is often way too large on the first few iterations !!!
-      // if the normalized difference is greater than 4, set x_i = 4.0
-      if(x_i > 4)  x_i = 4.0;
-
-      temporary = U + (1.0 - U) * standard_normal_cdf(x_i);
-
-      event_time[i] = prediction + sigma * standard_normal_quantile(temporary);
-    }
-  }
-}
-
-void AugmentCensoredObservations(
-  bool is_survival,
-  double* event_time, 
   const double* observed_left_time,
   const double* status_indicator,
   const double* observed_right_time,
   const double* interval_censoring_indicator, // 1 if interval censored, 
   const double* predicted_time,               // 0 if observed or right censored
-  const double& sigma,
-  const size_t& n, 
+  const double* sigma_obs,                    // error scale of each observation
+  const size_t& n,
   Random& random
 ) {
 
@@ -58,6 +20,8 @@ void AugmentCensoredObservations(
   
   // Loop over all observations 
   for (size_t i = 0; i < n; i++) {
+
+    const double sigma = sigma_obs[i];
 
     // RIGHT CENSORING
     if (status_indicator[i] == 0 && interval_censoring_indicator[i] == 0) {

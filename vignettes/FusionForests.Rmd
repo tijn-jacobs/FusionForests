@@ -81,11 +81,6 @@ The data describe no real treatment or real clinical effect.
 
 ``` r
 library(FusionForests)
-#> 
-#> Attaching package: 'FusionForests'
-#> The following objects are masked _by_ '.GlobalEnv':
-#> 
-#>     breast_fusion, breast_fusion_truth
 library(survival)
 
 x_names <- c("age", "meno", "size", "grade", "nodes", "pgr", "er")
@@ -166,14 +161,14 @@ fit <- FusionForest(
   N_post = 5000, N_burn = 5000,
   store_posterior_sample = TRUE, verbose = FALSE
 )
-#> Warning in FusionForest(y = y, status = status, X_train_control = X, X_train_treat = X, : internal error 1 in
-#> R_decompress1 with libdeflate
-#> Error in `FusionForest()`:
-#> ! lazy-load database '/Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/library/FusionForests/R/FusionForests.rdb' is corrupt
 fit
-#> Warning in get(method, envir = home): internal error 1 in R_decompress1 with libdeflate
-#> Error in `get()`:
-#> ! lazy-load database '/Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/library/FusionForests/R/FusionForests.rdb' is corrupt
+#> FusionForest fit
+#>   Outcome type:    right-censored (timescale: log)
+#>   Treatment coding: centered 
+#>   Error model:     source_hdp_scale
+#>   Observations:    3668 (RCT: 686, RWD: 2982)
+#>   Covariates:      7 (control forest), 7 (treatment forest)
+#>   Posterior draws: 5000 (burn-in: 5000)
 ```
 
 The default error model follows the paper.
@@ -183,43 +178,25 @@ The summary reports the residual scale, the spread of the individual CATEs and t
 
 ``` r
 summary(fit)
-#>                                    Length  Class  Mode     
-#> sigma                                 2000 -none- numeric  
-#> train_predictions                     3668 -none- numeric  
-#> test_predictions                      3668 -none- numeric  
-#> train_predictions_control             3668 -none- numeric  
-#> test_predictions_control              3668 -none- numeric  
-#> train_predictions_treat               3668 -none- numeric  
-#> test_predictions_treat                3668 -none- numeric  
-#> train_predictions_deconf              2982 -none- numeric  
-#> test_predictions_deconf               3668 -none- numeric  
-#> train_predictions_deviation           2982 -none- numeric  
-#> test_predictions_deviation            3668 -none- numeric  
-#> acceptance_ratio_control                 1 -none- numeric  
-#> acceptance_ratio_treat                   1 -none- numeric  
-#> acceptance_ratio_deconf                  1 -none- numeric  
-#> acceptance_ratio_deviation               1 -none- numeric  
-#> train_predictions_sample_control   7336000 -none- numeric  
-#> test_predictions_sample_control    7336000 -none- numeric  
-#> train_predictions_sample_treat     7336000 -none- numeric  
-#> test_predictions_sample_treat      7336000 -none- numeric  
-#> train_predictions_sample_deconf    5964000 -none- numeric  
-#> test_predictions_sample_deconf     7336000 -none- numeric  
-#> train_predictions_sample_deviation 5964000 -none- numeric  
-#> test_predictions_sample_deviation  7336000 -none- numeric  
-#> dp_mode                                  1 -none- numeric  
-#> dp_K                                     1 -none- numeric  
-#> dp_num_groups                            1 -none- numeric  
-#> dp_mix_prop                              2 -none- list     
-#> dp_locations                             2 -none- list     
-#> dp_mass                                  2 -none- list     
-#> dp_sigma_g                               2 -none- list     
-#> dp_locations_shared                 100000 -none- numeric  
-#> dp_beta                             100000 -none- numeric  
-#> dp_gamma                              2000 -none- numeric  
-#> dp_mu_g                                  2 -none- list     
-#> error_dist                               1 -none- character
-#> meta                                    14 -none- list
+#> Summary of FusionForest fit
+#> 
+#> Model
+#>   Outcome type:    right-censored
+#>   Treatment coding: centered 
+#>   Error model:     source_hdp_scale
+#>   Observations:    3668 (RCT: 686, RWD: 2982)
+#>   Posterior draws: 5000 (burn-in: 5000)
+#> 
+#> Residual standard deviation (posterior)
+#>   Mean: 0.586   Median: 0.588   95% CI: [0.509, 0.646]
+#> 
+#> Estimated individual treatment effects on log time (posterior means)
+#>    2.5%     25%     50%     75%   97.5% 
+#> -0.1350  0.0258  0.1770  0.3520  0.7530 
+#> 
+#> Average Metropolis-Hastings acceptance ratios
+#>   control     treat    deconf deviation 
+#>     0.269     0.191     0.162     0.246
 ```
 
 ### Treatment coding
@@ -251,7 +228,7 @@ We compare the fusion fit with two single-source analyses.
 `ShrinkageTrees::CausalShrinkageForest()`, from the **ShrinkageTrees** package, fits a causal forest to one source.
 We match its priors to those of `FusionForest()`.
 The RCT-only fit is unbiased but may have a large posterior variance.
-The RWD-only fit includes more patients, which lowers its posterior variance.
+The RWD-only fit includes more patients, but only 339 of them are treated.
 Its treatment effects are biased by the unmeasured confounders.
 
 
@@ -266,7 +243,7 @@ fit_single <- function(rows) {
     number_of_trees_control = 200, number_of_trees_treat = 100,
     prior_type_control = "standard", prior_type_treat = "standard",
     local_hp_control = 1 / (2 * sqrt(200)),
-    local_hp_treat = 0.5 / (2 * sqrt(100)),
+    local_hp_treat = 1 / (2 * sqrt(100)),
     power_control = 2, power_treat = 3,
     N_post = 5000, N_burn = 5000,
     store_posterior_sample = TRUE, verbose = FALSE
@@ -290,13 +267,9 @@ Our test set contains all patients of both sources.
 
 ``` r
 af_union <- fusion_estimand(fit, "AF", population_average = TRUE, seed = 42)
-#> Warning: restarting interrupted promise evaluation
-#> Warning: internal error 1 in R_decompress1 with libdeflate
-#> Error:
-#> ! lazy-load database '/Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/library/FusionForests/R/FusionForests.rdb' is corrupt
 quantile(af_union, c(0.025, 0.5, 0.975))
 #>     2.5%      50%    97.5% 
-#> 1.046517 1.227491 1.439904
+#> 1.049295 1.298964 1.636178
 ```
 
 Figure 2 shows the distribution of the posterior mean CATE over the patients, on the log-time scale.
@@ -320,10 +293,6 @@ af_draws <- list(
   "RWD only"     = exp(fit_os$test_predictions_sample_treat),
   "FusionForest" = fusion_estimand(fit, "AF")
 )
-#> Warning: restarting interrupted promise evaluation
-#> Warning: internal error 1 in R_decompress1 with libdeflate
-#> Error:
-#> ! lazy-load database '/Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/library/FusionForests/R/FusionForests.rdb' is corrupt
 summarise_af <- function(rows) {
   t(sapply(af_draws, function(d) {
     v <- rowMeans(d[, rows])
@@ -336,15 +305,15 @@ af_true <- c(RCT = mean(exp(breast_fusion_truth$tau[is_rct])),
 lapply(af_tab, round, 3)
 #> $RCT
 #>               mean  2.5% 97.5%
-#> RCT only     1.323 1.153 1.520
-#> RWD only     1.558 1.302 1.869
-#> FusionForest 1.274 1.095 1.477
+#> RCT only     1.414 1.227 1.634
+#> RWD only     1.700 1.394 2.054
+#> FusionForest 1.354 1.133 1.613
 #> 
 #> $RWD
 #>               mean  2.5% 97.5%
-#> RCT only     1.312 1.076 1.589
-#> RWD only     1.273 1.088 1.485
-#> FusionForest 1.226 1.026 1.445
+#> RCT only     1.385 1.101 1.749
+#> RWD only     1.213 1.026 1.438
+#> FusionForest 1.300 1.022 1.652
 round(af_true, 3)
 #>   RCT   RWD 
 #> 1.308 1.204
@@ -373,7 +342,8 @@ par(op)
 
 
 Figure 3 compares the three analyses.
-In the RWD population, the interval of the fusion fit is 0.82 times as wide as the RCT-only interval.
+In the RWD population, the interval of the fusion fit is 0.97 times as wide as the RCT-only interval.
+The fusion fit narrows the intervals of the individual effects more than the interval of the average effect (Table 1).
 
 Table 1 evaluates the individual CATEs on the log-time scale.
 Bias and root mean squared error (RMSE) compare the posterior mean with the true CATE.
@@ -415,12 +385,12 @@ Table: Table 1: Accuracy of the individual CATE estimates.
 
 |Population |Analysis     |   Bias|  RMSE| Posterior variance| Coverage|
 |:----------|:------------|------:|-----:|------------------:|--------:|
-|RCT        |RCT only     |  0.007| 0.147|              0.028|    0.964|
-|RCT        |RWD only     |  0.161| 0.239|              0.030|    0.815|
-|RCT        |FusionForest | -0.012| 0.156|              0.019|    0.904|
-|RWD        |RCT only     |  0.081| 0.166|              0.035|    0.949|
-|RWD        |RWD only     |  0.037| 0.229|              0.034|    0.850|
-|RWD        |FusionForest |  0.037| 0.175|              0.023|    0.840|
+|RCT        |RCT only     |  0.021| 0.233|              0.059|    0.948|
+|RCT        |RWD only     |  0.188| 0.363|              0.056|    0.762|
+|RCT        |FusionForest |  0.025| 0.128|              0.036|    0.994|
+|RWD        |RCT only     |  0.070| 0.247|              0.076|    0.970|
+|RWD        |RWD only     | -0.107| 0.443|              0.064|    0.710|
+|RWD        |FusionForest |  0.059| 0.153|              0.050|    0.990|
 
 
 
@@ -440,13 +410,9 @@ sd_rct <- sapply(times, function(t) {
   v <- rowMeans(d[, is_rct])
   c(mean = mean(v), quantile(v, c(0.025, 0.975)))
 })
-#> Warning in FUN(X[[i]], ...): restarting interrupted promise evaluation
-#> Warning in FUN(X[[i]], ...): internal error 1 in R_decompress1 with libdeflate
-#> Error in `FUN()`:
-#> ! lazy-load database '/Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/library/FusionForests/R/FusionForests.rdb' is corrupt
 round(sd_rct[, times == 5], 3)
 #>  mean  2.5% 97.5% 
-#> 0.097 0.027 0.159
+#> 0.117 0.043 0.190
 ```
 
 
@@ -493,10 +459,6 @@ In the simulation the CATE depends on the progesterone receptor and grade only.
 basis <- ~ age + meno + size + grade + log1p(nodes) + log1p(pgr) + log1p(er)
 proj  <- fusion_projection(fit, basis = basis, X_eval = as.data.frame(X),
                            weights = "bayesian_bootstrap", seed = 42)
-#> Warning: restarting interrupted promise evaluation
-#> Warning: internal error 1 in R_decompress1 with libdeflate
-#> Error:
-#> ! lazy-load database '/Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/library/FusionForests/R/FusionForests.rdb' is corrupt
 
 truth_df  <- cbind(as.data.frame(X), tau = breast_fusion_truth$tau)
 proj_true <- coef(lm(update(basis, tau ~ .), data = truth_df))
@@ -506,14 +468,14 @@ proj_tab <- t(apply(proj, 2, function(v)
   c(mean = mean(v), quantile(v, c(0.025, 0.975)))))
 round(cbind(proj_tab, truth = proj_true), 3)
 #>                mean   2.5% 97.5%  truth
-#> (Intercept)   0.190  0.027 0.351  0.162
-#> age          -0.001 -0.007 0.004  0.000
-#> meno          0.000 -0.191 0.192  0.000
-#> size          0.028 -0.076 0.132  0.000
-#> grade        -0.107 -0.285 0.067 -0.200
-#> log1p(nodes) -0.006 -0.061 0.052  0.000
-#> log1p(pgr)    0.043  0.007 0.080  0.115
-#> log1p(er)     0.012 -0.021 0.046  0.000
+#> (Intercept)   0.215 -0.002 0.442  0.162
+#> age          -0.003 -0.011 0.005  0.000
+#> meno          0.014 -0.224 0.256  0.000
+#> size          0.048 -0.091 0.189  0.000
+#> grade        -0.140 -0.360 0.099 -0.200
+#> log1p(nodes)  0.004 -0.089 0.110  0.000
+#> log1p(pgr)    0.076  0.028 0.123  0.115
+#> log1p(er)     0.023 -0.025 0.076  0.000
 ```
 
 ## Confounding and baseline deviation
@@ -544,8 +506,7 @@ par(op)
 
 
 
-The average posterior mean of $c$ over the RWD patients is 0.081.
-For comparison, the average CATE over the RWD patients differs by -0.015 between the RWD-only fit and the fusion fit.
+The average posterior mean of $c$ over the RWD patients is 0.063.
 
 ## Error distribution
 
@@ -574,9 +535,9 @@ sigma_s <- sapply(fit$dp_sigma_g, quantile, c(0.025, 0.5, 0.975))
 colnames(sigma_s) <- c("RWD", "RCT")
 round(sigma_s, 3)
 #>         RWD   RCT
-#> 2.5%  0.520 0.510
-#> 50%   0.605 0.593
-#> 97.5% 0.654 0.664
+#> 2.5%  0.511 0.444
+#> 50%   0.595 0.552
+#> 97.5% 0.658 0.678
 ```
 
 ## Interval censoring and other outcome types

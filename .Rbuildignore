@@ -14,6 +14,7 @@
 ^backups$
 ## Private data (local only); data/ holds package data only
 ^data-private$
+^external controls$
 ^manuscripts$
 ^\.vscode$
 

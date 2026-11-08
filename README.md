@@ -31,10 +31,6 @@ Dirichlet-process mixture. Each term is modelled by its own forest:
 - $c(X)$ — **confounding forest**: the bias in the RWD treatment
   contrast caused by unmeasured confounding (`deconf` arguments).
 
-The real-world data alone identify only the sum $\tau(x) + c(x)$. The
-trial anchors $\tau$, so the observational data add precision without
-their confounding leaking into the treatment effect estimate.
-
 ## Reference
 
 The methodology is described in:

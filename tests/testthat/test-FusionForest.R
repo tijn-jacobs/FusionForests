@@ -227,7 +227,7 @@ test_that("FusionForest defaults match the paper", {
   expect_equal(f$k_control, 1)
   expect_equal(f$k_deviation, 1)
   expect_equal(f$k_deconf, 1)
-  expect_equal(f$k_treat, 0.5)
+  expect_equal(f$k_treat, 1)
   expect_equal(eval(f$treatment_coding)[1], "centered")
   expect_equal(eval(f$error_dist)[1], "source_hdp_scale")
   expect_equal(f$error_truncation_K, 50L)

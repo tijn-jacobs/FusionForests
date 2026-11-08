@@ -1,0 +1,116 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# analyse_ic_v1.R -- local analysis of experiment 7 (handling of interval
+# censoring).
+#
+# Reads results/sim_ic_v1_output.rds (one row per scheme x replication x method x
+# target x population, produced on the HPC by sim_ic_v1.R) and writes, to
+# results/tables/:
+#   summary.csv      mean metrics per (scheme, method, target, population)
+#   paired_diff.csv  paired RMSE difference to the interval bounds, with SE
+#   ic_table.tex     the table for the supplement, pasted by hand
+# Base R only.  Run from the repository root:
+#   Rscript simulations/revision_v3/exp7_interval_handling/analyse_ic_v1.R
+# ══════════════════════════════════════════════════════════════════════════════
+
+res_dir <- "simulations/revision_v3/exp7_interval_handling/results"
+tab_dir <- file.path(res_dir, "tables")
+dir.create(tab_dir, recursive = TRUE, showWarnings = FALSE)
+
+res <- readRDS(file.path(res_dir, "sim_ic_v1_output.rds"))
+schemes <- unique(res$scheme)
+meth    <- c("bounds", "right", "midpoint", "exact", "trial")
+cat(sprintf("Loaded %d rows; %d schemes; %d reps per scheme\n", nrow(res),
+            length(schemes), max(res$Iter)))
+
+# ── Summary table ─────────────────────────────────────────────────────────────
+mean_na <- function(x) mean(x, na.rm = TRUE)
+summary_tbl <- aggregate(
+  cbind(rmse, bias, coverage, width, postvar) ~ scheme + method + target + population,
+  data = res, FUN = mean_na, na.action = na.pass)
+extra <- aggregate(
+  cbind(seconds, sigma_hat, ess_tau, ess_sigma, ic_rwd) ~ scheme + method + target + population,
+  data = res, FUN = mean_na, na.action = na.pass)
+n_tbl <- aggregate(rmse ~ scheme + method + target + population, data = res,
+                   FUN = function(x) sum(is.finite(x)), na.action = na.pass)
+names(n_tbl)[ncol(n_tbl)] <- "n"
+summary_tbl <- merge(merge(summary_tbl, extra), n_tbl)
+summary_tbl$method <- factor(summary_tbl$method, levels = meth)
+summary_tbl$scheme <- factor(summary_tbl$scheme, levels = schemes)
+summary_tbl <- summary_tbl[order(summary_tbl$scheme, summary_tbl$target,
+                                 summary_tbl$population, summary_tbl$method), ]
+write.csv(summary_tbl, file.path(tab_dir, "summary.csv"), row.names = FALSE)
+
+cat("\n=== CATE metrics, population All ===\n")
+print(summary_tbl[summary_tbl$target == "tau" & summary_tbl$population == "All",
+                  c("scheme", "method", "n", "rmse", "bias", "coverage", "width",
+                    "sigma_hat", "ess_tau", "ess_sigma", "seconds")],
+      row.names = FALSE, digits = 3)
+
+# ── Paired RMSE differences to the interval bounds ────────────────────────────
+a <- res[res$target == "tau" & res$population == "All", ]
+base <- a[a$method == "bounds", c("scheme", "Iter", "rmse")]
+dd <- merge(a[a$method != "bounds", c("scheme", "method", "Iter", "rmse")], base,
+            by = c("scheme", "Iter"), suffixes = c("", ".ref"))
+dv <- dd$rmse - dd$rmse.ref
+ag <- aggregate(dv, by = dd[, c("scheme", "method")],
+                FUN = function(x) c(mean = mean(x, na.rm = TRUE),
+                                    se = sd(x, na.rm = TRUE) / sqrt(sum(!is.na(x)))))
+diffs <- data.frame(scheme = ag$scheme, method = ag$method,
+                    diff = ag$x[, "mean"], se = ag$x[, "se"])
+write.csv(diffs, file.path(tab_dir, "paired_diff.csv"), row.names = FALSE)
+cat("\n=== Paired RMSE difference to the interval bounds ===\n")
+print(diffs, row.names = FALSE, digits = 3)
+
+# ── LaTeX table ───────────────────────────────────────────────────────────────
+num <- function(x, d = 2) {
+  if (length(x) == 0 || is.na(x)) return("---")
+  s <- formatC(x, format = "f", digits = d)
+  if (x < 0) paste0("$", s, "$") else s
+}
+get_val <- function(sc, m, tg, col) {
+  summary_tbl[[col]][summary_tbl$scheme == sc & summary_tbl$method == m &
+                       summary_tbl$target == tg &
+                       summary_tbl$population == ifelse(tg == "tau", "All", "RWD")]
+}
+scheme_tex <- c(visits_8 = "Eight visits", visits_3 = "Three visits")
+meth_tex   <- c(bounds = "Interval bounds", right = "Right-censored at last visit",
+                midpoint = "Midpoint as event", exact = "Exact event times",
+                trial = "Trial only")
+rows <- character(0)
+for (sc in schemes) {
+  rows <- c(rows, sprintf("    \\multicolumn{7}{l}{\\emph{%s}}\\\\", scheme_tex[[sc]]))
+  for (m in meth) {
+    rows <- c(rows, sprintf(
+      "    \\quad %s & %s & %s & %s & %s & %s & %s \\\\", meth_tex[[m]],
+      num(get_val(sc, m, "tau", "rmse")), num(get_val(sc, m, "tau", "bias")),
+      num(get_val(sc, m, "tau", "coverage")), num(get_val(sc, m, "tau", "width")),
+      if (m == "trial") "---" else num(get_val(sc, m, "c", "rmse")),
+      if (m == "trial") "---" else num(get_val(sc, m, "tau", "ess_tau"), 0)))
+  }
+  if (sc != tail(schemes, 1)) rows <- c(rows, "    \\addlinespace")
+}
+writeLines(c(
+  "% Generated by simulations/revision_v3/exp7_interval_handling/analyse_ic_v1.R -- do not edit.",
+  "\\begin{table}[!htbp]",
+  "  \\centering",
+  "  \\color{revisioncol}",
+  "  \\caption{The Bayesian fusion forest under four encodings of the same",
+  "    interval-censored real-world records, with the trial-only fit as reference,",
+  "    at $\\lambda_d = \\lambda_u = 1$. CATE metrics over the combined population;",
+  "    root mean squared error of $c(x)$ over the real-world rows; effective sample",
+  sprintf("    size (ESS) of the average CATE draws. Averages over $%d$ replications.}",
+          max(summary_tbl$n)),
+  "  \\label{tab:sim-ic}",
+  "  \\small",
+  "  \\begin{tabular}{@{}l rrrr rr@{}}",
+  "    \\toprule",
+  "    Encoding & RMSE & Bias & Coverage & Width & $c(x)$ RMSE & ESS \\\\",
+  "    \\midrule",
+  rows,
+  "    \\bottomrule",
+  "  \\end{tabular}",
+  "\\end{table}"), file.path(tab_dir, "ic_table.tex"))
+
+cat("\nWrote", file.path(tab_dir, "summary.csv"), ",",
+    file.path(tab_dir, "paired_diff.csv"), "and",
+    file.path(tab_dir, "ic_table.tex"), "\n")
