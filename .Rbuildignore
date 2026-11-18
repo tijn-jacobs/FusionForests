@@ -14,6 +14,7 @@
 ## Heavy folders not part of the package proper
 ^archive$
 ^backups$
+^inst/AFTrees-master$
 ## Private data (local only); data/ holds package data only
 ^data-private$
 ^external controls$

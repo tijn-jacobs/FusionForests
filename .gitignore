@@ -28,6 +28,10 @@ src/*.d
 *.tar.gz
 *.Rcheck/
 
+# Local copy of the AFTrees package (reference only; GPL-2, never part of
+# this package).  It is not tracked and must not be built into the package.
+inst/AFTrees-master/
+
 # macOS metadata
 .DS_Store
 **/.DS_Store
