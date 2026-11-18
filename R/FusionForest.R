@@ -589,8 +589,9 @@ FusionForest <- function(
     fit[[nm]] <- if (to_time) exp(out) else out
   }
 
-  # Discard burn-in sigma draws
-  if (!sigma_known) fit$sigma <- fit$sigma[-(1:N_burn)]
+  # Discard burn-in sigma draws.  Indexing the kept draws also works for
+  # N_burn = 0, where -(1:N_burn) would drop the first posterior draw.
+  if (!sigma_known) fit$sigma <- fit$sigma[N_burn + seq_len(N_post)]
 
   # Back-transform DP atoms onto the response scale (multiply by sigma_hat).
   # Atoms are mean-zero shifts so no y_mean offset is needed.  Mass and stick

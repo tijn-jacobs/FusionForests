@@ -20,6 +20,10 @@
   in base R.  It used to fall back on a cruder estimate when `survival` was
   missing, so results could differ between machines.  Fits without interval
   bounds are unchanged when `survival` is installed.
+- `N_burn = 0` no longer drops the first posterior draw of `sigma`.  The
+  shortened vector was also recycled by `fusion_estimand(estimand = "SD")`
+  under `error_dist = "gaussian"` and `"shared_dp"`, with a warning.  Fits
+  with `N_burn >= 1` are unchanged.
 
 # FusionForests 1.1.1
 

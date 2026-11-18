@@ -399,3 +399,31 @@ test_that("source_gaussian estimates a separate error scale per source", {
   expect_gt(sd_rwd, 1.0)
   expect_lt(sd_rct, 0.6)
 })
+
+test_that("N_burn = 0 keeps every posterior draw of sigma", {
+  for (ed in c("gaussian", "source_hdp_scale")) {
+    fit <- FusionForest(
+      y                         = y_srv,
+      status                    = stat,
+      X_train_control           = X,
+      X_train_treat             = X,
+      treatment_indicator_train = trt,
+      source_indicator_train    = src,
+      X_test_control            = X,
+      X_test_treat              = X,
+      outcome_type              = "right-censored",
+      error_dist                = ed,
+      N_post = N_post, N_burn = 0L,
+      store_posterior_sample = TRUE, verbose = FALSE
+    )
+    expect_length(fit$sigma, N_post)
+
+    # One sigma per stored draw: the survival difference must not recycle.
+    expect_warning(
+      sd_draws <- fusion_estimand(fit, estimand = "SD",
+                                  time = median(y_srv)),
+      NA
+    )
+    expect_equal(dim(sd_draws), c(N_post, n))
+  }
+})
