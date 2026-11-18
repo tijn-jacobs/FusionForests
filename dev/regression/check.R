@@ -25,7 +25,7 @@
 ## confirm that nothing else did.  Afterwards, pass the new commit as
 ## `reference`.
 
-regression_reference <- "bf3e2632f6c5ddfc1e8e52110efab76d9fead9be"
+regression_reference <- "6eed93e6f9ace2c49ef94c0c713e04ad32ffa1da"
 
 regression_check <- function(reference = regression_reference,
                              repo = ".",
