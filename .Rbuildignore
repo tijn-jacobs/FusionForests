@@ -2,12 +2,14 @@
 ^simulations$
 ^\.devcontainer$
 ^\.github$
+^\.git$
 ^\.claude$
 ^LICENSE\.md$
 ^CONTRIBUTING\.md$
 ^info$
 ^examples$
 ^notes$
+^dev$
 
 ## Heavy folders not part of the package proper
 ^archive$

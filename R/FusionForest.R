@@ -284,17 +284,8 @@ FusionForest <- function(
   if (!outcome_type %in% allowed_types)
     stop("Invalid outcome_type. Choose 'continuous' or 'right-censored'.")
 
-  # Per-forest tree-topology priors (power_*, base_*) are passed straight to
-  # the backend; there is no shared global power/base.
-
-  treatment_coding <- match.arg(treatment_coding,
-                                c("centered", "binary", "adaptive"))
-
-  error_dist <- match.arg(error_dist,
-                          c("source_hdp_scale", "gaussian",
-                            "source_gaussian", "shared_dp",
-                            "source_dp", "source_dp_scale",
-                            "source_hdp"))
+  treatment_coding <- match.arg(treatment_coding)
+  error_dist       <- match.arg(error_dist)
   mixture_mode <- switch(error_dist,
                          "gaussian"         = 0L,
                          "shared_dp"        = 1L,
@@ -466,8 +457,6 @@ FusionForest <- function(
       if (is.null(propensity_test))
         stop("treatment_coding = 'adaptive' requires propensity_test.")
       propensity_test <- as.numeric(propensity_test)[1L]
-      if (length(propensity_test) != 1L)
-        stop("propensity_test must have one entry when no test data is given.")
     } else {
       propensity_test <- numeric(0)
     }
@@ -494,12 +483,14 @@ FusionForest <- function(
   p_prune <- as.numeric(p_prune)[1L]
 
   ## ------------------------------------------------------------------
-  ## Outcome-specific setup and C++ call
+  ## Outcome-specific setup
   ## ------------------------------------------------------------------
 
-  if (outcome_type == "right-censored") {
+  is_survival <- outcome_type == "right-censored"
+  y           <- as.numeric(y)
 
-    y <- as.numeric(y)
+  if (is_survival) {
+
     if (timescale == "time") y <- log(y)
 
     ## Interval-censoring bounds.  Defaults reproduce right-censoring.
@@ -527,172 +518,75 @@ FusionForest <- function(
         observed_left_time  <- log(observed_left_time)
         observed_right_time <- log(observed_right_time)
       }
+      cens_inf <- censored_info(y, status, observed_left_time,
+                                observed_right_time,
+                                interval_censoring_indicator)
     } else {
-      observed_left_time           <- y
-      observed_right_time          <- y
-      interval_censoring_indicator <- rep(0, n_train)
+      cens_inf <- censored_info(y, status)
     }
-
-    cens_inf  <- if (icArgsSupplied) {
-      censored_info(y, status, observed_left_time, observed_right_time,
-                    interval_censoring_indicator)
-    } else {
-      censored_info(y, status)
-    }
-    y_mean    <- cens_inf$mu
-    y         <- y - y_mean
-    observed_left_time  <- observed_left_time  - y_mean
-    observed_right_time <- observed_right_time - y_mean
-
-    if (is.null(sigma)) {
-      sigma_hat  <- cens_inf$sd
-      sigma_known <- FALSE
-    } else {
-      sigma_hat  <- sigma
-      sigma_known <- TRUE
-    }
-
-    y                   <- y                   / sigma_hat
-    observed_left_time  <- observed_left_time  / sigma_hat
-    observed_right_time <- observed_right_time / sigma_hat
-    survival <- TRUE
-    qchi    <- qchisq(1.0 - q, nu)
-    lambda  <- (sigma_hat^2 * qchi) / nu
-
-    fit <- .call_cpp_backend(
-      TRUE, n_train, p_treat, p_control, X_train_treat,
-      X_train_control, y, status,
-      observed_left_time, observed_right_time, interval_censoring_indicator,
-      survival, treatment_indicator_train,
-      source_indicator_train, n_test, X_test_control, X_test_treat,
-      X_test_deconf, X_test_deviation, treatment_indicator_test,
-      source_indicator_test, n_deconf, p_deconf, X_train_deconf,
-      number_of_trees_deconf, n_deviation, p_deviation,
-      X_train_deviation, number_of_trees_deviation, omega_deviation,
-      number_of_trees_treat, number_of_trees_control,
-      omega_treat, omega_control, omega_deconf,
-      power_control, base_control, power_deviation, base_deviation,
-      power_treat, base_treat, power_deconf, base_deconf,
-      p_grow, p_prune, sigma_known, sigma_hat, lambda,
-      nu, N_post, N_burn, store_posterior_sample, verbose,
-      treatment_coding, propensity_train, propensity_test,
-      mixture_mode, error_truncation_K,
-      mixture_prior_atom_variance, mixture_mass_init
-    )
-
-    # Back-transform predictions
-    if (timescale == "time") {
-      fit$train_predictions         <- exp(fit$train_predictions         * sigma_hat + y_mean)
-      fit$test_predictions          <- exp(fit$test_predictions          * sigma_hat + y_mean)
-      fit$train_predictions_control <- exp(fit$train_predictions_control * sigma_hat + y_mean)
-      fit$test_predictions_control  <- exp(fit$test_predictions_control  * sigma_hat + y_mean)
-      fit$train_predictions_treat   <- exp(fit$train_predictions_treat   * sigma_hat)
-      fit$test_predictions_treat    <- exp(fit$test_predictions_treat    * sigma_hat)
-      fit$train_predictions_deconf  <- exp(fit$train_predictions_deconf  * sigma_hat)
-      fit$test_predictions_deconf   <- exp(fit$test_predictions_deconf   * sigma_hat)
-      fit$train_predictions_deviation <- exp(fit$train_predictions_deviation * sigma_hat)
-      fit$test_predictions_deviation  <- exp(fit$test_predictions_deviation  * sigma_hat)
-      if (store_posterior_sample) {
-        fit$train_predictions_sample_control <- exp(fit$train_predictions_sample_control * sigma_hat + y_mean)
-        fit$test_predictions_sample_control  <- exp(fit$test_predictions_sample_control  * sigma_hat + y_mean)
-        fit$train_predictions_sample_treat   <- exp(fit$train_predictions_sample_treat   * sigma_hat)
-        fit$test_predictions_sample_treat    <- exp(fit$test_predictions_sample_treat    * sigma_hat)
-        fit$train_predictions_sample_deconf  <- exp(fit$train_predictions_sample_deconf  * sigma_hat)
-        fit$test_predictions_sample_deconf   <- exp(fit$test_predictions_sample_deconf   * sigma_hat)
-        fit$train_predictions_sample_deviation <- exp(fit$train_predictions_sample_deviation * sigma_hat)
-        fit$test_predictions_sample_deviation  <- exp(fit$test_predictions_sample_deviation  * sigma_hat)
-      }
-    } else {
-      fit$train_predictions         <- fit$train_predictions         * sigma_hat + y_mean
-      fit$test_predictions          <- fit$test_predictions          * sigma_hat + y_mean
-      fit$train_predictions_control <- fit$train_predictions_control * sigma_hat + y_mean
-      fit$test_predictions_control  <- fit$test_predictions_control  * sigma_hat + y_mean
-      fit$train_predictions_treat   <- fit$train_predictions_treat   * sigma_hat
-      fit$test_predictions_treat    <- fit$test_predictions_treat    * sigma_hat
-      fit$train_predictions_deconf  <- fit$train_predictions_deconf  * sigma_hat
-      fit$test_predictions_deconf   <- fit$test_predictions_deconf   * sigma_hat
-      fit$train_predictions_deviation <- fit$train_predictions_deviation * sigma_hat
-      fit$test_predictions_deviation  <- fit$test_predictions_deviation  * sigma_hat
-      if (store_posterior_sample) {
-        fit$train_predictions_sample_control <- fit$train_predictions_sample_control * sigma_hat + y_mean
-        fit$test_predictions_sample_control  <- fit$test_predictions_sample_control  * sigma_hat + y_mean
-        fit$train_predictions_sample_treat   <- fit$train_predictions_sample_treat   * sigma_hat
-        fit$test_predictions_sample_treat    <- fit$test_predictions_sample_treat    * sigma_hat
-        fit$train_predictions_sample_deconf  <- fit$train_predictions_sample_deconf  * sigma_hat
-        fit$test_predictions_sample_deconf   <- fit$test_predictions_sample_deconf   * sigma_hat
-        fit$train_predictions_sample_deviation <- fit$train_predictions_sample_deviation * sigma_hat
-        fit$test_predictions_sample_deviation  <- fit$test_predictions_sample_deviation  * sigma_hat
-      }
-    }
+    y_mean <- cens_inf$mu
+    y_sd   <- cens_inf$sd
 
   } else {
 
-    # Continuous outcome
-    y       <- as.numeric(y)
-    status  <- rep(1L, n_train)
-    survival <- FALSE
+    status         <- rep(1L, n_train)
+    icArgsSupplied <- FALSE
+    y_mean         <- mean(y)
+    y_sd           <- sd(y)
 
-    if (is.null(sigma)) {
-      sigma_hat   <- sd(y)
-      sigma_known <- FALSE
-    } else {
-      sigma_hat   <- sigma
-      sigma_known <- TRUE
-    }
+  }
 
-    qchi   <- qchisq(1.0 - q, nu)
-    lambda <- (sigma_hat^2 * qchi) / nu
-    y_mean <- mean(y)
-    y      <- (y - y_mean) / sigma_hat
-
-    ## Dummy interval-censoring vectors so the C++ entry point's signature
-    ## is satisfied.  Ignored since is_survival = FALSE; no augmentation runs.
+  ## Without interval bounds both bounds equal y.  For a continuous outcome
+  ## they only satisfy the signature of the backend: no augmentation runs.
+  if (!icArgsSupplied) {
     observed_left_time           <- y
     observed_right_time          <- y
     interval_censoring_indicator <- rep(0, n_train)
+  }
 
-    fit <- .call_cpp_backend(
-      TRUE, n_train, p_treat, p_control, X_train_treat,
-      X_train_control, y, status,
-      observed_left_time, observed_right_time, interval_censoring_indicator,
-      survival, treatment_indicator_train,
-      source_indicator_train, n_test, X_test_control, X_test_treat,
-      X_test_deconf, X_test_deviation, treatment_indicator_test,
-      source_indicator_test, n_deconf, p_deconf, X_train_deconf,
-      number_of_trees_deconf, n_deviation, p_deviation,
-      X_train_deviation, number_of_trees_deviation, omega_deviation,
-      number_of_trees_treat, number_of_trees_control,
-      omega_treat, omega_control, omega_deconf,
-      power_control, base_control, power_deviation, base_deviation,
-      power_treat, base_treat, power_deconf, base_deconf,
-      p_grow, p_prune, sigma_known, sigma_hat, lambda,
-      nu, N_post, N_burn, store_posterior_sample, verbose,
-      treatment_coding, propensity_train, propensity_test,
-      mixture_mode, error_truncation_K,
-      mixture_prior_atom_variance, mixture_mass_init
-    )
+  sigma_known <- !is.null(sigma)
+  sigma_hat   <- if (sigma_known) sigma else y_sd
 
-    # Back-transform
-    fit$train_predictions         <- fit$train_predictions         * sigma_hat + y_mean
-    fit$test_predictions          <- fit$test_predictions          * sigma_hat + y_mean
-    fit$train_predictions_control <- fit$train_predictions_control * sigma_hat + y_mean
-    fit$test_predictions_control  <- fit$test_predictions_control  * sigma_hat + y_mean
-    fit$train_predictions_treat   <- fit$train_predictions_treat   * sigma_hat
-    fit$test_predictions_treat    <- fit$test_predictions_treat    * sigma_hat
-    fit$train_predictions_deconf  <- fit$train_predictions_deconf  * sigma_hat
-    fit$test_predictions_deconf   <- fit$test_predictions_deconf   * sigma_hat
-    fit$train_predictions_deviation <- fit$train_predictions_deviation * sigma_hat
-    fit$test_predictions_deviation  <- fit$test_predictions_deviation  * sigma_hat
-    if (store_posterior_sample) {
-      fit$train_predictions_sample_control <- fit$train_predictions_sample_control * sigma_hat + y_mean
-      fit$test_predictions_sample_control  <- fit$test_predictions_sample_control  * sigma_hat + y_mean
-      fit$train_predictions_sample_treat   <- fit$train_predictions_sample_treat   * sigma_hat
-      fit$test_predictions_sample_treat    <- fit$test_predictions_sample_treat    * sigma_hat
-      fit$train_predictions_sample_deconf  <- fit$train_predictions_sample_deconf  * sigma_hat
-      fit$test_predictions_sample_deconf   <- fit$test_predictions_sample_deconf   * sigma_hat
-      fit$train_predictions_sample_deviation <- fit$train_predictions_sample_deviation * sigma_hat
-      fit$test_predictions_sample_deviation  <- fit$test_predictions_sample_deviation  * sigma_hat
-    }
+  y                   <- (y                   - y_mean) / sigma_hat
+  observed_left_time  <- (observed_left_time  - y_mean) / sigma_hat
+  observed_right_time <- (observed_right_time - y_mean) / sigma_hat
+
+  qchi   <- qchisq(1.0 - q, nu)
+  lambda <- (sigma_hat^2 * qchi) / nu
+
+  ## ------------------------------------------------------------------
+  ## C++ call
+  ## ------------------------------------------------------------------
+
+  fit <- .call_cpp_backend(
+    TRUE, n_train, p_treat, p_control, X_train_treat,
+    X_train_control, y, status,
+    observed_left_time, observed_right_time, interval_censoring_indicator,
+    is_survival, treatment_indicator_train,
+    source_indicator_train, n_test, X_test_control, X_test_treat,
+    X_test_deconf, X_test_deviation, treatment_indicator_test,
+    source_indicator_test, n_deconf, p_deconf, X_train_deconf,
+    number_of_trees_deconf, n_deviation, p_deviation,
+    X_train_deviation, number_of_trees_deviation, omega_deviation,
+    number_of_trees_treat, number_of_trees_control,
+    omega_treat, omega_control, omega_deconf,
+    power_control, base_control, power_deviation, base_deviation,
+    power_treat, base_treat, power_deconf, base_deconf,
+    p_grow, p_prune, sigma_known, sigma_hat, lambda,
+    nu, N_post, N_burn, store_posterior_sample, verbose,
+    treatment_coding, propensity_train, propensity_test,
+    mixture_mode, error_truncation_K,
+    mixture_prior_atom_variance, mixture_mass_init
+  )
+
+  ## Back-transform the posterior means and draws to the response scale.
+  ## Only the fitted values and the shared baseline carry the location
+  ## y_mean; d, tau and c are differences.
+  to_time <- is_survival && timescale == "time"
+  for (nm in grep("_predictions", names(fit), value = TRUE)) {
+    out <- fit[[nm]] * sigma_hat
+    if (grepl("predictions$|_control$", nm)) out <- out + y_mean
+    fit[[nm]] <- if (to_time) exp(out) else out
   }
 
   # Discard burn-in sigma draws

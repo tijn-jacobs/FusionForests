@@ -60,8 +60,6 @@ Rcpp::List FusionForest_cpp(
   int* treatment_indicator = &treatment_indicator_vector[0];
   Rcpp::NumericVector status_indicator_vector(status_indicatorSEXP);
   double* status_indicator = &status_indicator_vector[0];
-  std::vector<double> y_observed_vector(y_vector.begin(), y_vector.end());
-  double* y_observed = y_observed_vector.data();
   // Interval-censoring bounds.  When the R wrapper does not supply them,
   // observed_left_time = observed_right_time = y and
   // interval_censoring_indicator is all zeros, which reproduces plain
@@ -443,41 +441,27 @@ Rcpp::List FusionForest_cpp(
     // -- Update mu (shared baseline, all observations) --
     forest_mu.UpdateForest(sigma, accepted_control, random);
 
-    // Refresh augmented outcomes after mu update
-    {
-      size_t j = 0;  // index into RWD subset
-      for (size_t k = 0; k < n; ++k) {
-        const double b      = b_train[k];
-        const bool   b_zero = (std::abs(b) < b_eps);
-        const double s =
-          (source_indicator[k] == 1) ? 1.0 : 0.0;
-
-        double g_k = 0.0, c_k = 0.0;
-        if (source_indicator[k] == 0) {
-          g_k = forest_g.GetPrediction(j);
-          c_k = forest_c.GetPrediction(j);
-          augmented_outcome_deviation[j] =
-            y[k] - forest_mu.GetPrediction(k)
-                 - b * (forest_tau.GetPrediction(k) + c_k)
-                 - theta_shift[k];
-          augmented_outcome_deconf[j] = b_zero ? 0.0
-            : (y[k] - forest_mu.GetPrediction(k) - g_k
-                    - b * forest_tau.GetPrediction(k)
-                    - theta_shift[k]) / b;
-          ++j;
-        }
-        augmented_outcome_treat[k] = b_zero ? 0.0
-          : (y[k] - forest_mu.GetPrediction(k)
-                  - (1.0 - s) * g_k
-                  - b * (1.0 - s) * c_k
-                  - theta_shift[k]) / b;
-      }
-    }
+    // Each forest below is fitted to its own partial residual, refreshed
+    // right before its update.  The residuals of d and c exist for the RWD
+    // rows only; j indexes that subset.
 
     // -- Update g (RWD deviation, RWD observations only) --
+    {
+      size_t j = 0;
+      for (size_t k = 0; k < n; ++k) {
+        if (source_indicator[k] != 0) continue;
+        const double b   = b_train[k];
+        const double c_k = forest_c.GetPrediction(j);
+        augmented_outcome_deviation[j] =
+          y[k] - forest_mu.GetPrediction(k)
+               - b * (forest_tau.GetPrediction(k) + c_k)
+               - theta_shift[k];
+        ++j;
+      }
+    }
     forest_g.UpdateForest(sigma, accepted_deviation, random);
 
-    // Refresh augmented outcomes after g update
+    // -- Update tau (treatment effect, all observations) --
     {
       size_t j = 0;
       for (size_t k = 0; k < n; ++k) {
@@ -490,10 +474,6 @@ Rcpp::List FusionForest_cpp(
         if (source_indicator[k] == 0) {
           g_k = forest_g.GetPrediction(j);
           c_k = forest_c.GetPrediction(j);
-          augmented_outcome_deconf[j] = b_zero ? 0.0
-            : (y[k] - forest_mu.GetPrediction(k) - g_k
-                    - b * forest_tau.GetPrediction(k)
-                    - theta_shift[k]) / b;
           ++j;
         }
         augmented_outcome_treat[k] = b_zero ? 0.0
@@ -503,63 +483,24 @@ Rcpp::List FusionForest_cpp(
                   - theta_shift[k]) / b;
       }
     }
-
-    // -- Update tau (treatment effect, all observations) --
     forest_tau.UpdateForest(sigma, accepted_treat, random);
 
-    // Refresh augmented outcomes after tau update
-    {
-      size_t j = 0;
-      for (size_t k = 0; k < n; ++k) {
-        const double b      = b_train[k];
-        const bool   b_zero = (std::abs(b) < b_eps);
-
-        double g_k = 0.0, c_k = 0.0;
-        if (source_indicator[k] == 0) {
-          g_k = forest_g.GetPrediction(j);
-          c_k = forest_c.GetPrediction(j);
-          augmented_outcome_deviation[j] =
-            y[k] - forest_mu.GetPrediction(k)
-                 - b * (forest_tau.GetPrediction(k) + c_k)
-                 - theta_shift[k];
-          augmented_outcome_deconf[j] = b_zero ? 0.0
-            : (y[k] - forest_mu.GetPrediction(k) - g_k
-                    - b * forest_tau.GetPrediction(k)
-                    - theta_shift[k]) / b;
-          ++j;
-        }
-      }
-    }
-
     // -- Update c (deconfounding, RWD observations only) --
-    forest_c.UpdateForest(sigma, accepted_deconf, random);
-
-    // Refresh augmented outcomes after c update
     {
       size_t j = 0;
       for (size_t k = 0; k < n; ++k) {
+        if (source_indicator[k] != 0) continue;
         const double b      = b_train[k];
         const bool   b_zero = (std::abs(b) < b_eps);
-        const double s =
-          (source_indicator[k] == 1) ? 1.0 : 0.0;
-
-        double g_k = 0.0, c_k = 0.0;
-        if (source_indicator[k] == 0) {
-          g_k = forest_g.GetPrediction(j);
-          c_k = forest_c.GetPrediction(j);
-          augmented_outcome_deviation[j] =
-            y[k] - forest_mu.GetPrediction(k)
-                 - b * (forest_tau.GetPrediction(k) + c_k)
-                 - theta_shift[k];
-          ++j;
-        }
-        augmented_outcome_treat[k] = b_zero ? 0.0
-          : (y[k] - forest_mu.GetPrediction(k)
-                  - (1.0 - s) * g_k
-                  - b * (1.0 - s) * c_k
+        const double g_k    = forest_g.GetPrediction(j);
+        augmented_outcome_deconf[j] = b_zero ? 0.0
+          : (y[k] - forest_mu.GetPrediction(k) - g_k
+                  - b * forest_tau.GetPrediction(k)
                   - theta_shift[k]) / b;
+        ++j;
       }
     }
+    forest_c.UpdateForest(sigma, accepted_deconf, random);
 
     // -- Compute total predictions --
     {
