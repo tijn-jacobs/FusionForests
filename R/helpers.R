@@ -4,7 +4,7 @@
 #' interval-censored survival data by the maximum likelihood fit of a normal
 #' distribution.  Uses `survival::survreg()` if available.  If `survival` is
 #' missing, or `survreg()` fails or does not converge, it solves the same
-#' likelihood in base R with [censored_normal_fit()], so the result does not
+#' likelihood in base R with `censored_normal_fit()`, so the result does not
 #' depend on the optional package beyond the tolerance of the optimizer.
 #'
 #' Rows follow the convention of [FusionForest()]: `status = 1` is an event at

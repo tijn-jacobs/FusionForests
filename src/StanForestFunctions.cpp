@@ -281,8 +281,11 @@ void BirthProposal(StanTree& tree, CutpointMatrix& cutpoints,
     double prob_sum_good = 0.0;
     double prob_sum_bad  = 0.0;
 
+    // good_vars is sorted, so variable j is good iff it is the next unused
+    // entry.  Once the good variables run out, every remaining j is bad.
     for (size_t j = 0; j < split_probabilities.size(); j++) {
-      if (good_vars[j - num_bad_vars] != j) {
+      const size_t next_good = j - num_bad_vars;
+      if (next_good >= good_vars.size() || good_vars[next_good] != j) {
         bad_vars.push_back(j);
         prob_bad_vars.push_back(split_probabilities[j]);
         prob_sum_bad += split_probabilities[j];

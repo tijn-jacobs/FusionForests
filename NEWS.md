@@ -24,6 +24,12 @@
   shortened vector was also recycled by `fusion_estimand(estimand = "SD")`
   under `error_dist = "gaussian"` and `"shared_dp"`, with a warning.  Fits
   with `N_burn >= 1` are unchanged.
+- Fixed an out-of-bounds read in the tree birth proposal.  It occurred in
+  leaves where the last covariates could no longer be split, such as binary
+  covariates already split on or constant columns, and made the proposal
+  depend on whatever value lay in memory past the end of a vector.  Results
+  could therefore differ between compilers or platforms.  On the platforms we
+  checked the results are unchanged.
 
 # FusionForests 1.1.1
 
