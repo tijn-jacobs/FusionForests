@@ -1,6 +1,68 @@
 #include "MixtureDP.h"
 #include <numeric>
 
+namespace {
+
+// Truncated stick-breaking draw (Ishwaran and James, 2001):
+//   V_h ~ Beta(1 + counts[h], concentration + sum_{j>h} counts[j]),
+//   weights[h] = V_h prod_{j<h} (1 - V_j)  for h < K - 1,
+// and the last weight takes the remainder.  Returns
+// sum_{h<K-1} log(1 - V_h), which the concentration update needs.
+double DrawStickWeights(const std::vector<int>& counts, double concentration,
+                        std::vector<double>& weights, Random& random) {
+  const size_t K = weights.size();
+  double log_prod_1m = 0.0;   // running log prod_{j<h}(1 - V_j)
+
+  for (size_t h = 0; h + 1 < K; ++h) {
+    int n_after = 0;
+    for (size_t j = h + 1; j < K; ++j) n_after += counts[j];
+
+    double shape1 = static_cast<double>(counts[h]) + 1.0;
+    double shape2 = concentration + static_cast<double>(n_after);
+    double V = random.beta(shape1, shape2);
+
+    if (V <= 0.0) V = std::nextafter(0.0, 1.0);
+    if (V >= 1.0) V = std::nextafter(1.0, 0.0);
+
+    weights[h] = std::exp(std::log(V) + log_prod_1m);
+    log_prod_1m += std::log(1.0 - V);
+  }
+
+  double partial = 0.0;
+  for (size_t h = 0; h + 1 < K; ++h) partial += weights[h];
+  weights[K - 1] = std::max(0.0, 1.0 - partial);
+
+  return log_prod_1m;
+}
+
+// Escobar and West (1995) auxiliary-variable update of a DP concentration
+// with a Gamma(psi1, psi2) prior, given n observations in k clusters:
+//   eta   ~ Beta(current + 1, n)
+//   value ~ omega     * Gamma(psi1 + k,     psi2 - log(eta)) +
+//           (1-omega) * Gamma(psi1 + k - 1, psi2 - log(eta))
+// with omega / (1 - omega) = (psi1 + k - 1) / (n * (psi2 - log(eta))).
+double DrawConcentration(double current, double n, double k,
+                         double psi1, double psi2, Random& random) {
+  double eta = random.beta(current + 1.0, n);
+  if (eta <= 0.0) eta = std::nextafter(0.0, 1.0);
+  if (eta >= 1.0) eta = std::nextafter(1.0, 0.0);
+  double rate = psi2 - std::log(eta);
+  if (rate <= 0.0) rate = 1.0e-10;
+
+  double odds = (psi1 + k - 1.0) / (n * rate);
+  double omega = odds / (1.0 + odds);
+  if (!(omega >= 0.0 && omega <= 1.0)) omega = 0.5;
+
+  double shape = (random.uniform() < omega) ? psi1 + k
+                                            : psi1 + k - 1.0;
+  if (shape < 1.0e-6) shape = 1.0e-6;
+  double value = random.gamma(shape, rate);
+  if (!(value > 0.0)) value = 1.0e-6;
+  return value;
+}
+
+} // namespace
+
 MixtureDP::MixtureDP(int mode, size_t n_total, size_t K,
                      double prior_atom_variance,
                      double mass_init,
@@ -233,36 +295,11 @@ void MixtureDP::tabCountsGroup(int g) {
 }
 
 void MixtureDP::updateMixGroup(int g, Random& random) {
-  std::vector<double>& prop = mix_prop_[g];
-  const std::vector<int>& nn = cluster_counts_[g];
   double& mass = mass_[g];
 
-  // Ishwaran-James truncated stick-breaking: V_h ~ Beta(n_h+1, mass + sum_{j>h} n_j)
-  double log_prod_1m  = 0.0;   // running log prod_{j<h}(1 - V_j)
-  double sum_log_1m   = 0.0;   // sum_{h=0..K-2} log(1 - V_h), used by concentration update
-
-  for (size_t h = 0; h + 1 < K_; ++h) {
-    int n_h = nn[h];
-    int n_after = 0;
-    for (size_t j = h + 1; j < K_; ++j) n_after += nn[j];
-
-    double shape1 = static_cast<double>(n_h) + 1.0;
-    double shape2 = mass + static_cast<double>(n_after);
-    double V = random.beta(shape1, shape2);
-
-    if (V <= 0.0)         V = std::nextafter(0.0, 1.0);
-    if (V >= 1.0)         V = std::nextafter(1.0, 0.0);
-
-    prop[h] = std::exp(std::log(V) + log_prod_1m);
-
-    double log_1mV = std::log(1.0 - V);
-    log_prod_1m += log_1mV;
-    sum_log_1m  += log_1mV;
-  }
-
-  double partial = 0.0;
-  for (size_t h = 0; h + 1 < K_; ++h) partial += prop[h];
-  prop[K_ - 1] = std::max(0.0, 1.0 - partial);
+  // sum_{h=0..K-2} log(1 - V_h), used by the concentration update
+  const double sum_log_1m =
+    DrawStickWeights(cluster_counts_[g], mass, mix_prop_[g], random);
 
   // Concentration update (Gamma conjugate, AFTrees defaults psi1=2, psi2=0.1)
   double gam_shape = psi1_ + static_cast<double>(K_) - 1.0;
@@ -438,21 +475,7 @@ void MixtureDP::updateBeta(Random& random) {
   for (int g = 0; g < num_groups_; ++g)
     for (size_t k = 0; k < K_; ++k) t_dot[k] += table_counts_[g][k];
 
-  double log_prod_1m = 0.0;
-  for (size_t h = 0; h + 1 < K_; ++h) {
-    int t_after = 0;
-    for (size_t j = h + 1; j < K_; ++j) t_after += t_dot[j];
-    double shape1 = 1.0 + static_cast<double>(t_dot[h]);
-    double shape2 = gamma_top_ + static_cast<double>(t_after);
-    double V = random.beta(shape1, shape2);
-    if (V <= 0.0) V = std::nextafter(0.0, 1.0);
-    if (V >= 1.0) V = std::nextafter(1.0, 0.0);
-    beta_[h] = std::exp(std::log(V) + log_prod_1m);
-    log_prod_1m += std::log(1.0 - V);
-  }
-  double partial = 0.0;
-  for (size_t h = 0; h + 1 < K_; ++h) partial += beta_[h];
-  beta_[K_ - 1] = std::max(0.0, 1.0 - partial);
+  DrawStickWeights(t_dot, gamma_top_, beta_, random);
 }
 
 void MixtureDP::updateMixHDP(int g, Random& random) {
@@ -480,34 +503,14 @@ void MixtureDP::updateMixHDP(int g, Random& random) {
 }
 
 void MixtureDP::updateMassHDP(int g, Random& random) {
-  // Escobar-West auxiliary-variable update for M_s.
-  //   eta ~ Beta(M_s + 1, n_s)
-  //   M_s ~ omega * Gamma(psi1 + t_{s.},     psi2 - log(eta))   +
-  //         (1-omega) * Gamma(psi1 + t_{s.} - 1, psi2 - log(eta))
-  // with omega / (1 - omega) = (psi1 + t_{s.} - 1) / (n_s * (psi2 - log(eta)))
+  // Escobar-West update of M_s, given n_s observations at t_{s.} tables.
   const double n_s = static_cast<double>(group_indices_[g].size());
   int t_sum = 0;
   for (size_t k = 0; k < K_; ++k) t_sum += table_counts_[g][k];
   const double t_sd = static_cast<double>(t_sum);
   if (n_s == 0.0 || t_sd == 0.0) return;
 
-  double M = mass_[g];
-  double eta = random.beta(M + 1.0, n_s);
-  if (eta <= 0.0) eta = std::nextafter(0.0, 1.0);
-  if (eta >= 1.0) eta = std::nextafter(1.0, 0.0);
-  double rate = psi2_ - std::log(eta);
-  if (rate <= 0.0) rate = 1.0e-10;
-
-  double odds = (psi1_ + t_sd - 1.0) / (n_s * rate);
-  double omega = odds / (1.0 + odds);
-  if (!(omega >= 0.0 && omega <= 1.0)) omega = 0.5;
-
-  double shape = (random.uniform() < omega) ? psi1_ + t_sd
-                                            : psi1_ + t_sd - 1.0;
-  if (shape < 1.0e-6) shape = 1.0e-6;
-  double new_M = random.gamma(shape, rate);
-  if (!(new_M > 0.0)) new_M = 1.0e-6;
-  mass_[g] = new_M;
+  mass_[g] = DrawConcentration(mass_[g], n_s, t_sd, psi1_, psi2_, random);
 }
 
 void MixtureDP::updateGamma(Random& random) {
@@ -523,23 +526,7 @@ void MixtureDP::updateGamma(Random& random) {
   }
   if (t_total == 0 || K_star == 0) return;
 
-  const double t_total_d = static_cast<double>(t_total);
-  const double K_star_d  = static_cast<double>(K_star);
-
-  double eta = random.beta(gamma_top_ + 1.0, t_total_d);
-  if (eta <= 0.0) eta = std::nextafter(0.0, 1.0);
-  if (eta >= 1.0) eta = std::nextafter(1.0, 0.0);
-  double rate = psi2_ - std::log(eta);
-  if (rate <= 0.0) rate = 1.0e-10;
-
-  double odds = (psi1_ + K_star_d - 1.0) / (t_total_d * rate);
-  double omega = odds / (1.0 + odds);
-  if (!(omega >= 0.0 && omega <= 1.0)) omega = 0.5;
-
-  double shape = (random.uniform() < omega) ? psi1_ + K_star_d
-                                            : psi1_ + K_star_d - 1.0;
-  if (shape < 1.0e-6) shape = 1.0e-6;
-  double new_gamma = random.gamma(shape, rate);
-  if (!(new_gamma > 0.0)) new_gamma = 1.0e-6;
-  gamma_top_ = new_gamma;
+  gamma_top_ = DrawConcentration(gamma_top_, static_cast<double>(t_total),
+                                 static_cast<double>(K_star),
+                                 psi1_, psi2_, random);
 }

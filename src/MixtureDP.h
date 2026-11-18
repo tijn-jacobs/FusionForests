@@ -60,8 +60,6 @@ public:
             double lambda_sigma    = 1.0);
 
   bool active() const          { return mode_ != GAUSSIAN; }
-  int mode() const             { return mode_; }
-  size_t truncation_level() const { return K_; }
   int num_groups() const       { return num_groups_; }
 
   // Run one Gibbs sweep of the DP block (labels -> tabulate -> stick weights
