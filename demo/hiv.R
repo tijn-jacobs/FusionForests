@@ -57,8 +57,6 @@ fit <- FusionForest(
   N_post = N_post, N_burn = N_burn, store_posterior_sample = TRUE)
 
 # ---- Trial only, predicted for all patients ---------------------------------
-# Needs ShrinkageTrees >= 2.1.1 (earlier versions ignore the weights of the
-# treatment forest).
 fit_trial <- CausalShrinkageForest(
   y = y[src == 1], status = rct$status,
   X_train_control = X[src == 1, ], X_train_treat = X[src == 1, ],

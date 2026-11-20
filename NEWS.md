@@ -1,5 +1,7 @@
 # FusionForests 1.1.2
 
+- New data set `hiv_rwd` (synthetic observational HIV data) and
+  `demo("hiv")`, which reruns the HIV analysis of the paper.
 - Censored event times are now augmented with the error scale of their own
   source under the error models with a scale per source (`source_hdp_scale`,
   `source_dp_scale`, `source_gaussian`).  They used to get the pooled scale
