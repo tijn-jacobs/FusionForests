@@ -88,3 +88,60 @@
 #' @examples
 #' summary(breast_fusion_truth$tau)
 "breast_fusion_truth"
+
+#' Synthetic observational data for the HIV data-fusion analysis
+#'
+#' A synthetic version of the observational data in the HIV analysis of the
+#' paper: HIV-positive men on antiretroviral therapy in 1991--95, with a CD4
+#' count of 200 to 500 cells/mm\eqn{^3} at baseline.  Combined with the men
+#' of the ACTG 175 trial (\code{ACTG175} in the \pkg{speff2trial} package),
+#' it runs that analysis end to end:
+#' \code{demo("hiv", package = "FusionForests")}.
+#'
+#' The data are synthetic.  Analyses of them approximate, but do not
+#' reproduce, the results of the paper.  Do not use them to draw
+#' conclusions about HIV treatment.
+#'
+#' @details
+#' Baseline is the first 1991--95 visit with current antiretroviral
+#' therapy, and the treatment is the regimen at that visit.  An event lies
+#' in the interval (\code{time_lower}, \code{time_upper}]; other patients
+#' are right-censored at \code{time_lower}.  With
+#' \code{\link{FusionForest}}, use \code{y = log(time_lower)},
+#' \code{status = 0}, \code{observed_left_time = log(time_lower)},
+#' \code{observed_right_time = log(ifelse(status == 1, time_upper,
+#' time_lower))} and \code{interval_censoring_indicator = status}.
+#'
+#' @format A data frame with 401 rows and 10 columns:
+#' \describe{
+#'   \item{trt}{Treatment (1 = an alternative regimen, 0 = zidovudine
+#'     monotherapy).}
+#'   \item{regimen}{Factor: \code{"ZDV"} (zidovudine), \code{"ddI"}
+#'     (didanosine), \code{"ZDV+ddI"} or \code{"ZDV+ddC"} (zidovudine with
+#'     didanosine or zalcitabine).}
+#'   \item{age}{Age in years.}
+#'   \item{cd4, cd8}{CD4 and CD8 count (cells/mm\eqn{^3}).}
+#'   \item{race}{Race (0 = white, 1 = non-white).}
+#'   \item{prior_art_years}{Years of antiretroviral therapy before
+#'     baseline.}
+#'   \item{time_lower}{Lower bound of the event time in years: the event
+#'     lies after \code{time_lower}.  For right-censored patients, the
+#'     censoring time.}
+#'   \item{time_upper}{Upper bound of the event time in years: the event
+#'     lies at or before \code{time_upper}.  \code{NA} for right-censored
+#'     patients.}
+#'   \item{status}{Censoring type: 1 = interval-censored, with the event
+#'     in (\code{time_lower}, \code{time_upper}]; 0 = right-censored at
+#'     \code{time_lower}.}
+#' }
+#'
+#' @source Synthesised from observational data on HIV-positive men.
+#'
+#' @examples
+#' table(hiv_rwd$regimen, hiv_rwd$status)
+#'
+#' \dontrun{
+#' # The full analysis (needs speff2trial; takes long)
+#' demo("hiv", package = "FusionForests")
+#' }
+"hiv_rwd"
